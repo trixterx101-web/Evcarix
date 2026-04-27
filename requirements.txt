@@ -1,0 +1,13 @@
+moviepy==1.0.3
+google-generativeai
+edge-tts
+requests
+python-dotenv
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
+beautifulsoup4
+feedparser
+pandas
+Pillow
+groq
