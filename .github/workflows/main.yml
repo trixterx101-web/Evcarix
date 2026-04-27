@@ -47,7 +47,7 @@ jobs:
 
     - name: Upload Artifacts (Optional)
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: daily-video
         path: output/daily_shorts_1.mp4
