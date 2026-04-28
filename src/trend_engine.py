@@ -1,1 +1,26 @@
-def select_trending_topic(articles):\n    # Implement AI-powered method to select the most trendy topic using Gemini API\n    # For demonstration purposes, let's assume we fetch the top articles using Gemini's capability.\n    top_articles = get_top_articles(articles)  # This function should fetch the top articles using Gemini\n    # Dynamically choose the most trendy news from the top 10 articles\n    trendy_topic = dynamic_selection(top_articles)  # Replace with actual logic to select most trendy from top 10\n    return trendy_topic\n\n# Example of how you might implement the dynamic_selection function which uses Gemini API integration\ndef dynamic_selection(top_articles):\n    # Placeholder logic for selecting the most trendy topic from top articles\n    return top_articles[0]  # As an example, return the first article; replace with AI logic as needed
+import requests
+
+# Original functionality...
+
+class GeminiAPI:
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = 'https://gemini-api.example.com'
+
+    def get_trendy_news(self, top_n=10):
+        response = requests.get(f'{self.base_url}/trending', params={'top_n': top_n}, headers={'Authorization': f'Bearer {self.api_key}'})
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception('API request failed')
+
+class TrendEngine:
+    def __init__(self, api_key):
+        self.gemini_api = GeminiAPI(api_key)
+
+    def select_trendy_topics(self):
+        trendy_news = self.gemini_api.get_trendy_news()
+        # Implement selection logic for unique videos...
+        return trendy_news
+
+# Existing functionality continues...
