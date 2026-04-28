@@ -52,23 +52,24 @@ class EvcarixOrchestrator:
             print("Hata: Video bulunamadı.")
             return
 
-        # 3. Seslendirme
-        print("\n[3/6] Seslendirme yapılıyor (Aria Neural)...")
+        # 3. Seslendirme (Premium)
+        print("\n[3/6] Premium seslendirme yapılıyor (Ava Neural)...")
         audio_path = os.path.abspath("assets/daily_voice.mp3")
-        await self.media_engine.generate_voiceover(
+        voice_result = await self.media_engine.generate_voiceover(
             text=script,
             output_path=audio_path,
-            voice_type="female",
-            rate="+10%"
+            voice_type=plan.get('voice', 'female'),
+            rate="+0%"
         )
+        word_timings = voice_result['word_timings']
 
         # 4. Montaj
-        print("\n[4/6] Video montajlanıyor...")
+        print("\n[4/6] Video montajlanıyor (Mükemmel Senkronizasyon)...")
         output_filename = "daily_shorts_1.mp4"
         final_video_path = self.editor.assemble_short(
             video_paths=video_paths,
             audio_path=audio_path,
-            script_text=script,
+            word_timings=word_timings,
             output_filename=output_filename
         )
 

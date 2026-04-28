@@ -67,17 +67,17 @@ class MediaEngine:
 
             img = Image.fromarray(frame).resize((1280, 720))
 
-            # Koyu gradient overlay
+            # Premium Gradient Overlay (Darker & Smoother)
             overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
             ov_draw = ImageDraw.Draw(overlay)
-            for y in range(img.height // 2, img.height):
-                alpha = int(190 * (y - img.height // 2) / (img.height // 2))
+            for y in range(img.height):
+                alpha = int(220 * (y / img.height)**1.5) # Non-linear for better look
                 ov_draw.rectangle([(0, y), (img.width, y + 1)], fill=(0, 0, 0, alpha))
             img = img.convert("RGBA")
             img = Image.alpha_composite(img, overlay).convert("RGB")
             draw = ImageDraw.Draw(img)
 
-            # Font yükle (Windows uyumlu ve fallback destekli)
+            # Font yükle
             def get_font(font_name, size):
                 possible_paths = [
                     f"fonts/{font_name}.ttf",
@@ -90,17 +90,9 @@ class MediaEngine:
                         return ImageFont.truetype(p, size)
                 return ImageFont.load_default()
 
-            title_font = get_font("Roboto-Bold", 72)
-            if title_font.getsize("Test")[1] < 20: # default check
-                title_font = get_font("arialbd", 72)
-            
-            ch_font = get_font("Roboto-Bold", 40)
-            if ch_font.getsize("Test")[1] < 10:
-                ch_font = get_font("arialbd", 40)
-
-            sl_font = get_font("Roboto-Regular", 30)
-            if sl_font.getsize("Test")[1] < 10:
-                sl_font = get_font("arial", 30)
+            title_font = get_font("Roboto-Bold", 85) # Larger hook
+            ch_font = get_font("Roboto-Bold", 45)
+            sl_font = get_font("Roboto-Regular", 32)
 
             # Başlık satırlarına böl
             words = title.split()
@@ -108,7 +100,7 @@ class MediaEngine:
             for w in words:
                 test = (current + " " + w).strip()
                 bbox = draw.textbbox((0, 0), test, font=title_font)
-                if bbox[2] - bbox[0] > 1200:
+                if bbox[2] - bbox[0] > 1100:
                     lines.append(current)
                     current = w
                 else:
@@ -116,25 +108,27 @@ class MediaEngine:
             if current:
                 lines.append(current)
 
-            # Başlık çiz (Sarı & Siyah Kontrast)
-            y_start = img.height - 100 - (len(lines) * 95) - 70
+            # Başlık çiz (Sarı & Siyah Glow)
+            y_start = (img.height // 2) - (len(lines) * 50)
             for line in lines:
                 bbox = draw.textbbox((0, 0), line, font=title_font)
                 x = (img.width - (bbox[2] - bbox[0])) // 2
-                # Gölge
-                draw.text((x + 5, y_start + 5), line, font=title_font, fill=(0, 0, 0))
+                # Glow/Shadow layers
+                for offset in range(1, 6):
+                    draw.text((x + offset, y_start + offset), line, font=title_font, fill=(0, 0, 0, 100))
                 # Ana metin
-                draw.text((x, y_start), line, font=title_font, fill=(255, 240, 0))
-                y_start += 95
+                draw.text((x, y_start), line, font=title_font, fill=(255, 235, 0)) # Vibrant Yellow
+                y_start += 110
 
             # Kanal & Misyon (Altta bant şeklinde)
-            footer_bg = Image.new("RGBA", (img.width, 140), (0, 0, 0, 180))
-            img.paste(footer_bg, (0, img.height - 140), footer_bg)
+            footer_h = 160
+            footer_bg = Image.new("RGBA", (img.width, footer_h), (0, 0, 0, 200))
+            img.paste(footer_bg, (0, img.height - footer_h), footer_bg)
             
             # Kanal adı (Canlı Yeşil)
             cb = draw.textbbox((0, 0), channel_name, font=ch_font)
             cx = (img.width - (cb[2] - cb[0])) // 2
-            draw.text((cx, img.height - 120), channel_name, font=ch_font, fill=(0, 255, 127))
+            draw.text((cx, img.height - 130), channel_name, font=ch_font, fill=(0, 255, 150))
 
             # Slogan (Parlak Beyaz)
             sb = draw.textbbox((0, 0), slogan, font=sl_font)
@@ -142,7 +136,7 @@ class MediaEngine:
             draw.text((sx, img.height - 65), slogan.upper(), font=sl_font, fill=(255, 255, 255))
 
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            img.save(output_path, "JPEG", quality=95)
+            img.save(output_path, "JPEG", quality=98) # Ultra quality
             print(f"[MediaEngine] Thumbnail kaydedildi: {output_path}")
             return output_path
         except Exception as e:

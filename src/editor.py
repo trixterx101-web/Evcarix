@@ -14,8 +14,8 @@ class AutoEditor:
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-    def assemble_short(self, video_paths, audio_path, script_text, output_filename):
-        """Dikey Shorts video montajı — Full HD (1080x1920) ve iyileştirilmiş altyazılar."""
+    def assemble_short(self, video_paths, audio_path, word_timings, output_filename):
+        """Dikey Shorts video montajı — Full HD (1080x1920) ve mükemmel senkronize altyazılar."""
         audio = AudioFileClip(audio_path)
 
         clips = []
@@ -25,7 +25,6 @@ class AutoEditor:
             try:
                 clip = VideoFileClip(path)
                 w, h = clip.size
-                # 9:16 dikey formata getir (Full HD 1080x1920 hedefli)
                 target_ratio = 9 / 16
                 if w / h > target_ratio:
                     new_w = h * target_ratio
@@ -34,7 +33,7 @@ class AutoEditor:
                     new_h = w / target_ratio
                     clip = clip.crop(y_center=h / 2, height=new_h)
                 
-                clip = clip.resize(width=1080) # 1080x1920
+                clip = clip.resize(width=1080)
                 clips.append(clip)
             except Exception as e:
                 print(f"Klip hatası ({path}): {e}")
@@ -51,10 +50,11 @@ class AutoEditor:
 
         final_video = final_video.set_audio(audio)
 
-        # Başlangıç Kancası (0.8 saniye süren dikkat çekici başlık ekranı)
+        # Başlangıç Kancası
         try:
+            hook_text = word_timings[0]['text'] + " " + word_timings[1]['text'] if len(word_timings) > 1 else "EVCARIX"
             hook_txt = TextClip(
-                script_text.split()[:5][0].upper() + "...", # İlk kelime veya kısa başlık
+                hook_text.upper() + "...",
                 fontsize=110,
                 color='white',
                 font='Arial-Bold',
@@ -65,32 +65,29 @@ class AutoEditor:
                 align='center'
             ).set_duration(0.8).set_position('center').set_start(0)
             
-            # Arka plana hafif bir karartma ekleyelim ki yazı okunsun
             hook_bg = ColorClip(size=(1080, 1920), color=(0,0,0)).set_opacity(0.4).set_duration(0.8)
-            
             final_video = CompositeVideoClip([final_video, hook_bg, hook_txt])
         except Exception as e:
             print(f"Hook ekranı eklenemedi: {e}")
 
-        # Altyazı — Daha okunaklı ve sığacak şekilde
+        # Mükemmel Senkronize Altyazı (6 kelimelik bloklar)
         try:
-            words = script_text.split()
-            chunk_size = 6 # Okunaklı bloklar için 6 kelime
-            duration_per_word = audio.duration / max(len(words), 1)
+            chunk_size = 6
             subtitle_clips = []
 
-            for i in range(0, len(words), chunk_size):
-                chunk = " ".join(words[i:i + chunk_size]) # Orijinal büyük/küçük harf korunuyor
-                start_t = i * duration_per_word
-                end_t = min((i + chunk_size) * duration_per_word, audio.duration)
+            for i in range(0, len(word_timings), chunk_size):
+                chunk_data = word_timings[i:i + chunk_size]
+                chunk_text = " ".join([w['text'] for w in chunk_data])
+                start_t = chunk_data[0]['start']
+                end_t = chunk_data[-1]['start'] + chunk_data[-1]['duration']
                 dur = end_t - start_t
 
                 if dur <= 0: continue
 
                 # Altyazı metni
                 txt = TextClip(
-                    chunk,
-                    fontsize=70,
+                    chunk_text,
+                    fontsize=75,
                     color='white', 
                     font='Arial-Bold',
                     method='caption',
@@ -103,7 +100,7 @@ class AutoEditor:
                 bg = ColorClip(size=(bg_w, bg_h), color=(0, 0, 0)).set_opacity(0.6).set_start(start_t).set_duration(dur)
                 
                 # Ekranın ALT bölümünde konumlandırma
-                pos_y = 1550 
+                pos_y = 1500 
                 txt = txt.set_position(("center", pos_y + 20))
                 bg = bg.set_position(("center", pos_y))
 
@@ -111,7 +108,9 @@ class AutoEditor:
 
             if subtitle_clips:
                 final_video = CompositeVideoClip([final_video] + subtitle_clips)
-                print(f"{len(subtitle_clips)//2} altyazı bloğu eklendi.")
+                print(f"[Editor] {len(subtitle_clips)//2} mükemmel senkronize altyazı bloğu eklendi.")
+        except Exception as e:
+            print(f"Altyazı eklenemedi: {e}")
         except Exception as e:
             print(f"Altyazı eklenemedi: {e}")
 

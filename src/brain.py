@@ -13,13 +13,13 @@ class EvcarixBrain:
     def get_daily_config(self):
         weekday = datetime.datetime.now().strftime("%A")
         schedule = {
-            "Monday":    {"type": "short", "topic": "Battery Tech & Degradation", "duration": 60},
-            "Tuesday":   {"type": "short", "topic": "Real-World Range Test",     "duration": 45},
-            "Wednesday": {"type": "short", "topic": "Charging Speed Analysis",   "duration": 50},
-            "Thursday":  {"type": "short", "topic": "Winter Performance Data",   "duration": 55},
-            "Friday":    {"type": "short", "topic": "LFP vs NMC Comparison",     "duration": 45},
-            "Saturday":  {"type": "short", "topic": "EV Efficiency Breakdown",   "duration": 60},
-            "Sunday":    {"type": "long",  "topic": "Deep Technical EV Review",  "duration": 480},
+            "Monday":    {"type": "short", "topic": "Next-Gen Battery Tech (Solid State, Sodium-ion)", "duration": 60},
+            "Tuesday":   {"type": "short", "topic": "Global EV Comparison: BYD vs Tesla vs Hyundai", "duration": 45},
+            "Wednesday": {"type": "short", "topic": "LFP vs NMC: Which battery wins for longevity?",   "duration": 50},
+            "Thursday":  {"type": "short", "topic": "Winter Range King: Global 0°C Efficiency Test",  "duration": 55},
+            "Friday":    {"type": "short", "topic": "Battery Degradation Data: 200,000 Mile Analysis", "duration": 45},
+            "Saturday":  {"type": "short", "topic": "Fastest Charging EVs in 2024 (10-80% Comparison)", "duration": 60},
+            "Sunday":    {"type": "long",  "topic": "The Future of Global Battery Supply Chains",      "duration": 480},
         }
         return schedule.get(weekday, schedule["Monday"])
 

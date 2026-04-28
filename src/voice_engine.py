@@ -4,30 +4,38 @@ import os
 
 class VoiceEngine:
     def __init__(self):
-        # Varsayılan sesler (İngilizce ABD)
+        # Premium voices (Microsoft Edge Neural)
         self.voices = {
-            "male": "en-US-GuyNeural",
-            "female": "en-US-AriaNeural"
+            "male": "en-US-AndrewNeural",
+            "female": "en-US-AvaNeural"
         }
-        self.default_voice = "en-US-AriaNeural"
+        self.default_voice = "en-US-AvaNeural"
 
-    async def generate_voice(self, text, output_path, voice_type="female", rate="+10%"):
+    async def generate_voice(self, text, output_path, voice_type="female", rate="+0%"):
         """
-        Metni ses dosyasına dönüştürür (edge-tts kullanarak).
-        :param text: Seslendirilecek metin
-        :param output_path: Kaydedilecek dosya yolu (.mp3)
-        :param voice_type: 'male' veya 'female'
-        :param rate: Konuşma hızı (örn: '+10%', '-5%')
+        Metni ses dosyasına dönüştürür ve kelime zamanlamalarını döner.
         """
         voice = self.voices.get(voice_type, self.default_voice)
+        print(f"[VoiceEngine] Premium ses kullanılıyor: {voice}")
         
-        print(f"Seslendirme yapılıyor: {voice} (Hız: {rate})...")
         communicate = edge_tts.Communicate(text, voice, rate=rate)
-        await communicate.save(output_path)
+        subs = []
+        
+        # Sesi kaydet ve kelime zamanlamalarını topla
+        with open(output_path, "wb") as f:
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    f.write(chunk["data"])
+                elif chunk["type"] == "WordBoundary":
+                    subs.append({
+                        "text": chunk["text"],
+                        "start": chunk["offset"] / 10**7, # Saniyeye çevir
+                        "duration": chunk["duration"] / 10**7
+                    })
         
         if os.path.exists(output_path):
-            print(f"Ses dosyası başarıyla oluşturuldu: {output_path}")
-            return output_path
+            print(f"[VoiceEngine] Premium ses dosyası ve {len(subs)} kelime zamanlaması hazır.")
+            return {"audio_path": output_path, "word_timings": subs}
         else:
             raise Exception("Ses dosyası oluşturulamadı!")
 
