@@ -21,8 +21,13 @@ class TrendEngine:
         ]
         self.gemini_api_key = os.getenv("GEMINI_API_KEY") if GEMINI_AVAILABLE else None
         if GEMINI_AVAILABLE and self.gemini_api_key:
-            genai.configure(api_key=self.gemini_api_key)
-            self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+            try:
+                genai.configure(api_key=self.gemini_api_key)
+                # Try with 1.5 flash, fallback if needed
+                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+            except Exception as e:
+                print(f"[TrendEngine] Gemini init hatası: {e}")
+                self.gemini_model = None
 
     def get_latest_news(self):
         """Haber kaynaklarından en son haberleri çeker."""

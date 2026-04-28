@@ -42,8 +42,11 @@ class EvcarixOrchestrator:
 
         # 2. Video indir
         print("\n[2/6] Stok videolar indiriliyor...")
+        # Arama sorgusunu temizle (Emoji ve özel karakterleri kaldır)
+        import re
+        search_query = re.sub(r'[^\w\s]', '', topic).strip()
         video_paths = self.media_engine.download_stock_videos(
-            query=topic,
+            query=search_query,
             output_dir="assets/temp_videos",
             count=5,
             orientation="portrait"

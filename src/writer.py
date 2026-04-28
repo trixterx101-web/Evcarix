@@ -15,8 +15,12 @@ class CreativeWriter:
     def __init__(self):
         self.gemini_api_key = os.getenv("GEMINI_API_KEY") if GEMINI_AVAILABLE else None
         if GEMINI_AVAILABLE and self.gemini_api_key:
-            genai.configure(api_key=self.gemini_api_key)
-            self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+            try:
+                genai.configure(api_key=self.gemini_api_key)
+                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+            except Exception as e:
+                print(f"[Writer] Gemini init hatası: {e}")
+                self.gemini_model = None
 
         self.groq_api_key = os.getenv("GROQ_API_KEY")
         self.groq_client = None

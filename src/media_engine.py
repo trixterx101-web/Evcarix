@@ -35,8 +35,11 @@ class MediaEngine:
                     video_files = video_data.get('video_files', [])
                     if not video_files:
                         continue
+                    import re
                     video_url = video_files[0]['link']
-                    filename = f"pexels_{query.replace(' ', '_')}_{i}.mp4"
+                    # Sanitize filename: remove emojis and illegal characters
+                    clean_query = re.sub(r'[^\w\s-]', '', query).strip().replace(' ', '_')
+                    filename = f"pexels_{clean_query}_{i}.mp4"
                     output_path = os.path.join(output_dir, filename)
                     print(f"İndiriliyor ({i+1}/{len(videos)}): {filename}")
                     v_res = requests.get(video_url, stream=True, timeout=60)
