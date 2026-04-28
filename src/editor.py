@@ -8,6 +8,22 @@ import PIL.Image
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
 
+# MoviePy / ImageMagick Windows Konfigürasyonu
+import platform
+if platform.system() == "Windows":
+    from moviepy.config import change_settings
+    # Yaygın kurulum yollarını dene
+    possible_magick_paths = [
+        r"C:\Program Files\ImageMagick-7.1.2-Q16-HDRI\magick.exe",
+        r"C:\Program Files\ImageMagick-7.1.1-Q16-HDRI\magick.exe",
+        r"C:\Program Files\ImageMagick-7.1.0-Q16-HDRI\magick.exe",
+    ]
+    for path in possible_magick_paths:
+        if os.path.exists(path):
+            change_settings({"IMAGEMAGICK_BINARY": path})
+            print(f"[Editor] ImageMagick bulundu: {path}")
+            break
+
 
 class AutoEditor:
     def __init__(self, output_dir="output"):
