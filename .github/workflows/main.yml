@@ -30,12 +30,15 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          YOUTUBE_TOKEN: ${{ secrets.YOUTUBE_TOKEN }}
-          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_TOKEN_DATA: ${{ secrets.YOUTUBE_TOKEN }}
+          YOUTUBE_CLIENT_SECRET_DATA: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           CI: "true"
         run: |
-          echo '${{ secrets.YOUTUBE_TOKEN }}' > token.json
-          echo '${{ secrets.YOUTUBE_CLIENT_SECRET }}' > client_secret.json
+          # JSON dosyalarını güvenli bir şekilde oluşturma (Tırnak hatası yapmaz)
+          python -c "import os; open('token.json', 'w').write(os.environ['YOUTUBE_TOKEN_DATA'])"
+          python -c "import os; open('client_secret.json', 'w').write(os.environ['YOUTUBE_CLIENT_SECRET_DATA'])"
+          
+          # Ana kodu çalıştır
           python main.py
 
       - name: Upload Artifact
