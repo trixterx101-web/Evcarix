@@ -29,12 +29,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Main Workflow
+      - - name: Run Main Workflow
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          YOUTUBE_TOKEN_DATA: ${{ secrets.YOUTUBE_TOKEN }}
-          YOUTUBE_CLIENT_SECRET_DATA: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          # Buradaki isimleri senin GitHub'daki isimlerinle (JSON ekli haliyle) eşitledim:
+          YOUTUBE_TOKEN_DATA: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          YOUTUBE_CLIENT_SECRET_DATA: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
           CI: "true"
         run: |
           python -c "import os; open('token.json', 'w').write(os.environ['YOUTUBE_TOKEN_DATA'])"
