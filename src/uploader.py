@@ -6,7 +6,11 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 
 class YouTubeUploader:
     def __init__(self, client_secrets_file):
-        self.scopes = ["https://www.googleapis.com/auth/youtube.upload"]
+        # youtube.force-ssl is REQUIRED for thumbnails().set()
+        self.scopes = [
+            "https://www.googleapis.com/auth/youtube.upload",
+            "https://www.googleapis.com/auth/youtube.force-ssl"
+        ]
         self.client_secrets_file = client_secrets_file
         self.youtube = self.get_authenticated_service()
 
@@ -39,18 +43,39 @@ class YouTubeUploader:
         
         return build("youtube", "v3", credentials=creds)
 
-    def upload_video(self, file_path, title, description, tags, category_id="28"):
-        """Videoyu YouTube'a yükler (28: Science & Technology)."""
+    def upload_video(self, file_path, title, description, tags, category_id="2"):
+        """Videoyu YouTube'a yükler.
+        Category 2 = Autos & Vehicles (EV içeriği için en uygun)
+        """
+        # #Shorts etiketini ekle — YouTube algoritması için kritik
+        if "#Shorts" not in title and len(title) < 90:
+            shorts_title = title  # başlığa #Shorts eklemiyoruz, açıklamaya ekliyoruz
+        else:
+            shorts_title = title[:97]
+        
+        # Tags listesine Shorts ekle
+        final_tags = list(tags) if tags else []
+        for must_have in ["Shorts", "EVShorts", "ElectricCarShorts"]:
+            if must_have not in final_tags:
+                final_tags.append(must_have)
+        # YouTube tag limiti: 500 karakter
+        tag_str = ",".join(final_tags)
+        if len(tag_str) > 500:
+            final_tags = final_tags[:15]  # sadece ilk 15 etiketi al
+
         body = {
             "snippet": {
-                "title": title,
+                "title": shorts_title,
                 "description": description,
-                "tags": tags,
-                "categoryId": category_id
+                "tags": final_tags,
+                "categoryId": category_id,
+                "defaultLanguage": "en",
+                "defaultAudioLanguage": "en"
             },
             "status": {
-                "privacyStatus": "public", # Veya 'unlisted' / 'private'
-                "selfDeclaredMadeForKids": False
+                "privacyStatus": "public",
+                "selfDeclaredMadeForKids": False,
+                "madeForKids": False
             }
         }
 

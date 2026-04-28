@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime
 
 try:
-    import google.generativeai as genai
+    from google import genai
     GEMINI_AVAILABLE = True
 except Exception:
     GEMINI_AVAILABLE = False
@@ -20,14 +20,13 @@ class TrendEngine:
             "https://ev-database.org/rss.xml"
         ]
         self.gemini_api_key = os.getenv("GEMINI_API_KEY") if GEMINI_AVAILABLE else None
+        self.gemini_client = None
         if GEMINI_AVAILABLE and self.gemini_api_key:
             try:
-                genai.configure(api_key=self.gemini_api_key)
-                # Try with 1.5 flash, fallback if needed
-                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+                self.gemini_client = genai.Client(api_key=self.gemini_api_key)
             except Exception as e:
                 print(f"[TrendEngine] Gemini init hatası: {e}")
-                self.gemini_model = None
+                self.gemini_client = None
 
     def get_latest_news(self):
         """Haber kaynaklarından en son haberleri çeker."""
@@ -92,11 +91,13 @@ class TrendEngine:
                 title = item['title']
                 # Filter to ensure it's EV or car related
                 if any(word in title.lower() for word in ['ev', 'electric', 'battery', 'tesla', 'range', 'car', 'volt', 'watt', 'efficiency']):
-                    print(f"[TrendEngine] YouTube technical trend selected: {title}")
+                    # Sanitize for console printing (remove emojis)
+                    clean_title = title.encode('ascii', 'ignore').decode('ascii')
+                    print(f"[TrendEngine] YouTube technical trend selected: {clean_title}")
                     return title
 
         # 2) Gemini Selection from RSS News - Secondary Priority
-        if GEMINI_AVAILABLE and self.gemini_api_key and news_df is not None and not news_df.empty:
+        if GEMINI_AVAILABLE and self.gemini_client and news_df is not None and not news_df.empty:
             try:
                 titles = news_df.head(15)['title'].tolist()
                 prompt = (
@@ -106,7 +107,10 @@ class TrendEngine:
                     "Return ONLY the headline text.\n\n"
                     + "\n".join(f"- {t}" for t in titles)
                 )
-                response = self.gemini_model.generate_content(prompt)
+                response = self.gemini_client.models.generate_content(
+                    model='gemini-1.5-flash',
+                    contents=prompt
+                )
                 selected = response.text.strip()
                 # Validate selection matches one of the titles (loosely)
                 if any(t.lower() in selected.lower() or selected.lower() in t.lower() for t in titles):

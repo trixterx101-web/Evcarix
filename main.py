@@ -37,8 +37,8 @@ class EvcarixOrchestrator:
         description = plan.get('description', f"{topic}\n\n#ev #electriccar #Evcarix #shorts")
         tags = plan.get('tags', ["ev", "electriccar", "Evcarix", "shorts"])
 
-        print(f"\n[1/6] Plan Hazır: {full_topic}")
-        print(f"       Başlık: {title}")
+        print(f"\n[1/6] Plan Hazır: {full_topic.encode('ascii', 'ignore').decode('ascii')}")
+        print(f"       Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
 
         # 2. Video indir
         print("\n[2/6] Stok videolar indiriliyor...")
@@ -76,12 +76,12 @@ class EvcarixOrchestrator:
             output_filename=output_filename
         )
 
-        # 5. Thumbnail
-        print("\n[5/6] Thumbnail oluşturuluyor...")
+        # 5. Premium Thumbnail (Pillow tabanlı — ImageMagick gerekmez)
+        print("\n[5/6] Premium Thumbnail oluşturuluyor...")
         thumbnail_path = "output/thumbnails/daily_shorts_1.jpg"
         os.makedirs("output/thumbnails", exist_ok=True)
-        self.media_engine.generate_thumbnail(
-            video_path=video_paths[0],
+        self.editor.generate_premium_thumbnail(
+            video_path=final_video_path,
             title=title,
             output_path=thumbnail_path
         )
