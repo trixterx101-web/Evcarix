@@ -50,8 +50,8 @@ class CreativeWriter:
                 completion = self.groq_client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=[
-                        {"role": "system", "content": "You generate YouTube titles as JSON arrays only."},
-                        {"role": "user", "content": f"Return 5 clickable EV YouTube titles for: {topic}. JSON array only."}
+                        {"role": "system", "content": "You generate YouTube titles as JSON arrays only. American English, data-driven, no hype."},
+                        {"role": "user", "content": f"Return 5 highly clickable EV YouTube titles for: {topic}. American English ONLY. No hype. Just numbers. JSON array only."}
                     ],
                     temperature=0.7, max_tokens=300,
                 )
@@ -195,6 +195,7 @@ SENARYO: [script text]
         prompt = (
             f"Generate a list of high-SEO YouTube tags for a video about '{topic}' with title '{title}'. "
             f"Focus on electric vehicles, battery tech, and performance. "
+            f"American English ONLY. "
             f"Return ONLY a comma-separated list of tags, no numbering, no hashtags, maximum 490 characters total."
         )
         

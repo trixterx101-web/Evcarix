@@ -76,20 +76,21 @@ class TrendEngine:
             return []
 
     def select_trending_topic(self, news_df):
-        """Selects a topic that aligns with Evcarix: No hype, just numbers."""
+        """Selects a topic that aligns with Evcarix: No hype, just numbers.
+        Hierarchy: YouTube Trending > Gemini (from RSS) > Core Topics Fallback
+        """
         
-        core_topics = [
-            "Real-world EV range test results",
-            "Battery degradation analysis: LFP vs NMC",
-            "Winter range loss in modern electric cars",
-            "EV charging speed comparison: 400V vs 800V",
-            "The true cost of EV ownership over 100k miles",
-            "Heat pump efficiency in extreme cold",
-            "Solid-state battery progress and data",
-            "EV efficiency: Wh/km breakdown by model"
-        ]
+        # 1) YouTube Trending (Autos Category) - Highest Priority
+        yt = self.get_youtube_trending(region_code=os.getenv('YOUTUBE_REGION', 'US'))
+        if yt:
+            for item in yt:
+                title = item['title']
+                # Filter to ensure it's EV or car related
+                if any(word in title.lower() for word in ['ev', 'electric', 'battery', 'tesla', 'range', 'car', 'volt', 'watt', 'efficiency']):
+                    print(f"[TrendEngine] YouTube technical trend selected: {title}")
+                    return title
 
-        # 1) Try to get technical news from RSS using Gemini
+        # 2) Gemini Selection from RSS News - Secondary Priority
         if GEMINI_AVAILABLE and self.gemini_api_key and news_df is not None and not news_df.empty:
             try:
                 titles = news_df.head(15)['title'].tolist()
@@ -102,24 +103,24 @@ class TrendEngine:
                 )
                 response = self.gemini_model.generate_content(prompt)
                 selected = response.text.strip()
-                # Validate selection
+                # Validate selection matches one of the titles (loosely)
                 if any(t.lower() in selected.lower() or selected.lower() in t.lower() for t in titles):
-                    print(f"[TrendEngine] Technical news selected: {selected}")
+                    print(f"[TrendEngine] Technical news selected via Gemini: {selected}")
                     return selected
             except Exception as e:
                 print(f"[TrendEngine] Gemini error: {e}")
 
-        # 2) YouTube Trending (Autos Category)
-        yt = self.get_youtube_trending(region_code=os.getenv('YOUTUBE_REGION', 'US'))
-        if yt:
-            for item in yt:
-                title = item['title']
-                # Basic filter to ensure it's somewhat EV or car related
-                if any(word in title.lower() for word in ['ev', 'electric', 'battery', 'tesla', 'range', 'car', 'volt', 'watt']):
-                    print(f"[TrendEngine] YouTube technical trend selected: {title}")
-                    return title
-
         # 3) Diverse Fallback from Core Topics
+        core_topics = [
+            "Real-world EV range test results",
+            "Battery degradation analysis: LFP vs NMC",
+            "Winter range loss in modern electric cars",
+            "EV charging speed comparison: 400V vs 800V",
+            "The true cost of EV ownership over 100k miles",
+            "Heat pump efficiency in extreme cold",
+            "Solid-state battery progress and data",
+            "EV efficiency: Wh/km breakdown by model"
+        ]
         import random
         selected_core = random.choice(core_topics)
         print(f"[TrendEngine] Using core concept fallback: {selected_core}")

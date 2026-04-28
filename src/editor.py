@@ -75,39 +75,43 @@ class AutoEditor:
         # Altyazı — Daha okunaklı ve sığacak şekilde
         try:
             words = script_text.split()
-            chunk_size = 3 # Daha az kelime = daha büyük/okunaklı metin
+            chunk_size = 6 # Okunaklı bloklar için 6 kelime
             duration_per_word = audio.duration / max(len(words), 1)
             subtitle_clips = []
 
             for i in range(0, len(words), chunk_size):
-                chunk = " ".join(words[i:i + chunk_size]).upper()
+                chunk = " ".join(words[i:i + chunk_size]) # Orijinal büyük/küçük harf korunuyor
                 start_t = i * duration_per_word
                 end_t = min((i + chunk_size) * duration_per_word, audio.duration)
                 dur = end_t - start_t
 
                 if dur <= 0: continue
 
-                # Altyazı metni (Daha güvenli genişlik ve hizalama)
+                # Altyazı metni
                 txt = TextClip(
                     chunk,
-                    fontsize=85,
-                    color='yellow', 
+                    fontsize=70,
+                    color='white', 
                     font='Arial-Bold',
-                    stroke_color='black',
-                    stroke_width=4,
                     method='caption',
-                    size=(950, None), 
+                    size=(900, None), 
                     align='center'
                 ).set_start(start_t).set_duration(dur)
                 
-                # Ekranın ortasında (Shorts yazılarına takılmaması için orta-alt güvenli bölge)
-                txt = txt.set_position(("center", 1100))
+                # Yarı-şeffaf siyah kutu (opacity=0.6)
+                bg_w, bg_h = 950, txt.h + 40
+                bg = ColorClip(size=(bg_w, bg_h), color=(0, 0, 0)).set_opacity(0.6).set_start(start_t).set_duration(dur)
+                
+                # Ekranın ALT bölümünde konumlandırma
+                pos_y = 1550 
+                txt = txt.set_position(("center", pos_y + 20))
+                bg = bg.set_position(("center", pos_y))
 
-                subtitle_clips.append(txt)
+                subtitle_clips.extend([bg, txt])
 
             if subtitle_clips:
                 final_video = CompositeVideoClip([final_video] + subtitle_clips)
-                print(f"{len(subtitle_clips)} altyazı bloğu eklendi.")
+                print(f"{len(subtitle_clips)//2} altyazı bloğu eklendi.")
         except Exception as e:
             print(f"Altyazı eklenemedi: {e}")
 

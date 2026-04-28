@@ -77,18 +77,30 @@ class MediaEngine:
             img = Image.alpha_composite(img, overlay).convert("RGB")
             draw = ImageDraw.Draw(img)
 
-            # Font yükle
-            try:
-                title_font = ImageFont.truetype("fonts/Roboto-Bold.ttf", 72)
-                ch_font = ImageFont.truetype("fonts/Roboto-Bold.ttf", 40)
-                sl_font = ImageFont.truetype("fonts/Roboto-Regular.ttf", 30)
-            except Exception:
-                try:
-                    title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 72)
-                    ch_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
-                    sl_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 30)
-                except Exception:
-                    title_font = ch_font = sl_font = ImageFont.load_default()
+            # Font yükle (Windows uyumlu ve fallback destekli)
+            def get_font(font_name, size):
+                possible_paths = [
+                    f"fonts/{font_name}.ttf",
+                    f"C:/Windows/Fonts/{font_name}.ttf",
+                    f"C:/Windows/Fonts/{font_name.replace('Bold', 'bd')}.ttf",
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+                ]
+                for p in possible_paths:
+                    if os.path.exists(p):
+                        return ImageFont.truetype(p, size)
+                return ImageFont.load_default()
+
+            title_font = get_font("Roboto-Bold", 72)
+            if title_font.getsize("Test")[1] < 20: # default check
+                title_font = get_font("arialbd", 72)
+            
+            ch_font = get_font("Roboto-Bold", 40)
+            if ch_font.getsize("Test")[1] < 10:
+                ch_font = get_font("arialbd", 40)
+
+            sl_font = get_font("Roboto-Regular", 30)
+            if sl_font.getsize("Test")[1] < 10:
+                sl_font = get_font("arial", 30)
 
             # Başlık satırlarına böl
             words = title.split()
