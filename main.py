@@ -94,6 +94,10 @@ class EvcarixOrchestrator:
                     final_video_path, title, description, tags
                 )
                 print(f"Yüklendi! Video ID: {video_id}")
+                
+                # Kapak görselini (Thumbnail) ayarla
+                if os.path.exists(thumbnail_path):
+                    self.uploader.set_thumbnail(video_id, thumbnail_path)
             except Exception as e:
                 print(f"YouTube yükleme hatası: {e}")
         else:

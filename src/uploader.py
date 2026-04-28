@@ -70,6 +70,23 @@ class YouTubeUploader:
         print(f"Yükleme Tamamlandı! Video ID: {response['id']}")
         return response['id']
 
+    def set_thumbnail(self, video_id, thumbnail_path):
+        """Video için kapak görselini yükler."""
+        if not os.path.exists(thumbnail_path):
+            print(f"Hata: Thumbnail dosyası bulunamadı: {thumbnail_path}")
+            return
+        
+        try:
+            print(f"Thumbnail yükleniyor: {thumbnail_path}...")
+            request = self.youtube.thumbnails().set(
+                videoId=video_id,
+                media_body=MediaFileUpload(thumbnail_path)
+            )
+            request.execute()
+            print("Thumbnail başarıyla güncellendi!")
+        except Exception as e:
+            print(f"Thumbnail yükleme hatası: {e}")
+
 if __name__ == "__main__":
     # uploader = YouTubeUploader("client_secret.json")
     # uploader.upload_video("output/test.mp4", "Test Başlık", "Test Açıklama", ["ev", "car"])

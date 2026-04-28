@@ -111,27 +111,31 @@ class MediaEngine:
             if current:
                 lines.append(current)
 
-            # Başlık çiz (Sarı & Siyah Glow)
-            y_start = (img.height // 2) - (len(lines) * 50)
+            # Başlık çiz (Sarı & Siyah Glow + Kalın Stroke)
+            y_start = (img.height // 2) - (len(lines) * 55)
             for line in lines:
                 bbox = draw.textbbox((0, 0), line, font=title_font)
                 x = (img.width - (bbox[2] - bbox[0])) // 2
-                # Glow/Shadow layers
-                for offset in range(1, 6):
-                    draw.text((x + offset, y_start + offset), line, font=title_font, fill=(0, 0, 0, 100))
+                
+                # Kalın Stroke (Outline)
+                stroke_w = 6
+                for dx in range(-stroke_w, stroke_w + 1):
+                    for dy in range(-stroke_w, stroke_w + 1):
+                        draw.text((x + dx, y_start + dy), line, font=title_font, fill=(0, 0, 0))
+                
                 # Ana metin
-                draw.text((x, y_start), line, font=title_font, fill=(255, 235, 0)) # Vibrant Yellow
-                y_start += 110
+                draw.text((x, y_start), line, font=title_font, fill=(255, 235, 0))
+                y_start += 120
 
             # Kanal & Misyon (Altta bant şeklinde)
             footer_h = 160
-            footer_bg = Image.new("RGBA", (img.width, footer_h), (0, 0, 0, 200))
+            footer_bg = Image.new("RGBA", (img.width, footer_h), (0, 0, 0, 220))
             img.paste(footer_bg, (0, img.height - footer_h), footer_bg)
             
-            # Kanal adı (Canlı Yeşil)
+            # Kanal adı (Vurgulu Yeşil)
             cb = draw.textbbox((0, 0), channel_name, font=ch_font)
             cx = (img.width - (cb[2] - cb[0])) // 2
-            draw.text((cx, img.height - 130), channel_name, font=ch_font, fill=(0, 255, 150))
+            draw.text((cx, img.height - 130), channel_name, font=ch_font, fill=(50, 255, 100))
 
             # Slogan (Parlak Beyaz)
             sb = draw.textbbox((0, 0), slogan, font=sl_font)
@@ -139,8 +143,8 @@ class MediaEngine:
             draw.text((sx, img.height - 65), slogan.upper(), font=sl_font, fill=(255, 255, 255))
 
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            img.save(output_path, "JPEG", quality=98) # Ultra quality
-            print(f"[MediaEngine] Thumbnail kaydedildi: {output_path}")
+            img.save(output_path, "JPEG", quality=98) 
+            print(f"[MediaEngine] Premium Thumbnail kaydedildi: {output_path}")
             return output_path
         except Exception as e:
             print(f"[MediaEngine] Thumbnail hatası: {e}")
