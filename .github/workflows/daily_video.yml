@@ -1,52 +1,79 @@
-name: Daily Evcarix Shorts
+name: Evcarix Daily Shorts
 
+# TR Saati 18:00 = UTC 15:00  |  TR Saati 21:00 = UTC 18:00
 on:
   schedule:
-    - cron: '0 7,16 * * *'
+    - cron: '0 15 * * *'   # TR 18:00 — Akşam prime time
+    - cron: '0 18 * * *'   # TR 21:00 — Gece prime time
   workflow_dispatch:
+    inputs:
+      slot:
+        description: 'Upload slot (evening / night)'
+        required: false
+        default: 'evening'
 
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
+
     steps:
+      # ── 1. Repo ──────────────────────────────────────────────────
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # ── 2. Python ────────────────────────────────────────────────
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
+      # ── 3. Sistem bağımlılıkları (ffmpeg zorunlu) ────────────────
       - name: Install System Dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y imagemagick
-          sudo sed -i 's/policy domain="path" rights="none" pattern="@\*"/policy domain="path" rights="read|write" pattern="@\*"/g' /etc/ImageMagick-6/policy.xml
+          sudo apt-get update -q
+          sudo apt-get install -y ffmpeg fonts-liberation fonts-dejavu
 
+      # ── 4. Python bağımlılıkları ─────────────────────────────────
       - name: Install Python Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip --quiet
+          pip install -r requirements.txt --quiet
 
-      - name: Run Main Workflow
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-          YOUTUBE_REGION: US
-          YOUTUBE_CLIENT_SECRET_FILE: "client_secret.json"
-          YOUTUBE_TOKEN_DATA: ${{ secrets.YOUTUBE_TOKEN }}
-          YOUTUBE_CLIENT_SECRET_DATA: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          CI: "true"
+      # ── 5. İnsan gibi rastgele bekleme (0-40 dakika) ─────────────
+      #     YouTube algoritmasına makine gibi görünmemek için
+      - name: Human-like Random Delay
         run: |
+          DELAY=$((RANDOM % 2400))
+          echo "Beklenilen süre: $DELAY saniye ($(($DELAY / 60)) dakika $(($DELAY % 60)) saniye)"
+          sleep $DELAY
+
+      # ── 6. Ana workflow ──────────────────────────────────────────
+      - name: Run Video Production & Upload
+        env:
+          GEMINI_API_KEY:            ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY:              ${{ secrets.GROQ_API_KEY }}
+          PEXELS_API_KEY:            ${{ secrets.PEXELS_API_KEY }}
+          YOUTUBE_API_KEY:           ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_REGION:            US
+          YOUTUBE_CLIENT_SECRET_FILE: "client_secret.json"
+          YOUTUBE_TOKEN_DATA:        ${{ secrets.YOUTUBE_TOKEN }}
+          YOUTUBE_CLIENT_SECRET_DATA: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          # Slot bilgisi: script hangi yayın diliminde çalıştığını bilsin
+          UPLOAD_SLOT: ${{ github.event.schedule == '0 15 * * *' && 'evening' || 'night' }}
+        run: |
+          # Kimlik dosyalarını oluştur
           python -c "import os; open('token.json', 'w').write(os.environ['YOUTUBE_TOKEN_DATA'])"
           python -c "import os; open('client_secret.json', 'w').write(os.environ['YOUTUBE_CLIENT_SECRET_DATA'])"
+          # Üretim & yükleme
           python main.py
 
-      - name: Upload Artifact
+      # ── 7. Çıktıları artifact olarak sakla ───────────────────────
+      - name: Save Output Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: daily-video
-          path: output/
+          name: evcarix-video-${{ github.run_number }}
+          path: |
+            output/
+            daily_plan.json
+          retention-days: 7

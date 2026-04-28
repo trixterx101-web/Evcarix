@@ -181,9 +181,10 @@ SENARYO: [script text]
     # ─────────────────────────────────────────────────────────────────
     # AÇIKLAMA — AI Destekli SEO Optimizasyonu
     # ─────────────────────────────────────────────────────────────────
-    def generate_description(self, topic, title, tags_list):
+    def generate_description(self, topic, title, tags_list, cta_override=None):
         """YouTube SEO için optimize edilmiş, başlıkla bire bir örtüşen açıklama üretir."""
         hashtags = " ".join([f"#{t.replace(' ', '').replace('-', '')}" for t in tags_list[:10]])
+        cta = cta_override or "Subscribe to Evcarix for real EV data every day."
 
         channel_about = (
             "\n🔋 About Evcarix:\n"
@@ -201,7 +202,7 @@ SENARYO: [script text]
             f"Requirements:\n"
             f"1. First 2 lines must be a strong hook matching the title (shown in search preview)\n"
             f"2. Add 'What you'll learn:' bullet list with 4 specific data-driven points\n"
-            f"3. Add a CTA: 'Subscribe to Evcarix for real EV data every day'\n"
+            f"3. Add a CTA: '{cta}'\n"
             f"4. Include naturally embedded keyword phrases related to the topic\n"
             f"5. Max 350 words. American English only.\n"
             f"Return only the description text, no extra formatting."
@@ -233,7 +234,7 @@ SENARYO: [script text]
                 f"• Battery efficiency metrics\n"
                 f"• True ownership cost breakdown\n"
                 f"• How it compares to rivals\n\n"
-                f"Subscribe to Evcarix for real EV data every day."
+                f"{cta}"
             )
 
         return (

@@ -1,5 +1,6 @@
 import asyncio
 import os
+import random
 import datetime
 from dotenv import load_dotenv
 
@@ -26,49 +27,57 @@ class EvcarixOrchestrator:
                 print(f"YouTube Uploader başlatılamadı: {e}")
 
     async def run_daily_shorts_workflow(self):
-        print(f"\n--- Evcarix Daily Workflow: {datetime.datetime.now()} ---\n")
+        # ── Zaman damgası & slot bilgisi ──────────────────────────
+        now = datetime.datetime.now()
+        slot = os.getenv("UPLOAD_SLOT", "evening")  # evening | night
+        ts = now.strftime("%Y%m%d_%H%M%S")
 
-        # 1. Plan
-        plan = self.brain.create_daily_plan()
-        script = plan['script']
-        topic = plan['topic']
-        full_topic = plan['full_topic']
-        title = plan.get('title', topic)
-        description = plan.get('description', f"{topic}\n\n#ev #electriccar #Evcarix #shorts")
-        tags = plan.get('tags', ["ev", "electriccar", "Evcarix", "shorts"])
+        print(f"\n{'='*60}")
+        print(f"  Evcarix Auto-Studio — {now.strftime('%d %b %Y, %H:%M')}")
+        print(f"  Slot: {slot.upper()}")
+        print(f"{'='*60}\n")
 
-        print(f"\n[1/6] Plan Hazır: {full_topic.encode('ascii', 'ignore').decode('ascii')}")
-        print(f"       Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
+        # ── 1. Plan ───────────────────────────────────────────────
+        plan = self.brain.create_daily_plan(slot=slot)
+        script      = plan['script']
+        topic       = plan['topic']
+        full_topic  = plan['full_topic']
+        title       = plan.get('title', topic)
+        description = plan.get('description', f"{topic}\n\n#EV #Evcarix #Shorts")
+        tags        = plan.get('tags', ["ev", "electric car", "Evcarix", "Shorts"])
 
-        # 2. Video indir
+        print(f"\n[1/6] Plan Hazır")
+        print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}")
+        print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
+
+        # ── 2. Stok videolar ──────────────────────────────────────
         print("\n[2/6] Stok videolar indiriliyor...")
-        # Arama sorgusunu temizle (Emoji ve özel karakterleri kaldır)
         import re
         search_query = re.sub(r'[^\w\s]', '', topic).strip()
         video_paths = self.media_engine.download_stock_videos(
             query=search_query,
-            output_dir="assets/temp_videos",
+            output_dir=f"assets/temp_videos/{ts}",
             count=5,
             orientation="portrait"
         )
         if not video_paths:
-            print("Hata: Video bulunamadı.")
+            print("Hata: Hiç video indirilemedi. Çıkılıyor.")
             return
 
-        # 3. Seslendirme (Premium)
-        print("\n[3/6] Premium seslendirme yapılıyor (Ava Neural)...")
-        audio_path = os.path.abspath("assets/daily_voice.mp3")
+        # ── 3. Seslendirme ────────────────────────────────────────
+        print("\n[3/6] Seslendirme yapılıyor...")
+        audio_path = os.path.abspath(f"assets/voice_{ts}.mp3")
         voice_result = await self.media_engine.generate_voiceover(
             text=script,
             output_path=audio_path,
             voice_type=plan.get('voice', 'female'),
-            rate="+0%"
+            rate=random.choice(["+0%", "+2%", "-2%"])   # Hafif hız varyasyonu
         )
         word_timings = voice_result['word_timings']
 
-        # 4. Montaj
-        print("\n[4/6] Video montajlanıyor (Mükemmel Senkronizasyon)...")
-        output_filename = "daily_shorts_1.mp4"
+        # ── 4. Video montajı ──────────────────────────────────────
+        print("\n[4/6] Video montajlanıyor...")
+        output_filename = f"shorts_{ts}.mp4"
         final_video_path = self.editor.assemble_short(
             video_paths=video_paths,
             audio_path=audio_path,
@@ -76,9 +85,9 @@ class EvcarixOrchestrator:
             output_filename=output_filename
         )
 
-        # 5. Premium Thumbnail (Pillow tabanlı — ImageMagick gerekmez)
+        # ── 5. Premium Thumbnail ──────────────────────────────────
         print("\n[5/6] Premium Thumbnail oluşturuluyor...")
-        thumbnail_path = "output/thumbnails/daily_shorts_1.jpg"
+        thumbnail_path = f"output/thumbnails/thumb_{ts}.jpg"
         os.makedirs("output/thumbnails", exist_ok=True)
         self.editor.generate_premium_thumbnail(
             video_path=final_video_path,
@@ -86,27 +95,39 @@ class EvcarixOrchestrator:
             output_path=thumbnail_path
         )
 
-        # 6. YouTube'a yükle
+        # ── 6. YouTube'a yükle ────────────────────────────────────
         if self.uploader and os.path.exists(final_video_path):
             print("\n[6/6] YouTube'a yükleniyor...")
+
+            # İnsan gibi küçük bir bekleme (5-25 sn) yükleme öncesi
+            pre_upload_delay = random.randint(5, 25)
+            print(f"      Yükleme öncesi {pre_upload_delay}sn bekleniyor...")
+            await asyncio.sleep(pre_upload_delay)
+
             try:
                 video_id = self.uploader.upload_video(
                     final_video_path, title, description, tags
                 )
-                print(f"Yüklendi! Video ID: {video_id}")
-                
-                # Kapak görselini (Thumbnail) ayarla
-                if os.path.exists(thumbnail_path):
-                    self.uploader.set_thumbnail(video_id, thumbnail_path)
-            except Exception as e:
-                print(f"YouTube yükleme hatası: {e}")
-        else:
-            print("\n[6/6] YouTube yükleme atlanıyor.")
+                print(f"      ✅ Yüklendi! Video ID: {video_id}")
+                print(f"      🔗 https://www.youtube.com/watch?v={video_id}")
 
-        print(f"\n--- Tamamlandı! ---")
-        print(f"Video : {final_video_path}")
-        print(f"Thumbnail: {thumbnail_path}")
-        print(f"Başlık: {title}")
+                # Thumbnail yükle
+                if os.path.exists(thumbnail_path):
+                    # Thumbnail yüklemesi öncesi de küçük bekleme
+                    await asyncio.sleep(random.randint(3, 10))
+                    self.uploader.set_thumbnail(video_id, thumbnail_path)
+
+            except Exception as e:
+                print(f"      ❌ YouTube yükleme hatası: {e}")
+        else:
+            print("\n[6/6] YouTube yükleme atlandı (uploader yok veya video bulunamadı).")
+
+        print(f"\n{'='*60}")
+        print(f"  ✅ TAMAMLANDI!")
+        print(f"  Video    : {final_video_path}")
+        print(f"  Thumbnail: {thumbnail_path}")
+        print(f"  Başlık   : {title.encode('ascii', 'ignore').decode('ascii')}")
+        print(f"{'='*60}\n")
 
 
 if __name__ == "__main__":
