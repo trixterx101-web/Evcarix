@@ -2,13 +2,14 @@ import os
 import json
 from dotenv import load_dotenv
 
+# .env dosyasını yükle
 load_dotenv()
 
 from src.brain import Brain
 from src.media_engine import MediaEngine
 from src.editor import assemble_short
 
-# Optional TTS
+# İsteğe bağlı TTS (Seslendirme)
 try:
     import edge_tts
     import asyncio
@@ -22,19 +23,19 @@ os.makedirs(os.path.join(OUTPUT_DIR, "thumbnails"), exist_ok=True)
 
 
 async def generate_audio(script, output_path, voice="en-US-AriaNeural"):
-    """Generate TTS audio using edge-tts."""
+    """edge-tts kullanarak ses dosyası oluşturur."""
     communicate = edge_tts.Communicate(script, voice)
     await communicate.save(output_path)
-    print(f"[TTS] Audio saved: {output_path}")
+    print(f"[TTS] Ses kaydedildi: {output_path}")
 
 
 def main():
     print("=" * 50)
-    print("  EVCARIX — Automated YouTube Shorts Pipeline")
+    print("  EVCARIX — Otomatik YouTube Shorts Hattı")
     print("=" * 50)
 
-    # Step 1: Create daily plan
-    print("\n[Step 1/6] Creating daily content plan...")
+    # Adım 1: Günlük planı oluştur
+    print("\n[Adım 1/6] Günlük içerik planı hazırlanıyor...")
     brain = Brain()
     plans = brain.create_daily_plan(num_videos=1)
 
@@ -48,32 +49,36 @@ def main():
         description = plan["description"]
 
         print(f"\n{'=' * 40}")
-        print(f"Processing Video {idx}: {title}")
+        print(f"Video {idx} İşleniyor: {title}")
         print(f"{'=' * 40}")
 
-        # Step 2: Get video clips
-        print(f"\n[Step 2/6] Downloading video clips for: {topic[:50]}...")
+        # Adım 2: Video kliplerini indir
+        print(f"\n[Adım 2/6] Klipler indiriliyor: {topic[:50]}...")
         clips = media.get_video_clips(topic, num_clips=4)
         if not clips:
-            print("[Main] No clips found, skipping video.")
+            print("[Main] Klip bulunamadı, bu video atlanıyor.")
             continue
 
-        # Step 3: Generate audio
+        # Adım 3: Seslendirme oluştur
         audio_path = os.path.join(OUTPUT_DIR, f"audio_{idx}.mp3")
         if TTS_AVAILABLE:
-            print(f"\n[Step 3/6] Generating TTS audio...")
+            print(f"\n[Adım 3/6] Seslendirme (TTS) üretiliyor...")
             import asyncio
-            asyncio.run(generate_audio(script, audio_path))
+            try:
+                asyncio.run(generate_audio(script, audio_path))
+            except Exception as e:
+                print(f"[TTS] Hata: {e}")
+                audio_path = None
         else:
-            print("[Step 3/6] edge-tts not available, skipping audio.")
+            print("[Adım 3/6] edge-tts kütüphanesi eksik, ses atlanıyor.")
             audio_path = None
 
         if not audio_path or not os.path.exists(audio_path):
-            print("[Main] No audio file, skipping video.")
+            print("[Main] Ses dosyası yok, video oluşturulamaz.")
             continue
 
-        # Step 4: Assemble video
-        print(f"\n[Step 4/6] Assembling video...")
+        # Adım 4: Videoyu birleştir (Montaj)
+        print(f"\n[Adım 4/6] Montaj yapılıyor...")
         video_output = os.path.join(OUTPUT_DIR, f"daily_shorts_{idx}.mp4")
         try:
             assemble_short(
@@ -83,11 +88,11 @@ def main():
                 output_path=video_output
             )
         except Exception as e:
-            print(f"[Main] Assembly error: {e}")
+            print(f"[Main] Montaj hatası: {e}")
             continue
 
-        # Step 5: Generate thumbnail
-        print(f"\n[Step 5/6] Generating thumbnail...")
+        # Adım 5: Kapak fotoğrafı (Thumbnail) oluştur
+        print(f"\n[Adım 5/6] Kapak fotoğrafı üretiliyor...")
         thumbnail_path = os.path.join(OUTPUT_DIR, "thumbnails", f"daily_shorts_{idx}.jpg")
         media.generate_thumbnail(
             video_path=clips[0],
@@ -95,27 +100,24 @@ def main():
             output_path=thumbnail_path
         )
 
-        # Step 6: Upload to YouTube (optional)
-        print(f"\n[Step 6/6] Ready to upload:")
-        print(f"  Video   : {video_output}")
-        print(f"  Thumbnail: {thumbnail_path}")
-        print(f"  Title   : {title}")
-        print(f"  Description:\n{description[:200]}...")
+        # Adım 6: YouTube'a Yükle
+        print(f"\n[Adım 6/6] YouTube'a yükleniyor...")
+        try:
+            # Mevcut upload_video.py dosyasındaki fonksiyonu çağırır
+            from upload_video import upload_video_to_youtube
+            
+            upload_video_to_youtube(
+                video_file=video_output,
+                title=title,
+                description=description,
+                tags=plan["tags"],
+                thumbnail_file=thumbnail_path
+            )
+            print("✅ Video başarıyla YouTube'a yüklendi!")
+        except Exception as e:
+            print(f"❌ Yükleme sırasında bir hata oluştu: {e}")
 
-        # Save upload info
-        upload_info = {
-            "video_path": video_output,
-            "thumbnail_path": thumbnail_path,
-            "title": title,
-            "description": description,
-            "tags": plan["tags"]
-        }
-        info_path = os.path.join(OUTPUT_DIR, f"upload_info_{idx}.json")
-        with open(info_path, "w", encoding="utf-8") as f:
-            json.dump(upload_info, f, indent=2, ensure_ascii=False)
-        print(f"  Upload info saved: {info_path}")
-
-    print("\n✅ Pipeline complete!")
+    print("\n✅ Tüm süreç tamamlandı!")
 
 
 if __name__ == "__main__":
