@@ -1,7 +1,7 @@
 name: Daily Evcarix Shorts
 
 on:
-  workflow_dispatch:  # BU SATIR EKSİKSE BUTON ASLA ÇIKMAZ!
+  workflow_dispatch:
   schedule:
     - cron: '0 12 * * *'
 
@@ -31,7 +31,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - - name: Run Main Workflow
+      - name: Run Main Workflow
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
