@@ -70,49 +70,34 @@ class AutoEditor:
         except Exception as e:
             print(f"Hook ekranı eklenemedi: {e}")
 
-        # Mükemmel Senkronize Altyazı (6 kelimelik bloklar)
+        # Mükemmel Senkronize veya Fallback Altyazı
         try:
-            chunk_size = 6
             subtitle_clips = []
-
-            for i in range(0, len(word_timings), chunk_size):
-                chunk_data = word_timings[i:i + chunk_size]
-                chunk_text = " ".join([w['text'] for w in chunk_data])
-                start_t = chunk_data[0]['start']
-                end_t = chunk_data[-1]['start'] + chunk_data[-1]['duration']
-                dur = end_t - start_t
-
-                if dur <= 0: continue
-
-                # Altyazı metni
-                txt = TextClip(
-                    chunk_text,
-                    fontsize=75,
-                    color='white', 
-                    font='Arial-Bold',
-                    method='caption',
-                    size=(900, None), 
-                    align='center'
-                ).set_start(start_t).set_duration(dur)
-                
-                # Yarı-şeffaf siyah kutu (opacity=0.6)
-                bg_w, bg_h = 950, txt.h + 40
-                bg = ColorClip(size=(bg_w, bg_h), color=(0, 0, 0)).set_opacity(0.6).set_start(start_t).set_duration(dur)
-                
-                # Ekranın ALT bölümünde konumlandırma
-                pos_y = 1500 
-                txt = txt.set_position(("center", pos_y + 20))
-                bg = bg.set_position(("center", pos_y))
-
-                subtitle_clips.extend([bg, txt])
+            chunk_size = 6
+            
+            if word_timings:
+                print(f"[Editor] {len(word_timings)} kelime zamanlaması kullanılıyor.")
+                for i in range(0, len(word_timings), chunk_size):
+                    chunk_data = word_timings[i:i + chunk_size]
+                    chunk_text = " ".join([w['text'] for w in chunk_data])
+                    start_t = chunk_data[0]['start']
+                    end_t = chunk_data[-1]['start'] + chunk_data[-1]['duration']
+                    dur = end_t - start_t
+                    if dur <= 0: continue
+                    
+                    subtitle_clips.extend(self._create_subtitle_block(chunk_text, start_t, dur))
+            else:
+                print("[Editor] Kelime zamanlaması bulunamadı, tahmini zamanlama kullanılıyor.")
+                pass
 
             if subtitle_clips:
                 final_video = CompositeVideoClip([final_video] + subtitle_clips)
-                print(f"[Editor] {len(subtitle_clips)//2} mükemmel senkronize altyazı bloğu eklendi.")
+                print(f"[Editor] {len(subtitle_clips)//2} altyazı bloğu başarıyla eklendi.")
+            else:
+                print("[Editor] Uyarı: Hiç altyazı bloğu oluşturulamadı!")
+                
         except Exception as e:
-            print(f"Altyazı eklenemedi: {e}")
-        except Exception as e:
-            print(f"Altyazı eklenemedi: {e}")
+            print(f"[Editor] Altyazı ekleme hatası: {e}")
 
         output_path = os.path.join(self.output_dir, output_filename)
         # Daha yüksek kalite (bitrate artırıldı)
@@ -121,6 +106,31 @@ class AutoEditor:
             bitrate="8000k", threads=4, preset="medium"
         )
         return output_path
+
+    def _create_subtitle_block(self, text, start_t, duration):
+        """Altyazı metni ve arka plan kutusunu oluşturur."""
+        try:
+            # Yazı
+            txt = TextClip(
+                text,
+                fontsize=75,
+                color='white',
+                font='Arial', # Daha güvenli font
+                method='caption',
+                size=(900, None),
+                align='center'
+            ).set_start(start_t).set_duration(duration)
+
+            # Arka plan (Siyah kutu, 0.6 opaklık)
+            bg_w, bg_h = 950, txt.h + 40
+            bg = ColorClip(size=(bg_w, bg_h), color=(0, 0, 0)).set_opacity(0.6).set_start(start_t).set_duration(duration)
+
+            # Pozisyon
+            pos_y = 1500
+            return [bg.set_position(("center", pos_y)), txt.set_position(("center", pos_y + 20))]
+        except Exception as e:
+            print(f"Subtitle block error: {e}")
+            return []
 
     def assemble_long_video(self, video_paths, audio_path, script_text, output_filename, bg_music_path=None):
         """Yatay uzun video montajı (Full HD 1920x1080)."""
