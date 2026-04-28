@@ -23,8 +23,16 @@ class EvcarixOrchestrator:
         if os.path.exists(secret_path):
             try:
                 self.uploader = YouTubeUploader(secret_path)
+                print("✅ YouTube Uploader başarıyla başlatıldı.")
             except Exception as e:
-                print(f"YouTube Uploader başlatılamadı: {e}")
+                print(f"❌ YouTube Uploader başlatılamadı: {e}")
+                # Hata durumunda işlemi durdur ki neden yüklenemediğini anlayalım
+                if os.getenv("CI"):
+                    raise Exception(f"YouTube uploader başlatılamadı: {e}")
+        else:
+            print("⚠️ client_secret.json bulunamadı.")
+            if os.getenv("CI"):
+                raise FileNotFoundError("GitHub Actions ortamında client_secret.json eksik!")
 
     async def run_daily_shorts_workflow(self):
         # ── Zaman damgası & slot bilgisi ──────────────────────────

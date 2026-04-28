@@ -43,7 +43,7 @@ jobs:
       #     YouTube algoritmasına makine gibi görünmemek için
       - name: Human-like Random Delay
         run: |
-          DELAY=$((RANDOM % 2400))
+          DELAY=$((RANDOM % 120))
           echo "Beklenilen süre: $DELAY saniye ($(($DELAY / 60)) dakika $(($DELAY % 60)) saniye)"
           sleep $DELAY
 

@@ -195,7 +195,7 @@ class AutoEditor:
             audio_codec="aac",
             bitrate="6000k",
             threads=4,
-            preset="fast",
+            preset="ultrafast",
             logger="bar"
         )
         print(f"[Editor] Video hazır: {output_path}")
