@@ -14,14 +14,32 @@ class MediaEngine:
     async def generate_voiceover(self, text, output_path, voice_type="female", rate="+10%"):
         return await self.voice_engine.generate_voice(text, output_path, voice_type=voice_type, rate=rate)
 
+    def _get_professional_query(self, topic):
+        """Arama sorgusunu ultra-profesyonel ve telifsiz sonuçlar için optimize eder."""
+        # Gereksiz kelimeleri temizle
+        clean_topic = topic.split(':')[0] if ':' in topic else topic
+        # Profesyonel anahtar kelimeler ekle
+        professional_keywords = [
+            f"{clean_topic} cinematic car 4k",
+            f"{clean_topic} electric vehicle driving",
+            f"{clean_topic} car interior tech",
+            f"{clean_topic} modern car exterior luxury",
+            "electric car charging station 4k",
+            "future electric vehicle technology"
+        ]
+        import random
+        return random.choice(professional_keywords)
+
     def download_stock_videos(self, query, output_dir="assets/temp_videos", count=4, orientation="portrait"):
         if not self.pexels_api_key:
             print("Hata: PEXELS_API_KEY bulunamadı!")
             return []
         os.makedirs(output_dir, exist_ok=True)
 
+        # Sorguyu optimize et
+        optimized_query = self._get_professional_query(query)
         headers = {"Authorization": self.pexels_api_key}
-        url = f"https://api.pexels.com/videos/search?query={query}&per_page={count}&orientation={orientation}"
+        url = f"https://api.pexels.com/videos/search?query={optimized_query}&per_page={count}&orientation={orientation}"
         paths = []
         try:
             print(f"Pexels: '{query}' aranıyor...")
