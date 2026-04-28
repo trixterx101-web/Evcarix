@@ -1,9 +1,9 @@
 name: Daily Evcarix Shorts
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 9 * * *' # Her gün Türkiye saatiyle 12:00 (UTC 09:00)
-  workflow_dispatch: # Manuel tetikleme için
+    - cron: '0 12 * * *'
 
 jobs:
   build-and-upload:
