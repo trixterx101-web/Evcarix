@@ -2,7 +2,7 @@ name: Daily Evcarix Shorts
 
 on:
   schedule:
-    - cron: '0 9 * * *' # Her gün Türkiye saatiyle 12:00 (UTC 09:00)
+    - cron: '0 9 * * *' # Her gün Türkiye saatiyle 12:00
   workflow_dispatch: # Manuel tetikleme için
 
 jobs:
@@ -22,7 +22,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y imagemagick
-        # ImageMagick policy fix (for TextClip)
         sudo sed -i 's/policy domain="path" rights="none" pattern="@\*"/policy domain="path" rights="read|write" pattern="@\*"/g' /etc/ImageMagick-6/policy.xml
 
     - name: Install Python Dependencies
@@ -30,24 +29,19 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Setup Secrets
-      env:
-        YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
-        YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
-      run: python src/setup_secrets.py
-
     - name: Run Main Workflow
       env:
+        # GitHub Secrets kısmındaki isimlerle birebir aynı yapıldı
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        YOUTUBE_CLIENT_SECRET_FILE: "client_secret.json"
+        YOUTUBE_TOKEN: ${{ secrets.YOUTUBE_TOKEN }}
+        YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
         CI: "true"
       run: python main.py
 
-    - name: Upload Artifacts (Optional)
+    - name: Upload Artifacts (Yedek Al)
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: daily-video
-        path: output/daily_shorts_1.mp4
+        path: output/
