@@ -119,6 +119,7 @@ class EvcarixOrchestrator:
 
             except Exception as e:
                 print(f"      ❌ YouTube yükleme hatası: {e}")
+                raise e # GitHub Actions'ın hata olduğunu anlaması için hatayı fırlatıyoruz
         else:
             print("\n[6/6] YouTube yükleme atlandı (uploader yok veya video bulunamadı).")
 
