@@ -13,13 +13,13 @@ class EvcarixBrain:
     def get_daily_config(self):
         weekday = datetime.datetime.now().strftime("%A")
         schedule = {
-            "Monday":    {"type": "short", "topic": "EV News Summary",       "duration": 60},
-            "Tuesday":   {"type": "short", "topic": "Charging Tips",          "duration": 45},
-            "Wednesday": {"type": "short", "topic": "Tesla/BMW/Rivian",       "duration": 50},
-            "Thursday":  {"type": "short", "topic": "Market Comparison",      "duration": 55},
-            "Friday":    {"type": "short", "topic": "World EV Trend",         "duration": 45},
-            "Saturday":  {"type": "short", "topic": "Weekend EV Tips",        "duration": 60},
-            "Sunday":    {"type": "long",  "topic": "Deep EV Review",         "duration": 480},
+            "Monday":    {"type": "short", "topic": "Battery Tech & Degradation", "duration": 60},
+            "Tuesday":   {"type": "short", "topic": "Real-World Range Test",     "duration": 45},
+            "Wednesday": {"type": "short", "topic": "Charging Speed Analysis",   "duration": 50},
+            "Thursday":  {"type": "short", "topic": "Winter Performance Data",   "duration": 55},
+            "Friday":    {"type": "short", "topic": "LFP vs NMC Comparison",     "duration": 45},
+            "Saturday":  {"type": "short", "topic": "EV Efficiency Breakdown",   "duration": 60},
+            "Sunday":    {"type": "long",  "topic": "Deep Technical EV Review",  "duration": 480},
         }
         return schedule.get(weekday, schedule["Monday"])
 

@@ -91,8 +91,9 @@ class CreativeWriter:
     def _get_prompt(self, topic, format_type):
         evcarix_mission = (
             "Evcarix is a data-driven electric vehicle channel focused on real-world EV performance and battery science. "
-            "No hype. Just numbers. Focus on driving range, battery efficiency, winter range loss, charging speed, "
-            "and technical EV technology (LFP vs NMC, degradation, etc.)."
+            "We test electric cars beyond marketing claims — measuring true driving range, battery efficiency, winter range loss, "
+            "cold weather performance, charging speed, charging costs, and long-term EV ownership experience. "
+            "Mission: No hype. Just numbers."
         )
         if format_type == "short":
             return f"""
@@ -158,17 +159,19 @@ SENARYO: [script text]
     def generate_description(self, topic, title, tags_list):
         tags_line = " ".join([f"#{t.replace(' ', '')}" for t in tags_list[:8]])
         channel_desc = (
-            "Evcarix is a data-driven electric vehicle channel focused on real-world EV performance "
-            "and battery science. We test electric cars beyond marketing claims — measuring true "
-            "driving range, battery efficiency, winter range loss, cold weather performance, "
-            "charging speed, charging costs, and long-term EV ownership experience.\n\n"
+            "Evcarix is a data-driven electric vehicle channel focused on real-world EV performance and battery science.\n"
+            "We test electric cars beyond marketing claims — measuring true driving range, battery efficiency, winter range loss, "
+            "cold weather performance, charging speed, charging costs, and long-term EV ownership experience.\n\n"
             "On this channel you’ll find:\n"
             "• Real-world EV range tests\n"
             "• Winter vs summer EV performance comparisons\n"
             "• EV battery degradation analysis\n"
             "• LFP vs NMC battery comparisons\n"
-            "• Fast charging impact explained\n\n"
-            "Our mission: No hype. Just numbers. ⚡"
+            "• Fast charging impact explained\n"
+            "• EV efficiency & consumption breakdowns\n"
+            "• Electric vehicle technology explained clearly\n\n"
+            "Our mission is simple: No hype. Just numbers. ⚡\n\n"
+            "If you care about real electric vehicle data, battery performance, and honest EV analysis — welcome to Evcarix ⚡"
         )
         
         # SEO-friendly description content
