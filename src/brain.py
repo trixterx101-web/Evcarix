@@ -40,8 +40,12 @@ class EvcarixBrain:
         # Script üret
         writer_output = self.writer.generate_script(full_topic, format_type=config['type'])
 
+        # Tags üret
+        tags_list = self.writer.generate_tags(specific_topic, best_title)
+        print(f"Etiketler üretildi: {len(tags_list)} adet.")
+
         # Açıklama üret
-        description = self.writer.generate_description(specific_topic, best_title)
+        description = self.writer.generate_description(specific_topic, best_title, tags_list)
 
         plan = {
             "timestamp": datetime.datetime.now().strftime('%Y%m%d_%H%M%S'),
@@ -53,8 +57,7 @@ class EvcarixBrain:
             "script": writer_output['script'],
             "voice": writer_output['voice'],
             "description": description,
-            "tags": ["ev", "electriccar", "electricvehicle", "battery",
-                     "tesla", "evrange", "Evcarix", "shorts"]
+            "tags": tags_list
         }
 
         with open("daily_plan.json", "w", encoding="utf-8") as f:

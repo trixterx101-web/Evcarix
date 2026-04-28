@@ -104,24 +104,30 @@ class MediaEngine:
             if current:
                 lines.append(current)
 
-            # Başlık çiz (sarı)
-            y_start = img.height - 70 - (len(lines) * 88) - 70
+            # Başlık çiz (Sarı & Siyah Kontrast)
+            y_start = img.height - 100 - (len(lines) * 95) - 70
             for line in lines:
                 bbox = draw.textbbox((0, 0), line, font=title_font)
                 x = (img.width - (bbox[2] - bbox[0])) // 2
-                draw.text((x + 3, y_start + 3), line, font=title_font, fill=(0, 0, 0))
-                draw.text((x, y_start), line, font=title_font, fill=(255, 220, 0))
-                y_start += 88
+                # Gölge
+                draw.text((x + 5, y_start + 5), line, font=title_font, fill=(0, 0, 0))
+                # Ana metin
+                draw.text((x, y_start), line, font=title_font, fill=(255, 240, 0))
+                y_start += 95
 
-            # Kanal adı (yeşil)
+            # Kanal & Misyon (Altta bant şeklinde)
+            footer_bg = Image.new("RGBA", (img.width, 140), (0, 0, 0, 180))
+            img.paste(footer_bg, (0, img.height - 140), footer_bg)
+            
+            # Kanal adı (Canlı Yeşil)
             cb = draw.textbbox((0, 0), channel_name, font=ch_font)
             cx = (img.width - (cb[2] - cb[0])) // 2
-            draw.text((cx, img.height - 110), channel_name, font=ch_font, fill=(0, 230, 100))
+            draw.text((cx, img.height - 120), channel_name, font=ch_font, fill=(0, 255, 127))
 
-            # Slogan (beyaz)
+            # Slogan (Parlak Beyaz)
             sb = draw.textbbox((0, 0), slogan, font=sl_font)
             sx = (img.width - (sb[2] - sb[0])) // 2
-            draw.text((sx, img.height - 60), slogan, font=sl_font, fill=(210, 210, 210))
+            draw.text((sx, img.height - 65), slogan.upper(), font=sl_font, fill=(255, 255, 255))
 
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             img.save(output_path, "JPEG", quality=95)

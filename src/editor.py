@@ -15,7 +15,7 @@ class AutoEditor:
         os.makedirs(output_dir, exist_ok=True)
 
     def assemble_short(self, video_paths, audio_path, script_text, output_filename):
-        """Dikey Shorts video montajı — altyazılar alt kısımda yarı şeffaf kutu içinde."""
+        """Dikey Shorts video montajı — Full HD (1080x1920) ve iyileştirilmiş altyazılar."""
         audio = AudioFileClip(audio_path)
 
         clips = []
@@ -25,19 +25,22 @@ class AutoEditor:
             try:
                 clip = VideoFileClip(path)
                 w, h = clip.size
-                # 9:16 dikey formata getir
-                if w / h > 9 / 16:
-                    new_w = h * (9 / 16)
+                # 9:16 dikey formata getir (Full HD 1080x1920 hedefli)
+                target_ratio = 9 / 16
+                if w / h > target_ratio:
+                    new_w = h * target_ratio
                     clip = clip.crop(x_center=w / 2, width=new_w)
-                clip = clip.resize(height=1280)
-                if clip.w > 720:
-                    clip = clip.crop(x_center=clip.w / 2, width=720)
+                else:
+                    new_h = w / target_ratio
+                    clip = clip.crop(y_center=h / 2, height=new_h)
+                
+                clip = clip.resize(width=1080) # 1080x1920
                 clips.append(clip)
             except Exception as e:
                 print(f"Klip hatası ({path}): {e}")
 
         if not clips:
-            clips = [ColorClip(size=(720, 1280), color=(0, 0, 0)).set_duration(audio.duration)]
+            clips = [ColorClip(size=(1080, 1920), color=(0, 0, 0)).set_duration(audio.duration)]
 
         final_video = concatenate_videoclips(clips, method="compose")
 
@@ -48,53 +51,76 @@ class AutoEditor:
 
         final_video = final_video.set_audio(audio)
 
-        # Altyazı — alt kısımda yarı şeffaf kutu
+        # Başlangıç Kancası (0.8 saniye süren dikkat çekici başlık ekranı)
+        try:
+            hook_txt = TextClip(
+                script_text.split()[:5][0].upper() + "...", # İlk kelime veya kısa başlık
+                fontsize=110,
+                color='white',
+                font='Arial-Bold',
+                stroke_color='black',
+                stroke_width=5,
+                method='caption',
+                size=(1000, None),
+                align='center'
+            ).set_duration(0.8).set_position('center').set_start(0)
+            
+            # Arka plana hafif bir karartma ekleyelim ki yazı okunsun
+            hook_bg = ColorClip(size=(1080, 1920), color=(0,0,0)).set_opacity(0.4).set_duration(0.8)
+            
+            final_video = CompositeVideoClip([final_video, hook_bg, hook_txt])
+        except Exception as e:
+            print(f"Hook ekranı eklenemedi: {e}")
+
+        # Altyazı — Daha okunaklı ve sığacak şekilde
         try:
             words = script_text.split()
-            chunk_size = 5
+            chunk_size = 3 # Daha az kelime = daha büyük/okunaklı metin
             duration_per_word = audio.duration / max(len(words), 1)
             subtitle_clips = []
 
             for i in range(0, len(words), chunk_size):
-                chunk = " ".join(words[i:i + chunk_size])
+                chunk = " ".join(words[i:i + chunk_size]).upper()
                 start_t = i * duration_per_word
                 end_t = min((i + chunk_size) * duration_per_word, audio.duration)
                 dur = end_t - start_t
 
-                # Yarı şeffaf siyah kutu
-                box = ColorClip(size=(720, 180), color=(0, 0, 0))
-                box = box.set_opacity(0.6).set_start(start_t).set_duration(dur)
-                box = box.set_position(("center", 1280 - 200))
+                if dur <= 0: continue
 
-                # Altyazı metni
+                # Altyazı metni (Daha güvenli genişlik ve hizalama)
                 txt = TextClip(
                     chunk,
-                    fontsize=58,
-                    color='white',
+                    fontsize=85,
+                    color='yellow', 
                     font='Arial-Bold',
                     stroke_color='black',
-                    stroke_width=2,
+                    stroke_width=4,
                     method='caption',
-                    size=(680, None),
+                    size=(950, None), 
                     align='center'
                 ).set_start(start_t).set_duration(dur)
-                txt = txt.set_position(("center", 1280 - 185))
+                
+                # Ekranın ortasında (Shorts yazılarına takılmaması için orta-alt güvenli bölge)
+                txt = txt.set_position(("center", 1100))
 
-                subtitle_clips.extend([box, txt])
+                subtitle_clips.append(txt)
 
-            final_video = CompositeVideoClip([final_video] + subtitle_clips)
-            print(f"{len(subtitle_clips) // 2} altyazı bloğu eklendi.")
+            if subtitle_clips:
+                final_video = CompositeVideoClip([final_video] + subtitle_clips)
+                print(f"{len(subtitle_clips)} altyazı bloğu eklendi.")
         except Exception as e:
             print(f"Altyazı eklenemedi: {e}")
 
         output_path = os.path.join(self.output_dir, output_filename)
+        # Daha yüksek kalite (bitrate artırıldı)
         final_video.write_videofile(
-            output_path, fps=24, codec="libx264", audio_codec="aac", threads=4
+            output_path, fps=30, codec="libx264", audio_codec="aac", 
+            bitrate="8000k", threads=4, preset="medium"
         )
         return output_path
 
     def assemble_long_video(self, video_paths, audio_path, script_text, output_filename, bg_music_path=None):
-        """Yatay uzun video montajı."""
+        """Yatay uzun video montajı (Full HD 1920x1080)."""
         audio = AudioFileClip(audio_path)
         clips = []
         for path in video_paths:
@@ -133,5 +159,7 @@ class AutoEditor:
             final_video = final_video.set_audio(audio)
 
         output_path = os.path.join(self.output_dir, output_filename)
-        final_video.write_videofile(output_path, fps=24, codec="libx264", audio_codec="aac")
+        final_video.write_videofile(
+            output_path, fps=30, codec="libx264", audio_codec="aac", bitrate="12000k"
+        )
         return output_path
