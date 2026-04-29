@@ -59,7 +59,12 @@ jobs:
           YOUTUBE_TOKEN_DATA:        ${{ secrets.YOUTUBE_TOKEN }}
           YOUTUBE_CLIENT_SECRET_DATA: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           # Slot bilgisi: script hangi yayın diliminde çalıştığını bilsin
-          UPLOAD_SLOT: ${{ github.event.schedule == '0 15 * * *' && 'evening' || 'night' }}
+          # workflow_dispatch -> inputs.slot, cron 15:00 UTC -> evening, cron 18:00 UTC -> night
+          UPLOAD_SLOT: >-
+            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.slot ||
+                github.event.schedule == '0 15 * * *' && 'evening' ||
+                github.event.schedule == '0 18 * * *' && 'night' ||
+                'evening' }}
         run: |
           # Kimlik dosyalarını oluştur
           python -c "import os; open('token.json', 'w').write(os.environ['YOUTUBE_TOKEN_DATA'])"

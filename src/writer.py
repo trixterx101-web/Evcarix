@@ -53,7 +53,7 @@ class CreativeWriter:
         if GEMINI_AVAILABLE and self.gemini_client:
             try:
                 resp = self.gemini_client.models.generate_content(
-                    model='gemini-1.5-flash', contents=prompt
+                    model='gemini-2.0-flash', contents=prompt
                 )
                 text = resp.text.strip().replace("```json", "").replace("```", "").strip()
                 titles = json.loads(text)
@@ -164,7 +164,7 @@ SENARYO: [script text]
 
     def _generate_with_gemini(self, prompt):
         response = self.gemini_client.models.generate_content(
-            model='gemini-1.5-flash', contents=prompt
+            model='gemini-2.0-flash', contents=prompt
         )
         return self._parse_response(response.text)
 
@@ -219,7 +219,7 @@ SENARYO: [script text]
                 seo_body = completion.choices[0].message.content.strip()
             elif GEMINI_AVAILABLE and self.gemini_client:
                 resp = self.gemini_client.models.generate_content(
-                    model='gemini-1.5-flash', contents=prompt
+                    model='gemini-2.0-flash', contents=prompt
                 )
                 seo_body = resp.text.strip()
         except Exception as e:
@@ -273,7 +273,7 @@ SENARYO: [script text]
                 raw_tags = completion.choices[0].message.content.strip()
             elif GEMINI_AVAILABLE and self.gemini_client:
                 resp = self.gemini_client.models.generate_content(
-                    model='gemini-1.5-flash', contents=prompt
+                    model='gemini-2.0-flash', contents=prompt
                 )
                 raw_tags = resp.text.strip()
 

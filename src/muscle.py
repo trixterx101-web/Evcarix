@@ -2,9 +2,9 @@ import os
 import json
 import asyncio
 import datetime
-from media_engine import MediaEngine
-from editor import AutoEditor
-from uploader import YouTubeUploader
+from src.media_engine import MediaEngine
+from src.editor import AutoEditor
+from src.uploader import YouTubeUploader
 
 class EvcarixMuscle:
     def __init__(self):

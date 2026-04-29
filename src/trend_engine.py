@@ -108,7 +108,7 @@ class TrendEngine:
                     + "\n".join(f"- {t}" for t in titles)
                 )
                 response = self.gemini_client.models.generate_content(
-                    model='gemini-1.5-flash',
+                    model='gemini-2.0-flash',
                     contents=prompt
                 )
                 selected = response.text.strip()

@@ -193,7 +193,7 @@ class AutoEditor:
             fps=30,
             codec="libx264",
             audio_codec="aac",
-            bitrate="6000k",
+            bitrate="4000k",
             threads=4,
             preset="ultrafast",
             logger="bar"
