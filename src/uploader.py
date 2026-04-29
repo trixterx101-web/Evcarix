@@ -8,8 +8,7 @@ class YouTubeUploader:
     def __init__(self, client_secrets_file):
         # youtube.force-ssl is REQUIRED for thumbnails().set()
         self.scopes = [
-            "https://www.googleapis.com/auth/youtube.upload",
-            "https://www.googleapis.com/auth/youtube.force-ssl"
+            "https://www.googleapis.com/auth/youtube.upload"
         ]
         self.client_secrets_file = client_secrets_file
         self.youtube = self.get_authenticated_service()
