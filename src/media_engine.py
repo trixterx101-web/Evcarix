@@ -12,6 +12,7 @@ load_dotenv()
 class MediaEngine:
     def __init__(self):
         self.pexels_api_key = os.getenv("PEXELS_API_KEY")
+        self.pixabay_api_key = os.getenv("PIXABAY_API_KEY")
         self.voice_engine = VoiceEngine()
 
     async def generate_voiceover(self, text, output_path, voice_type="female", rate="+10%"):
@@ -35,68 +36,154 @@ class MediaEngine:
         ]
         return random.choice(strategies)
 
-    def download_stock_videos(self, query, output_dir="assets/temp_videos", count=4, orientation="portrait"):
+    # ─── Pexels Video İndirme ──────────────────────────────────────────────────
+    def _download_from_pexels(self, query, output_dir, count, orientation):
+        """Pexels API'den rastgele sayfa ve sorgu ile video indirir."""
         if not self.pexels_api_key:
-            print("Hata: PEXELS_API_KEY bulunamadı!")
+            print("[Pexels] API key bulunamadı, atlanıyor.")
             return []
-        os.makedirs(output_dir, exist_ok=True)
 
         optimized_query = self._get_professional_query(query)
         headers = {"Authorization": self.pexels_api_key}
-
-        # Her çalışmada farklı sayfa — çeşitlilik için rastgele offset
         page = random.randint(1, 8)
 
         url = (
             f"https://api.pexels.com/videos/search"
             f"?query={optimized_query}"
-            f"&per_page={count + 4}"   # Fazla çek, en iyilerini seç
+            f"&per_page={count + 4}"
             f"&page={page}"
             f"&orientation={orientation}"
         )
         paths = []
         try:
-            print(f"Pexels: '{optimized_query}' (sayfa {page}) aranıyor...")
+            print(f"[Pexels] '{optimized_query}' (sayfa {page}) aranıyor...")
             response = requests.get(url, headers=headers, timeout=15)
             if response.status_code == 200:
                 videos = response.json().get('videos', [])
                 if not videos:
-                    # Sayfa boşsa ilk sayfaya fallback
                     url_p1 = url.replace(f"&page={page}", "&page=1")
                     response = requests.get(url_p1, headers=headers, timeout=15)
                     videos = response.json().get('videos', []) if response.status_code == 200 else []
-                if not videos:
-                    print(f"'{query}' için video bulunamadı.")
-                    return []
-                # Listeyi karıştır — her seferinde farklı sıra
                 random.shuffle(videos)
-                videos = videos[:count]   # İstenilen kadar al
-                for i, video_data in enumerate(videos):
+                for i, video_data in enumerate(videos[:count]):
                     video_files = video_data.get('video_files', [])
                     if not video_files:
                         continue
-                    # En yüksek çözünürlükleri sırala, ilk 3'ten rastgele seç
                     sorted_files = sorted(video_files, key=lambda x: x.get('width', 0), reverse=True)
                     chosen = random.choice(sorted_files[:3]) if len(sorted_files) >= 3 else sorted_files[0]
                     video_url = chosen['link']
-                    clean_query = re.sub(r'[^\w\s-]', '', query).strip().replace(' ', '_')[:40]
-                    filename = f"pexels_{clean_query}_{page}_{i}.mp4"
-                    output_path = os.path.join(output_dir, filename)
-                    print(f"İndiriliyor ({i+1}/{len(videos)}): {filename}")
+                    clean_q = re.sub(r'[^\w\s-]', '', query).strip().replace(' ', '_')[:30]
+                    filename = f"pexels_{clean_q}_{page}_{i}.mp4"
+                    out_path = os.path.join(output_dir, filename)
                     v_res = requests.get(video_url, stream=True, timeout=60)
                     if v_res.status_code == 200:
-                        with open(output_path, 'wb') as f:
+                        with open(out_path, 'wb') as f:
                             for chunk in v_res.iter_content(chunk_size=1024 * 1024):
                                 if chunk:
                                     f.write(chunk)
-                        paths.append(output_path)
+                        paths.append(out_path)
+                        print(f"[Pexels] ✅ İndirildi: {filename}")
             else:
-                print(f"Pexels API Hatası: {response.status_code}")
+                print(f"[Pexels] API hatası: {response.status_code}")
         except Exception as e:
-            print(f"Video indirme hatası: {e}")
-
-        print(f"{len(paths)} video indirildi.")
+            print(f"[Pexels] İndirme hatası: {e}")
         return paths
+
+    # ─── Pixabay Video İndirme ─────────────────────────────────────────────────
+    def _download_from_pixabay(self, query, output_dir, count, orientation):
+        """Pixabay API'den video indirir. Ücretsiz & ticari kullanım serbest."""
+        if not self.pixabay_api_key:
+            print("[Pixabay] API key bulunamadı, atlanıyor.")
+            return []
+
+        pixabay_queries = [
+            "electric car",
+            "EV charging",
+            "electric vehicle",
+            "car technology",
+            "sustainable energy car",
+            "battery electric",
+            "modern car driving",
+            "car highway",
+        ]
+        optimized_query = random.choice(pixabay_queries)
+        page = random.randint(1, 5)
+        pix_orientation = "vertical" if orientation == "portrait" else "horizontal"
+
+        url = "https://pixabay.com/api/videos/"
+        params = {
+            'key': self.pixabay_api_key,
+            'q': optimized_query,
+            'video_type': 'film',
+            'orientation': pix_orientation,
+            'order': 'popular',
+            'per_page': count + 4,
+            'page': page,
+            'safesearch': 'true',
+        }
+        paths = []
+        try:
+            print(f"[Pixabay] '{optimized_query}' (sayfa {page}) aranıyor...")
+            response = requests.get(url, params=params, timeout=15)
+            if response.status_code == 200:
+                hits = response.json().get('hits', [])
+                if not hits:
+                    params['page'] = 1
+                    response = requests.get(url, params=params, timeout=15)
+                    hits = response.json().get('hits', []) if response.status_code == 200 else []
+                random.shuffle(hits)
+                for i, hit in enumerate(hits[:count]):
+                    videos_dict = hit.get('videos', {})
+                    chosen_video = None
+                    for quality in ['large', 'medium', 'small', 'tiny']:
+                        if quality in videos_dict and videos_dict[quality].get('url'):
+                            chosen_video = videos_dict[quality]
+                            break
+                    if not chosen_video:
+                        continue
+                    video_url = chosen_video['url']
+                    clean_q = re.sub(r'[^\w\s-]', '', optimized_query).strip().replace(' ', '_')[:30]
+                    filename = f"pixabay_{clean_q}_{page}_{i}.mp4"
+                    out_path = os.path.join(output_dir, filename)
+                    v_res = requests.get(video_url, stream=True, timeout=60)
+                    if v_res.status_code == 200:
+                        with open(out_path, 'wb') as f:
+                            for chunk in v_res.iter_content(chunk_size=1024 * 1024):
+                                if chunk:
+                                    f.write(chunk)
+                        paths.append(out_path)
+                        print(f"[Pixabay] ✅ İndirildi: {filename}")
+            else:
+                print(f"[Pixabay] API hatası: {response.status_code}")
+        except Exception as e:
+            print(f"[Pixabay] İndirme hatası: {e}")
+        return paths
+
+    # ─── Ana İndirme Metodu — Pexels + Pixabay birleşik ──────────────────────
+    def download_stock_videos(self, query, output_dir="assets/temp_videos", count=4, orientation="portrait"):
+        """Pexels ve Pixabay'dan video indirir, birleştirir ve karıştırır."""
+        os.makedirs(output_dir, exist_ok=True)
+
+        pexels_count = (count + 1) // 2
+        pixabay_count = count - pexels_count
+
+        pexels_paths = self._download_from_pexels(query, output_dir, pexels_count, orientation)
+        pixabay_paths = self._download_from_pixabay(query, output_dir, pixabay_count, orientation)
+
+        all_paths = pexels_paths + pixabay_paths
+        random.shuffle(all_paths)
+
+        if not all_paths:
+            print("[MediaEngine] Her iki kaynaktan da video alınamadı!")
+            return []
+
+        if len(all_paths) < count:
+            extra_needed = count - len(all_paths)
+            extra = self._download_from_pexels(query, output_dir, extra_needed, orientation)
+            all_paths += extra
+
+        print(f"[MediaEngine] Toplam {len(all_paths)} klip hazır ({len(pexels_paths)} Pexels + {len(pixabay_paths)} Pixabay)")
+        return all_paths[:count]
 
     def generate_thumbnail(self, video_path, title, output_path,
                            channel_name="EVCARIX", slogan="No hype. Just numbers."):
