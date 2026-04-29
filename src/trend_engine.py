@@ -1,4 +1,6 @@
 import os
+import json
+import random
 import feedparser
 import requests
 import pandas as pd
@@ -10,6 +12,9 @@ try:
 except Exception:
     GEMINI_AVAILABLE = False
 
+TOPIC_HISTORY_FILE = "used_topics.json"
+TOPIC_HISTORY_LIMIT = 14  # Son 14 konu tekrar edilmez
+
 
 class TrendEngine:
     def __init__(self):
@@ -17,7 +22,27 @@ class TrendEngine:
             "https://electrek.co/feed/",
             "https://insideevs.com/rss/articles/all/",
             "https://www.teslarati.com/feed/",
-            "https://ev-database.org/rss.xml"
+            "https://ev-database.org/rss.xml",
+            "https://www.greencarreports.com/rss/news",
+            "https://cleantechnica.com/feed/",
+        ]
+        # EV konularında YouTube arama terimleri — her çalışmada farklısı seçilir
+        self.ev_search_queries = [
+            "electric car range test",
+            "EV battery technology 2024",
+            "Tesla vs competition real world",
+            "electric vehicle charging speed comparison",
+            "EV battery degradation data",
+            "best electric cars 2024 real test",
+            "solid state battery breakthrough",
+            "electric car ownership cost analysis",
+            "BYD electric car range test",
+            "EV winter range cold weather",
+            "800V charging electric car comparison",
+            "electric car efficiency wh per mile",
+            "EV vs hybrid total cost",
+            "electric vehicle battery life test",
+            "fast charging impact battery health",
         ]
         self.gemini_api_key = os.getenv("GEMINI_API_KEY") if GEMINI_AVAILABLE else None
         self.gemini_client = None
@@ -28,6 +53,37 @@ class TrendEngine:
                 print(f"[TrendEngine] Gemini init hatası: {e}")
                 self.gemini_client = None
 
+    # ─── Konu Geçmişi ─────────────────────────────────────────────────────────
+    def _load_topic_history(self):
+        """Daha önce kullanılan konuları yükler."""
+        if os.path.exists(TOPIC_HISTORY_FILE):
+            try:
+                with open(TOPIC_HISTORY_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                return []
+        return []
+
+    def _save_topic_history(self, topic):
+        """Kullanılan konuyu geçmişe ekler, limitin üstündekini siler."""
+        history = self._load_topic_history()
+        if topic in history:
+            history.remove(topic)
+        history.append(topic)
+        history = history[-TOPIC_HISTORY_LIMIT:]
+        with open(TOPIC_HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+
+    def _is_used_recently(self, topic):
+        """Bu konu son TOPIC_HISTORY_LIMIT içinde kullanıldı mı?"""
+        history = self._load_topic_history()
+        topic_lower = topic.lower()
+        for h in history:
+            if h.lower() in topic_lower or topic_lower in h.lower():
+                return True
+        return False
+
+    # ─── RSS Haberleri ─────────────────────────────────────────────────────────
     def get_latest_news(self):
         """Haber kaynaklarından en son haberleri çeker."""
         news_items = []
@@ -46,8 +102,9 @@ class TrendEngine:
                 print(f"Feed hatası ({url}): {e}")
         return pd.DataFrame(news_items)
 
-    def get_youtube_trending(self, region_code="US", max_results=10):
-        """YouTube Data API'den en popüler videoları çeker."""
+    # ─── YouTube Trending (Autos Kategorisi) ───────────────────────────────────
+    def get_youtube_trending(self, region_code="US", max_results=20):
+        """YouTube Data API'den en popüler Autos & Vehicles videolarını çeker."""
         api_key = os.getenv("YOUTUBE_API_KEY")
         if not api_key:
             print("[TrendEngine] YOUTUBE_API_KEY bulunamadı, trending atlanıyor.")
@@ -57,7 +114,7 @@ class TrendEngine:
             'part': 'snippet,statistics',
             'chart': 'mostPopular',
             'regionCode': region_code,
-            'videoCategoryId': '2', # Autos & Vehicles
+            'videoCategoryId': '2',  # Autos & Vehicles
             'maxResults': max_results,
             'key': api_key
         }
@@ -79,60 +136,134 @@ class TrendEngine:
             print(f"[TrendEngine] YouTube trending hatası: {e}")
             return []
 
-    def select_trending_topic(self, news_df):
-        """Selects a topic that aligns with Evcarix: No hype, just numbers.
-        Hierarchy: YouTube Trending > Gemini (from RSS) > Core Topics Fallback
-        """
-        
-        # 1) YouTube Trending (Autos Category) - Highest Priority
-        yt = self.get_youtube_trending(region_code=os.getenv('YOUTUBE_REGION', 'US'))
-        if yt:
-            for item in yt:
-                title = item['title']
-                # Filter to ensure it's EV or car related
-                if any(word in title.lower() for word in ['ev', 'electric', 'battery', 'tesla', 'range', 'car', 'volt', 'watt', 'efficiency']):
-                    # Sanitize for console printing (remove emojis)
-                    clean_title = title.encode('ascii', 'ignore').decode('ascii')
-                    print(f"[TrendEngine] YouTube technical trend selected: {clean_title}")
-                    return title
+    # ─── YouTube EV Keyword Araması ────────────────────────────────────────────
+    def get_youtube_ev_search(self, max_results=20):
+        """EV anahtar kelimeleriyle en çok izlenen YouTube videolarını arar."""
+        api_key = os.getenv("YOUTUBE_API_KEY")
+        if not api_key:
+            return []
+        # Her seferinde farklı bir arama terimi seç
+        query = random.choice(self.ev_search_queries)
+        url = "https://www.googleapis.com/youtube/v3/search"
+        params = {
+            'part': 'snippet',
+            'q': query,
+            'type': 'video',
+            'order': 'viewCount',
+            'relevanceLanguage': 'en',
+            'maxResults': max_results,
+            'key': api_key
+        }
+        try:
+            r = requests.get(url, params=params, timeout=15)
+            r.raise_for_status()
+            results = []
+            for it in r.json().get('items', []):
+                snip = it.get('snippet', {})
+                results.append({
+                    'title': snip.get('title', ''),
+                    'channelTitle': snip.get('channelTitle', ''),
+                    'videoId': it.get('id', {}).get('videoId', ''),
+                    'query_used': query
+                })
+            print(f"[TrendEngine] YouTube EV araması '{query}': {len(results)} sonuç")
+            return results
+        except Exception as e:
+            print(f"[TrendEngine] YouTube EV arama hatası: {e}")
+            return []
 
-        # 2) Gemini Selection from RSS News - Secondary Priority
+    # ─── Ana Konu Seçici ───────────────────────────────────────────────────────
+    def select_trending_topic(self, news_df):
+        """Her seferinde farklı, geçmişte kullanılmamış EV konusu seçer.
+        Öncelik: YouTube EV Arama > YouTube Trending > Gemini RSS > Core Fallback
+        """
+        ev_keywords = [
+            'ev', 'electric', 'battery', 'tesla', 'range', 'charging',
+            'volt', 'watt', 'efficiency', 'byd', 'ioniq', 'rivian', 'lucid',
+            'solid state', 'lithium', 'kwh', 'kilowatt', 'hybrid', 'motor'
+        ]
+
+        def is_ev_related(title):
+            t = title.lower()
+            return any(word in t for word in ev_keywords)
+
+        # 1) YouTube EV Keyword Araması — En Yüksek Öncelik
+        yt_ev = self.get_youtube_ev_search(max_results=20)
+        random.shuffle(yt_ev)  # Her seferinde farklı sıra
+        for item in yt_ev:
+            title = item['title']
+            if is_ev_related(title) and not self._is_used_recently(title):
+                clean = title.encode('ascii', 'ignore').decode('ascii')
+                print(f"[TrendEngine] YouTube EV search selected: {clean}")
+                self._save_topic_history(title)
+                return title
+
+        # 2) YouTube Trending (Autos Kategorisi)
+        yt = self.get_youtube_trending(region_code=os.getenv('YOUTUBE_REGION', 'US'))
+        candidates = [i for i in yt if is_ev_related(i['title'])]
+        random.shuffle(candidates)
+        for item in candidates:
+            title = item['title']
+            if not self._is_used_recently(title):
+                clean = title.encode('ascii', 'ignore').decode('ascii')
+                print(f"[TrendEngine] YouTube trending selected: {clean}")
+                self._save_topic_history(title)
+                return title
+
+        # 3) Gemini — RSS Haberlerinden Seçim
         if GEMINI_AVAILABLE and self.gemini_client and news_df is not None and not news_df.empty:
             try:
-                titles = news_df.head(15)['title'].tolist()
+                titles = news_df['title'].tolist()
+                random.shuffle(titles)
+                unused = [t for t in titles if not self._is_used_recently(t)]
+                pool = (unused if unused else titles)[:20]
                 prompt = (
                     "You are a technical EV analyst for the 'Evcarix' channel. "
-                    "Pick the ONE most data-driven, technical, or performance-related headline from this list. "
-                    "Avoid generic hype or political news. Focus on batteries, range, charging, or efficiency. "
+                    "Pick the ONE most data-driven, technical, or performance-related headline. "
+                    "Focus on batteries, range, charging, efficiency, or real-world tests. "
                     "Return ONLY the headline text.\n\n"
-                    + "\n".join(f"- {t}" for t in titles)
+                    + "\n".join(f"- {t}" for t in pool)
                 )
                 response = self.gemini_client.models.generate_content(
                     model='gemini-2.0-flash',
                     contents=prompt
                 )
                 selected = response.text.strip()
-                # Validate selection matches one of the titles (loosely)
-                if any(t.lower() in selected.lower() or selected.lower() in t.lower() for t in titles):
-                    print(f"[TrendEngine] Technical news selected via Gemini: {selected}")
+                if any(t.lower() in selected.lower() or selected.lower() in t.lower() for t in pool):
+                    print(f"[TrendEngine] Gemini RSS selection: {selected}")
+                    self._save_topic_history(selected)
                     return selected
             except Exception as e:
                 print(f"[TrendEngine] Gemini error: {e}")
 
-        # 3) Diverse Fallback from Core Topics
+        # 4) Geniş Core Topics Fallback — Geçmişte kullanılmayanı seç
         core_topics = [
-            "Real-world EV range test results",
-            "Battery degradation analysis: LFP vs NMC",
-            "Winter range loss in modern electric cars",
-            "EV charging speed comparison: 400V vs 800V",
-            "The true cost of EV ownership over 100k miles",
-            "Heat pump efficiency in extreme cold",
-            "Solid-state battery progress and data",
-            "EV efficiency: Wh/km breakdown by model"
+            "Real-world EV range test vs manufacturer claims",
+            "Battery degradation: LFP vs NMC after 100k miles",
+            "Winter range loss in modern electric cars: real data",
+            "EV charging speed: 400V vs 800V architecture comparison",
+            "True cost of EV ownership over 100k miles",
+            "Heat pump efficiency in extreme cold weather",
+            "Solid-state battery progress: real timeline and data",
+            "EV efficiency: Wh/km breakdown by model",
+            "Tesla Model 3 vs BYD Seal: head-to-head efficiency test",
+            "Hyundai IONIQ 6 real-world range: the real numbers",
+            "EV battery warranty: what manufacturers don't tell you",
+            "DC fast charging impact on battery health: long-term data",
+            "Rivian R1T range in cold weather: real test results",
+            "EV vs hybrid: total cost comparison over 5 years",
+            "Home charging vs public charging costs: full breakdown",
+            "LFP battery advantages: why BYD keeps winning on cost",
+            "800V ultra-fast charging: which EVs actually support it",
+            "EV depreciation rates: which models hold value best",
+            "Regenerative braking efficiency: how much range does it add",
+            "Used EV battery health: how to check before buying",
         ]
-        import random
-        selected_core = random.choice(core_topics)
-        print(f"[TrendEngine] Using core concept fallback: {selected_core}")
+        unused_core = [t for t in core_topics if not self._is_used_recently(t)]
+        pool = unused_core if unused_core else core_topics
+        selected_core = random.choice(pool)
+        print(f"[TrendEngine] Core concept fallback: {selected_core}")
+        self._save_topic_history(selected_core)
         return selected_core
 
 

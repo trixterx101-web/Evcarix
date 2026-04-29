@@ -1,9 +1,12 @@
 import os
+import re
+import random
 import requests
 from src.voice_engine import VoiceEngine
 from dotenv import load_dotenv
 
 load_dotenv()
+
 
 
 class MediaEngine:
@@ -15,20 +18,22 @@ class MediaEngine:
         return await self.voice_engine.generate_voice(text, output_path, voice_type=voice_type, rate=rate)
 
     def _get_professional_query(self, topic):
-        """Arama sorgusunu ultra-profesyonel ve telifsiz sonuçlar için optimize eder."""
-        # Gereksiz kelimeleri temizle
-        clean_topic = topic.split(':')[0] if ':' in topic else topic
-        # Profesyonel anahtar kelimeler ekle
-        professional_keywords = [
-            f"{clean_topic} cinematic car 4k",
-            f"{clean_topic} electric vehicle driving",
-            f"{clean_topic} car interior tech",
-            f"{clean_topic} modern car exterior luxury",
-            "electric car charging station 4k",
-            "future electric vehicle technology"
+        """Her çalışmada farklı bir arama sorgusu üretir."""
+        clean_topic = topic.split(':')[0].split('?')[0].strip() if ':' in topic or '?' in topic else topic
+        # Her çalışmada farklı strateji — 7 farklı çerçeve
+        strategies = [
+            f"{clean_topic} electric car 4k cinematic",
+            f"{clean_topic} EV driving footage",
+            f"electric vehicle {clean_topic} exterior",
+            f"{clean_topic} car interior technology",
+            f"modern electric car {clean_topic} driving",
+            "electric car charging station cinematic 4k",
+            "electric vehicle highway driving sunset",
+            "EV battery technology laboratory",
+            "electric car dashboard display tech",
+            "sustainable transport electric vehicle city",
         ]
-        import random
-        return random.choice(professional_keywords)
+        return random.choice(strategies)
 
     def download_stock_videos(self, query, output_dir="assets/temp_videos", count=4, orientation="portrait"):
         if not self.pexels_api_key:
@@ -36,28 +41,46 @@ class MediaEngine:
             return []
         os.makedirs(output_dir, exist_ok=True)
 
-        # Sorguyu optimize et
         optimized_query = self._get_professional_query(query)
         headers = {"Authorization": self.pexels_api_key}
-        url = f"https://api.pexels.com/videos/search?query={optimized_query}&per_page={count}&orientation={orientation}"
+
+        # Her çalışmada farklı sayfa — çeşitlilik için rastgele offset
+        page = random.randint(1, 8)
+
+        url = (
+            f"https://api.pexels.com/videos/search"
+            f"?query={optimized_query}"
+            f"&per_page={count + 4}"   # Fazla çek, en iyilerini seç
+            f"&page={page}"
+            f"&orientation={orientation}"
+        )
         paths = []
         try:
-            print(f"Pexels: '{query}' aranıyor...")
+            print(f"Pexels: '{optimized_query}' (sayfa {page}) aranıyor...")
             response = requests.get(url, headers=headers, timeout=15)
             if response.status_code == 200:
                 videos = response.json().get('videos', [])
                 if not videos:
+                    # Sayfa boşsa ilk sayfaya fallback
+                    url_p1 = url.replace(f"&page={page}", "&page=1")
+                    response = requests.get(url_p1, headers=headers, timeout=15)
+                    videos = response.json().get('videos', []) if response.status_code == 200 else []
+                if not videos:
                     print(f"'{query}' için video bulunamadı.")
                     return []
+                # Listeyi karıştır — her seferinde farklı sıra
+                random.shuffle(videos)
+                videos = videos[:count]   # İstenilen kadar al
                 for i, video_data in enumerate(videos):
                     video_files = video_data.get('video_files', [])
                     if not video_files:
                         continue
-                    import re
-                    video_url = video_files[0]['link']
-                    # Sanitize filename: remove emojis and illegal characters
-                    clean_query = re.sub(r'[^\w\s-]', '', query).strip().replace(' ', '_')
-                    filename = f"pexels_{clean_query}_{i}.mp4"
+                    # En yüksek çözünürlükleri sırala, ilk 3'ten rastgele seç
+                    sorted_files = sorted(video_files, key=lambda x: x.get('width', 0), reverse=True)
+                    chosen = random.choice(sorted_files[:3]) if len(sorted_files) >= 3 else sorted_files[0]
+                    video_url = chosen['link']
+                    clean_query = re.sub(r'[^\w\s-]', '', query).strip().replace(' ', '_')[:40]
+                    filename = f"pexels_{clean_query}_{page}_{i}.mp4"
                     output_path = os.path.join(output_dir, filename)
                     print(f"İndiriliyor ({i+1}/{len(videos)}): {filename}")
                     v_res = requests.get(video_url, stream=True, timeout=60)
