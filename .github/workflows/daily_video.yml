@@ -11,6 +11,32 @@ on:
         description: 'Upload slot (evening / night)'
         required: false
         default: 'evening'
+      topic_id:
+        description: 'Generate content for specific topic ID (1-67) - leave empty for auto'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - '1'
+          - '2'
+          - '3'
+          - '4'
+          - '5'
+          - '6'
+          - '7'
+          - '8'
+          - '9'
+          - '10'
+      mode:
+        description: 'Content generation mode'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - 'auto'
+          - 'single'
+          - 'all'
 
 jobs:
   build-and-upload:
@@ -38,6 +64,25 @@ jobs:
         run: |
           python -m pip install --upgrade pip --quiet
           pip install -r requirements.txt --quiet
+
+      # ── 4.1 Content Generation (generate_content.py) ───────────────
+      - name: Generate Content from topics.csv
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          MODE="${{ github.event.inputs.mode }}"
+          TOPIC_ID="${{ github.event.inputs.topic_id }}"
+
+          if [ "$MODE" = "single" ] && [ -n "$TOPIC_ID" ]; then
+            echo "Mode: Single topic ID $TOPIC_ID"
+            python scripts/generate_content.py --id $TOPIC_ID
+          elif [ "$MODE" = "all" ]; then
+            echo "Mode: All topics"
+            python scripts/generate_content.py --force
+          else
+            echo "Mode: Auto (high priority)"
+            python scripts/generate_content.py --priority high
+          fi
 
       # ── 5. İnsan gibi rastgele bekleme (0-40 dakika) ─────────────
       #     YouTube algoritmasına makine gibi görünmemek için
@@ -71,6 +116,11 @@ jobs:
           python src/setup_secrets.py
           # Üretim & yükleme
           python main.py
+
+      # ── 6.1 Rebuild Summary (rebuild_summary.yml) ─────────────────
+      - name: Rebuild Content Summary
+        run: |
+          python scripts/generate_content.py --summary
 
       # ── 7. Çıktıları artifact olarak sakla ───────────────────────
       - name: Save Output Artifacts
