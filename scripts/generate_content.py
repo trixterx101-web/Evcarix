@@ -28,7 +28,7 @@ except ImportError:
 # ── Sabitler ───────────────────────────────────────────────────────────────────
 MODEL      = "llama-3.3-70b-versatile"
 MAX_TOKENS = 2048
-DELAY_SEC  = 2
+DELAY_SEC  = 5
 BASE       = Path(__file__).parent.parent
 OUTPUT_DIR = BASE / "output"
 TOPICS_CSV = BASE / "data" / "topics.csv"
@@ -217,40 +217,71 @@ def check_visuals(script: str, category_id: str) -> list[str]:
 
 
 # ── Üretim ────────────────────────────────────────────────────────────────────
-def generate(client: Groq, topic: dict) -> dict:
+def generate(client: Groq, topic: dict, max_retries: int = 3) -> dict:
     cat_id = topic["category_id"]
 
-    response = client.chat.completions.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        messages=[
-            {"role": "system", "content": build_system(cat_id)},
-            {"role": "user", "content": (
-                f"Category: {topic['category_title']}\n"
-                f"Topic: {topic['topic']}\n"
-                f"Priority: {topic['priority']}\n\n"
-                "Generate complete YouTube Shorts content for this Evcarix video."
-            )}
-        ],
-        temperature=0.7,
-    )
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model=MODEL,
+                max_tokens=MAX_TOKENS,
+                messages=[
+                    {"role": "system", "content": build_system(cat_id)},
+                    {"role": "user", "content": (
+                        f"Category: {topic['category_title']}\n"
+                        f"Topic: {topic['topic']}\n"
+                        f"Priority: {topic['priority']}\n\n"
+                        "Generate complete YouTube Shorts content for this Evcarix video."
+                    )}
+                ],
+                temperature=0.7,
+            )
 
-    raw = response.choices[0].message.content
-    # markdown fence temizle
-    if raw.startswith("```"):
-        raw = raw.split("```", 2)[-1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.rsplit("```", 1)[0].strip()
+            raw = response.choices[0].message.content
+            if not raw:
+                raise ValueError("Empty response from API")
 
-    parsed = json.loads(raw)
-    parsed["tags"] = trim_tags(parsed.get("tags", ""))
+            # markdown fence temizle
+            if raw.startswith("```"):
+                raw = raw.split("```", 2)[-1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+                raw = raw.rsplit("```", 1)[0].strip()
 
-    bad_visuals = check_visuals(parsed.get("shorts_script", ""), cat_id)
-    if bad_visuals:
-        parsed["_visual_warnings"] = bad_visuals
+            if not raw:
+                raise ValueError("Empty response after cleaning")
 
-    return parsed
+            parsed = json.loads(raw)
+            parsed["tags"] = trim_tags(parsed.get("tags", ""))
+
+            bad_visuals = check_visuals(parsed.get("shorts_script", ""), cat_id)
+            if bad_visuals:
+                parsed["_visual_warnings"] = bad_visuals
+
+            return parsed
+
+        except json.JSONDecodeError as e:
+            print(f"  JSON parse error (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(5 * (attempt + 1))
+            else:
+                raise
+        except Exception as e:
+            error_str = str(e)
+            if "rate_limit" in error_str.lower() or "429" in error_str:
+                print(f"  Rate limit hit (attempt {attempt + 1}/{max_retries}): Waiting...")
+                if attempt < max_retries - 1:
+                    wait_time = 60 * (attempt + 1)
+                    print(f"  Waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+                else:
+                    raise Exception(f"Rate limit exceeded after {max_retries} attempts")
+            else:
+                print(f"  Error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(5 * (attempt + 1))
+                else:
+                    raise
 
 
 def save_result(topic: dict, content: dict) -> Path:
