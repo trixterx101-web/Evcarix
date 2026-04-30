@@ -115,8 +115,13 @@ class AutoEditor:
                 break
 
             frame = self._make_subtitle_frame(chunk_text, width, height)
+            # MoviePy: RGB kanalları + ayrı alpha maskesi (saydam arka plan için)
+            rgb_frame = frame[:, :, :3]
+            alpha_mask = frame[:, :, 3].astype(float) / 255.0
+            clip = ImageClip(rgb_frame, ismask=False)
+            clip = clip.set_mask(ImageClip(alpha_mask, ismask=True))
             clip = (
-                ImageClip(frame, ismask=False)
+                clip
                 .set_start(start_t)
                 .set_duration(min(duration, video_duration - start_t))
                 .set_position((0, 0))
@@ -290,19 +295,31 @@ class AutoEditor:
         """
         W, H = 1080, 1920
 
-        # ── Gradient arka plan oluştur (koyu mavi → mor → turuncu-kırmızı) ──
-        bg = Image.new("RGB", (W, H), (0, 0, 0))
-        pixels = bg.load()
-        for y in range(H):
-            t = y / H
-            # Üst: koyu mavi-lacivert (5, 10, 35) → Orta: mor (25, 5, 45) → Alt: koyu turuncu (45, 20, 5)
-            r = int(5 + 40 * t + 15 * np.sin(t * np.pi))
-            g = int(10 - 5 * t)
-            b = int(35 - 25 * t + 10 * np.sin(t * np.pi))
-            for x in range(W):
-                # Hafif yatay vignette
-                vignette = 1.0 - 0.3 * abs((x / W) - 0.5)
-                pixels[x, y] = (int(r * vignette), int(g * vignette), int(b * vignette))
+        # ── Arka plan: videodan frame varsa kullan, yoksa gradient ──
+        bg = None
+        if video_path and os.path.exists(video_path):
+            try:
+                from moviepy.editor import VideoFileClip
+                with VideoFileClip(video_path) as vc:
+                    mid_t = vc.duration / 2 if vc.duration else 0
+                    frame = vc.get_frame(mid_t)
+                    bg = Image.fromarray(frame).convert("RGB").resize((W, H))
+                    print(f"[Thumbnail] Video frame kullanılıyor: {video_path}")
+            except Exception as e:
+                print(f"[Thumbnail] Video frame alınamadı: {e}")
+
+        if bg is None:
+            # Gradient arka plan (koyu mavi → mor → turuncu-kırmızı)
+            bg = Image.new("RGB", (W, H), (0, 0, 0))
+            pixels = bg.load()
+            for y in range(H):
+                t = y / H
+                r = int(5 + 40 * t + 15 * np.sin(t * np.pi))
+                g = int(10 - 5 * t)
+                b = int(35 - 25 * t + 10 * np.sin(t * np.pi))
+                for x in range(W):
+                    vignette = 1.0 - 0.3 * abs((x / W) - 0.5)
+                    pixels[x, y] = (int(r * vignette), int(g * vignette), int(b * vignette))
 
         # ── EV temalı dekoratif şekiller ──
         deco = Image.new("RGBA", (W, H), (0, 0, 0, 0))
