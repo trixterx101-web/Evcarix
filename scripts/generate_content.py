@@ -1,168 +1,316 @@
 #!/usr/bin/env python3
 """
-Evcarix YouTube Content Generator
-Generates SEO title, description, tags (500 char), and Shorts script for each topic.
-Usage:
-  python generate_content.py                  # generate all pending topics
-  python generate_content.py --id 5           # generate single topic by id
-  python generate_content.py --priority high  # generate only high-priority topics
+Evcarix YouTube Shorts Content Generator
+- Konu dışı görsel YASAK: sadece kategoriye özel whitelist görseller
+- Format: 9:16 dikey Shorts (60 saniye)
+- Çıktı: title · description · tags (<=500 chr) · shorts_script
+
+Kullanım:
+  python generate_content.py                   # bekleyen tüm konular
+  python generate_content.py --id 5            # tek konu
   python generate_content.py --category battery
-  python generate_content.py --force          # regenerate even if output exists
+  python generate_content.py --priority high
+  python generate_content.py --force
+  python generate_content.py --dry-run
+  python generate_content.py --summary
 """
 
-import os
-import csv
-import json
-import time
-import argparse
-import sys
+import os, csv, json, time, argparse, sys, re
 from pathlib import Path
 from datetime import datetime
 
 try:
     from groq import Groq
 except ImportError:
-    print("ERROR: groq package not found. Run: pip install groq")
+    print("ERROR: pip install groq")
     sys.exit(1)
 
-# ── Config ────────────────────────────────────────────────────────────────────
-MODEL         = "llama-3.3-70b-versatile"
-MAX_TOKENS    = 2048
-DELAY_SECONDS = 2          # pause between API calls to respect rate limits
-DATA_DIR      = Path(__file__).parent.parent / "data"
-OUTPUT_DIR    = Path(__file__).parent.parent / "output"
-TOPICS_CSV    = DATA_DIR / "topics.csv"
+# ── Sabitler ───────────────────────────────────────────────────────────────────
+MODEL      = "llama-3.3-70b-versatile"
+MAX_TOKENS = 2048
+DELAY_SEC  = 2
+BASE       = Path(__file__).parent.parent
+OUTPUT_DIR = BASE / "output"
+TOPICS_CSV = BASE / "data" / "topics.csv"
 
-SYSTEM_PROMPT = """You are an elite YouTube SEO specialist for "Evcarix" — a data-driven EV channel.
+# ── Kategori bazlı onaylı görsel listesi ──────────────────────────────────────
+VISUAL_WHITELIST = {
+    "battery": [
+        "LFP battery cell cross-section diagram",
+        "NMC NCA battery cell comparison chart",
+        "battery pack 3D visualization",
+        "degradation curve graph capacity percent charge cycle",
+        "BMS circuit block diagram",
+        "battery thermal heat map",
+        "SOH bar graph percentage indicator",
+        "solid-state vs liquid electrolyte comparison diagram",
+        "1 million km line graph km capacity percent",
+        "charge cycle voltage current animation frame",
+    ],
+    "range": [
+        "range bar graph km per vehicle comparison",
+        "temperature range curve degree km axis",
+        "kWh 100km consumption bar chart",
+        "summer winter range comparison side by side bar",
+        "speed range curve animation frame",
+        "highway vs city range split screen graph",
+        "AC consumption pie chart energy distribution",
+        "regenerative braking energy flow diagram",
+        "vehicle weight range scatter plot graph",
+    ],
+    "charging": [
+        "800V 400V charging speed comparison bar graph",
+        "charging curve kW SoC percent line graph",
+        "CCS CHAdeMO connector technical diagram",
+        "DC fast charging AC home charging flow diagram",
+        "V2G V2H energy flow diagram",
+        "charging network map Europe America point density",
+        "solar energy EV charging flow diagram",
+        "night day charging cost bar graph",
+        "cable length power loss line graph",
+    ],
+    "ownership": [
+        "5 year total cost stacked bar graph EV diesel",
+        "value loss curve year vehicle value axis graph",
+        "insurance cost comparison bar graph",
+        "maintenance cost breakdown pie chart brake tire service",
+        "battery replacement cost timeline infographic",
+        "100k km user data distribution dot graph",
+        "warranty coverage layered infographic diagram",
+    ],
+    "comparison": [
+        "vehicle comparison radar graph range charging cost",
+        "segment price range scatter plot graph",
+        "70 vehicle range ranking horizontal bar graph",
+        "single axle dual axle efficiency comparison curve",
+        "budget EV comparison table infographic",
+        "SUV range test result bar graph",
+        "America market price comparison bar graph",
+    ],
+    "market": [
+        "country based EV sales percent world map choropleth",
+        "brand market share pie chart 2024 2025 comparison",
+        "China EV brands Europe market share growth line graph",
+        "EV sales trend monthly line graph",
+        "subsidy before after sales comparison bar graph",
+        "EV price deflation trend line graph",
+        "second hand market size annual bar graph",
+    ],
+    "infrastructure": [
+        "charging station reliability percent bar graph",
+        "America charging point density map state based",
+        "apartment charging installation cost breakdown infographic",
+        "charging time calculation table kW battery capacity",
+        "grid load simulation hourly consumption graph",
+        "smart vs standard charging comparison diagram",
+        "renewable energy EV integration flow diagram",
+    ],
+    "education": [
+        "heat pump working principle step flow diagram",
+        "PTC heat pump efficiency comparison bar graph",
+        "one-pedal regeneration power flow animation frame",
+        "thermal management system schematic block diagram",
+        "aerodynamic drag Cd value visualization",
+        "charging curve drop point explained graph arrow",
+        "SOH measurement method step by step block diagram",
+        "inverter circuit block diagram DC AC conversion",
+        "WLTP EPA real range comparison bar graph",
+    ],
+    "tools": [
+        "range calculator interface screen diagram",
+        "EV diesel cost calculator output bar graph",
+        "charging cost calculation table diagram",
+        "battery degradation prediction curve graph",
+        "charging speed comparison real time bar graph",
+        "range loss information graph infographic",
+        "market share interactive pie chart diagram",
+    ],
+}
+
+FORBIDDEN = (
+    "NEVER use:\n"
+    "- Real human face or recognizable person\n"
+    "- Vehicle brand logo (Tesla, BMW, etc.) — only anonymous vehicle silhouette\n"
+    "- Stock photo (smiling driver, charging hand, etc.)\n"
+    "- Irrelevant nature/landscape/city visual\n"
+    "- Real banknote or money visual\n"
+    "- Social media interface (Twitter, Instagram, etc.)\n"
+    "- Animated character or cartoon element\n"
+    "- Clipart or generic stock graphic\n"
+    "- Any visual NOT in the approved list above\n"
+)
+
+
+def build_system(category_id: str) -> str:
+    allowed = VISUAL_WHITELIST.get(category_id, [])
+    allowed_block = "\n".join(f"  {i+1}. {v}" for i, v in enumerate(allowed))
+
+    return f"""You are an expert YouTube Shorts content producer for "Evcarix" channel.
 Channel motto: "No hype. Just numbers." — Real test data, shocking statistics, no marketing fluff.
 Primary audience: American EV enthusiasts + international viewers.
 
-Return ONLY a valid JSON object with these exact fields (no markdown, no code blocks, no extra text):
-{
-  "title": "YouTube title max 60 chars. Must open with a data hook or provocative question. High CTR style. Example: 'Fast Charging KILLS Battery? Real 500,000km Data'",
+══════════════════════════════════════════
+VISUAL RESTRICTION — STRICT RULE
+══════════════════════════════════════════
+Every (VISUAL: ...) note in Shorts script MUST be selected ONLY from this list:
 
-  "description": "Full YouTube description 400-500 words. Structure:\\n1) HOOK: First line with shocking stat or question (this is above the fold)\\n2) WHAT YOU LEARN: 3 bullet points starting with •\\n3) KEY FINDINGS: 2 paragraphs with real data context\\n4) WHY IT MATTERS: 1 short paragraph\\n5) CHANNEL LINE: One sentence about Evcarix — No hype. Just numbers.\\n6) HASHTAGS: 8 hashtags on last line\\nNaturally integrate EV keywords throughout. Do not use generic filler.",
+{allowed_block}
 
-  "tags": "Comma-separated YouTube tags. CRITICAL: total character count including commas must be UNDER 500 characters. Order by search volume descending. Mix: 3 very broad EV terms + 4 medium specificity + 4 long-tail exact match terms. No duplicates.",
+{FORBIDDEN}
 
-  "shorts_script": "60-second vertical 9:16 Shorts script. Use this exact format for each section:\\n\\n[HOOK — 0 to 3s]\\nSpoken line: <the line>\\n(VISUAL: <what appears on screen>)\\n\\n[SHOCKING STAT — 3 to 8s]\\nSpoken line: <the line>\\n(VISUAL: <bold text overlay description>)\\n\\n[MYTH vs REALITY — 8 to 20s]\\nSpoken line: <the line>\\n(VISUAL: <split screen or animation note>)\\n\\n[DATA REVEAL — 20 to 45s]\\nSpoken line: <the line>\\n(VISUAL: <chart, graph, or data visualization note>)\\n\\n[KEY TAKEAWAY — 45 to 55s]\\nSpoken line: <the line>\\n(VISUAL: <text overlay with key number>)\\n\\n[CTA — 55 to 60s]\\nSpoken line: <subscribe hook tied to the topic>\\n(VISUAL: subscribe button animation)"
-}"""
+══════════════════════════════════════════
+SHORTS FORMAT: 9:16 VERTICAL · 60 SECONDS
+══════════════════════════════════════════
+Size: 1080x1920 pixels. Full screen data chart + text overlay.
+
+Return ONLY JSON (no markdown, no explanation, no other text):
+{{
+  "title": "Max 60 chars. Start with shocking data point or question. High CTR.",
+  "description": "400-500 word YouTube description.\\n1) HOOK: Shocking stat above fold\\n2) WHAT YOU LEARN: 3 bullet points\\n3) KEY FINDINGS: 2 paragraphs\\n4) WHY IT MATTERS: 1 paragraph\\n5) CHANNEL: Evcarix - No hype. Just numbers.\\n6) 8 hashtags on last line",
+  "tags": "Comma-separated tags. Total UNDER 500 characters. Order by search volume descending. 3 broad + 4 medium + 4 long-tail.",
+  "shorts_script": "[HOOK 0-3s]\\nSpoken: <text>\\n(VISUAL: <only from list>)\\n\\n[SHOCKING STAT 3-8s]\\nSpoken: <text>\\n(VISUAL: <only from list - big number overlay>)\\n\\n[MYTH vs REALITY 8-20s]\\nSpoken: <text>\\n(VISUAL: <only from list>)\\n\\n[DATA REVEAL 20-45s]\\nSpoken: <text>\\n(VISUAL: <only from list - chart or diagram>)\\n\\n[KEY TAKEAWAY 45-55s]\\nSpoken: <text>\\n(VISUAL: <only from list - key number overlay>)\\n\\n[CTA 55-60s]\\nSpoken: <subscribe hook tied to topic>\\n(VISUAL: subscribe animation + Evcarix logo)"
+}}"""
 
 
-def load_topics(csv_path: Path) -> list[dict]:
-    with open(csv_path, encoding="utf-8") as f:
+# ── Yardımcılar ────────────────────────────────────────────────────────────────
+def load_topics() -> list[dict]:
+    with open(TOPICS_CSV, encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
-def output_path(topic_id: str, topic_text: str) -> Path:
-    safe = "".join(c if c.isalnum() or c in "- " else "_" for c in topic_text[:50]).strip()
-    return OUTPUT_DIR / f"{int(topic_id):03d}_{safe}.json"
+def out_path(tid: str, topic: str) -> Path:
+    safe = re.sub(r"[^\w\- ]", "_", topic[:50]).strip()
+    return OUTPUT_DIR / f"{int(tid):03d}_{safe}.json"
 
 
-def already_generated(topic_id: str, topic_text: str) -> bool:
-    return output_path(topic_id, topic_text).exists()
+def is_done(tid: str, topic: str) -> bool:
+    return out_path(tid, topic).exists()
 
 
-def generate_content(client: Groq, topic: dict) -> dict:
-    user_msg = (
-        f"Category: {topic['category_title']}\n"
-        f"Topic: {topic['topic']}\n"
-        f"Priority: {topic['priority']}\n\n"
-        f"Generate complete YouTube SEO content for this Evcarix video."
-    )
+def trim_tags(tags: str) -> str:
+    if len(tags) <= 500:
+        return tags
+    parts, total, out = tags.split(","), 0, []
+    for p in parts:
+        chunk = p.strip()
+        needed = len(chunk) + (2 if out else 0)
+        if total + needed > 500:
+            break
+        out.append(chunk)
+        total += needed
+    return ", ".join(out)
+
+
+def check_visuals(script: str, category_id: str) -> list[str]:
+    """Return (VISUAL: ...) notes not in approved list."""
+    allowed = VISUAL_WHITELIST.get(category_id, [])
+    found   = re.findall(r"\(VISUAL:\s*(.+?)\)", script, re.IGNORECASE)
+    bad     = []
+    for visual in found:
+        v = visual.strip().lower()
+        if not any(
+            any(kw in v for kw in ref.lower().split())
+            for ref in allowed
+        ):
+            bad.append(visual)
+    return bad
+
+
+# ── Üretim ────────────────────────────────────────────────────────────────────
+def generate(client: Groq, topic: dict) -> dict:
+    cat_id = topic["category_id"]
 
     response = client.chat.completions.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_msg}
+            {"role": "system", "content": build_system(cat_id)},
+            {"role": "user", "content": (
+                f"Category: {topic['category_title']}\n"
+                f"Topic: {topic['topic']}\n"
+                f"Priority: {topic['priority']}\n\n"
+                "Generate complete YouTube Shorts content for this Evcarix video."
+            )}
         ],
         temperature=0.7,
     )
 
     raw = response.choices[0].message.content
-    # strip markdown fences if model added them
-    clean = raw.strip()
-    if clean.startswith("```"):
-        clean = clean.split("```", 2)[-1]
-        if clean.startswith("json"):
-            clean = clean[4:]
-        clean = clean.rsplit("```", 1)[0].strip()
+    # markdown fence temizle
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[-1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.rsplit("```", 1)[0].strip()
 
-    parsed = json.loads(clean)
+    parsed = json.loads(raw)
+    parsed["tags"] = trim_tags(parsed.get("tags", ""))
 
-    # enforce 500-char tag limit
-    if len(parsed.get("tags", "")) > 500:
-        tags = parsed["tags"].split(",")
-        trimmed, total = [], 0
-        for t in tags:
-            chunk = t.strip()
-            if total + len(chunk) + 2 > 500:
-                break
-            trimmed.append(chunk)
-            total += len(chunk) + 2
-        parsed["tags"] = ", ".join(trimmed)
+    bad_visuals = check_visuals(parsed.get("shorts_script", ""), cat_id)
+    if bad_visuals:
+        parsed["_visual_warnings"] = bad_visuals
 
     return parsed
 
 
 def save_result(topic: dict, content: dict) -> Path:
-    out = {
+    record = {
         "generated_at": datetime.utcnow().isoformat() + "Z",
-        "topic_id": topic["id"],
-        "category": topic["category_title"],
-        "topic": topic["topic"],
-        "priority": topic["priority"],
-        "content": content,
+        "topic_id":     topic["id"],
+        "category":     topic["category_title"],
+        "topic":        topic["topic"],
+        "priority":     topic["priority"],
+        "content":      content,
         "stats": {
-            "title_chars": len(content.get("title", "")),
+            "title_chars":       len(content.get("title", "")),
             "description_words": len(content.get("description", "").split()),
-            "tags_chars": len(content.get("tags", "")),
-            "tags_count": len(content.get("tags", "").split(",")),
+            "tags_chars":        len(content.get("tags", "")),
+            "tags_count":        len([t for t in content.get("tags", "").split(",") if t.strip()]),
+            "visual_clean":      "_visual_warnings" not in content,
         },
     }
-    path = output_path(topic["id"], topic["topic"])
+    path = out_path(topic["id"], topic["topic"])
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
+        json.dump(record, f, ensure_ascii=False, indent=2)
     return path
 
 
 def build_summary(topics: list[dict]) -> None:
-    """Write output/SUMMARY.md with all generated content at a glance."""
     rows = []
     for t in topics:
-        p = output_path(t["id"], t["topic"])
+        p = out_path(t["id"], t["topic"])
         if not p.exists():
             continue
         with open(p, encoding="utf-8") as f:
-            data = json.load(f)
-        c = data["content"]
+            d = json.load(f)
+        c    = d["content"]
+        flag = "✅" if d["stats"].get("visual_clean") else "⚠️ Visual warning"
         rows.append(
-            f"## {t['id']}. {c.get('title','—')}\n"
+            f"## {t['id']}. {c.get('title','—')} {flag}\n"
             f"**Category:** {t['category_title']}  \n"
             f"**Topic:** {t['topic']}  \n"
-            f"**Tags ({data['stats']['tags_chars']} chars):** `{c.get('tags','')}`\n\n"
+            f"**Tags ({d['stats']['tags_chars']} chars):** `{c.get('tags','')}`\n\n"
             f"<details><summary>Description</summary>\n\n{c.get('description','')}\n\n</details>\n\n"
-            f"<details><summary>Shorts Script</summary>\n\n{c.get('shorts_script','')}\n\n</details>\n\n---\n"
+            f"<details><summary>Shorts Script 9:16</summary>\n\n{c.get('shorts_script','')}\n\n</details>\n\n---\n"
         )
     summary = OUTPUT_DIR / "SUMMARY.md"
     with open(summary, "w", encoding="utf-8") as f:
         f.write(f"# Evcarix Content Summary\n\nGenerated: {datetime.utcnow().isoformat()}Z\n\n")
         f.write("\n".join(rows))
-    print(f"  📄 Summary written → {summary}")
+    print(f"  📄 SUMMARY.md → {summary}")
 
 
+# ── CLI ───────────────────────────────────────────────────────────────────────
 def main():
-    parser = argparse.ArgumentParser(description="Evcarix content generator")
-    parser.add_argument("--id",       type=int,   help="Generate single topic by id")
-    parser.add_argument("--category", type=str,   help="Filter by category_id (e.g. battery)")
-    parser.add_argument("--priority", type=str,   choices=["high","medium","new"], help="Filter by priority")
-    parser.add_argument("--force",    action="store_true", help="Regenerate even if output exists")
-    parser.add_argument("--dry-run",  action="store_true", help="Show what would be generated, no API calls")
-    parser.add_argument("--summary",  action="store_true", help="Only rebuild SUMMARY.md from existing outputs")
-    args = parser.parse_args()
+    ap = argparse.ArgumentParser(description="Evcarix Shorts content generator")
+    ap.add_argument("--id",       type=int, help="Topic ID (1-67)")
+    ap.add_argument("--category", type=str, help="Category filter")
+    ap.add_argument("--priority", type=str, choices=["high", "medium", "new"])
+    ap.add_argument("--force",    action="store_true")
+    ap.add_argument("--dry-run",  action="store_true")
+    ap.add_argument("--summary",  action="store_true")
+    args = ap.parse_args()
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -171,58 +319,58 @@ def main():
         print("ERROR: GROQ_API_KEY environment variable not set.")
         sys.exit(1)
 
-    topics = load_topics(TOPICS_CSV)
+    topics = load_topics()
 
     if args.summary:
         build_summary(topics)
         return
 
-    # Apply filters
-    if args.id:
-        topics = [t for t in topics if int(t["id"]) == args.id]
-    if args.category:
-        topics = [t for t in topics if t["category_id"] == args.category]
-    if args.priority:
-        topics = [t for t in topics if t["priority"] == args.priority]
-    if not args.force:
-        topics = [t for t in topics if not already_generated(t["id"], t["topic"])]
+    if args.id:        topics = [t for t in topics if int(t["id"]) == args.id]
+    if args.category:  topics = [t for t in topics if t["category_id"] == args.category]
+    if args.priority:  topics = [t for t in topics if t["priority"] == args.priority]
+    if not args.force: topics = [t for t in topics if not is_done(t["id"], t["topic"])]
 
     if not topics:
-        print("✅ Nothing to generate (all topics already have output). Use --force to regenerate.")
+        print("No topics to generate. Use --force to regenerate.")
         return
 
-    print(f"\n⚡ Evcarix Content Generator")
+    print(f"\n⚡ Evcarix Shorts Content Generator")
     print(f"   Model  : {MODEL}")
+    print(f"   Format : 9:16 vertical Shorts - 60 seconds")
     print(f"   Topics : {len(topics)}")
-    print(f"   Dry run: {args.dry_run}\n")
+    print(f"   Dry-run: {args.dry_run}\n")
 
-    if args.dry_run:
+    if args.dry-run:
         for t in topics:
-            print(f"  [{t['id']:>2}] {t['category_title']} → {t['topic']}")
+            wl = len(VISUAL_WHITELIST.get(t["category_id"], []))
+            print(f"  [{t['id']:>2}] {t['category_title']} ({wl} approved visuals) -> {t['topic']}")
         return
 
     client = Groq(api_key=api_key)
+    ok = fail = warn = 0
 
-    ok, fail = 0, 0
     for i, topic in enumerate(topics, 1):
-        print(f"[{i}/{len(topics)}] Generating: {topic['topic'][:60]}")
+        print(f"[{i}/{len(topics)}] {topic['topic'][:65]}")
         try:
-            content = generate_content(client, topic)
-            path = save_result(topic, content)
-            print(f"  ✓ Saved → {path.name}")
-            print(f"    Title ({len(content.get('title',''))} chars): {content.get('title','')}")
-            print(f"    Tags  ({len(content.get('tags',''))} chars)")
+            content = generate(client, topic)
+            path    = save_result(topic, content)
+            w       = content.get("_visual_warnings", [])
+            if w:
+                warn += 1
+                print(f"  VISUAL WARNING: {w}")
+            print(f"  Saved -> {path.name}")
+            print(f"  Title ({len(content.get('title',''))} chars): {content.get('title','')}")
+            print(f"  Tags ({len(content.get('tags',''))} chars)")
             ok += 1
         except Exception as e:
-            print(f"  ✗ FAILED: {e}")
+            print(f"  ERROR: {e}")
             fail += 1
 
         if i < len(topics):
-            time.sleep(DELAY_SECONDS)
+            time.sleep(DELAY_SEC)
 
-    print(f"\n{'='*50}")
-    print(f"Done. ✓ {ok} generated  ✗ {fail} failed")
-
+    print(f"\n{'='*55}")
+    print(f"Done. {ok} generated  {fail} errors  {warn} visual warnings")
     build_summary(topics)
 
 
