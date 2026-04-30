@@ -245,8 +245,9 @@ class AutoEditor:
                 thumb_dur = 3.0  # YouTube frame secimi icin yeterli sure
                 thumb_img = ImageClip(thumbnail_path).set_duration(thumb_dur)
                 # Dikey videoya letterbox olarak sigdir
-                thumb_img = thumb_img.resize(width=1080)
-                thumb_img = thumb_img.set_position(("center", (1920 - thumb_img.h) // 2))
+                # Thumbnail'i tam 9:16 ekrana sigdir (kirmizi/beyaz Shorts kutusu full screen)
+                thumb_img = thumb_img.resize((1080, 1920))
+                thumb_img = thumb_img.set_position(("center", "center"))
                 thumb_bg = ColorClip(size=(1080, 1920), color=(5, 5, 15)).set_duration(thumb_dur)
                 thumb_layer = CompositeVideoClip([thumb_bg, thumb_img], size=(1080, 1920))
                 base_video = concatenate_videoclips([base_video, thumb_layer], method="compose")
@@ -263,6 +264,10 @@ class AutoEditor:
             print("[Editor] Uyarı: word_timings boş, altyazı eklenemedi.")
 
         final_video = CompositeVideoClip(all_layers, size=(1080, 1920))
+
+        # Kesin 9:16 boyut garantisi (ffmpeg output kesinlikle 1080x1920 olsun)
+        if final_video.w != 1080 or final_video.h != 1920:
+            final_video = final_video.resize((1080, 1920))
 
         output_path = os.path.join(self.output_dir, output_filename)
         final_video.write_videofile(
@@ -290,7 +295,7 @@ class AutoEditor:
         - EV temalı şekiller (Pillow ile çizilmiş ikonlar)
         - Kanal branding (alt bant)
         """
-        W, H = 1280, 720
+        W, H = 1080, 1920
 
         # ── Gradient arka plan oluştur (koyu mavi → mor → turuncu-kırmızı) ──
         bg = Image.new("RGB", (W, H), (0, 0, 0))
@@ -323,10 +328,10 @@ class AutoEditor:
         bg = Image.alpha_composite(bg.convert("RGBA"), deco).convert("RGB")
         draw = ImageDraw.Draw(bg)
 
-        # ── Font yükleme — daha büyük, daha dikkat çekici başlık ──
-        title_font = self._load_font("bold", 110)
-        ch_font = self._load_font("bold", 48)
-        sl_font = self._load_font("regular", 28)
+        # ── Font yükleme — dikey 9:16 için optimize boyutlar ──
+        title_font = self._load_font("bold", 96)
+        ch_font = self._load_font("bold", 44)
+        sl_font = self._load_font("regular", 26)
 
         # ── Başlık metni — en fazla 2 satır, ortada ──
         max_title_w = W - 120
@@ -345,9 +350,9 @@ class AutoEditor:
             lines.append(current)
         lines = lines[:2]
 
-        line_h = title_font.size + 16
-        total_text_h = len(lines) * line_h
-        y_title = (H - total_text_h) // 2 - 60
+        line_h = title_font.size + 18
+        total_text_h = len(lines) * line_h + (len(lines) - 1) * 18
+        y_title = (H - total_text_h) // 2 - 80
 
         for line in lines:
             bbox = draw.textbbox((0, 0), line, font=title_font)
