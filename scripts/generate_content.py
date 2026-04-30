@@ -340,7 +340,7 @@ def main():
     print(f"   Topics : {len(topics)}")
     print(f"   Dry-run: {args.dry_run}\n")
 
-    if args.dry-run:
+    if args.dry_run:
         for t in topics:
             wl = len(VISUAL_WHITELIST.get(t["category_id"], []))
             print(f"  [{t['id']:>2}] {t['category_title']} ({wl} approved visuals) -> {t['topic']}")
