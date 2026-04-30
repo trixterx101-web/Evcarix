@@ -183,7 +183,14 @@ class MediaEngine:
                     if not video_files:
                         continue
                     sorted_files = sorted(video_files, key=lambda x: x.get('width', 0), reverse=True)
-                    chosen = random.choice(sorted_files[:3]) if len(sorted_files) >= 3 else sorted_files[0]
+                    # Sadece portrait (dikey) videoları seç - 9:16 formatı için zorunlu
+                    portrait_files = [f for f in sorted_files if f.get('width', 0) < f.get('height', 0)]
+                    if portrait_files:
+                        chosen = random.choice(portrait_files[:3]) if len(portrait_files) >= 3 else portrait_files[0]
+                    else:
+                        # Portrait yoksa atla
+                        print(f"[Pexels] ⚠️ Portrait video bulunamadı, atlanıyor")
+                        continue
                     video_url = chosen['link']
                     clean_q = re.sub(r'[^\w\s-]', '', query).strip().replace(' ', '_')[:30]
                     filename = f"pexels_{clean_q}_{page}_{i}.mp4"
@@ -260,11 +267,16 @@ class MediaEngine:
                 for i, hit in enumerate(hits[:count]):
                     videos_dict = hit.get('videos', {})
                     chosen_video = None
+                    # Portrait (dikey) video kontrolü
                     for quality in ['large', 'medium', 'small', 'tiny']:
                         if quality in videos_dict and videos_dict[quality].get('url'):
-                            chosen_video = videos_dict[quality]
-                            break
+                            vid = videos_dict[quality]
+                            # Portrait kontrol: width < height
+                            if vid.get('width', 0) < vid.get('height', 0):
+                                chosen_video = vid
+                                break
                     if not chosen_video:
+                        print(f"[Pixabay] ⚠️ Portrait video bulunamadı, atlanıyor")
                         continue
                     video_url = chosen_video['url']
                     clean_q = re.sub(r'[^\w\s-]', '', optimized_query).strip().replace(' ', '_')[:30]
