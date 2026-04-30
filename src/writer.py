@@ -222,16 +222,17 @@ class CreativeWriter:
 Topic: {topic}
 Category: {category or "general"}
 Channel Concept: {evcarix_mission}
-Format: YouTube Short (Maximum 55 seconds)
+Format: YouTube Short (20-40 seconds)
 Language: American English ONLY.
 
 Category-specific instructions: {cat_extra}
 
 Requirements:
-1. Start with a data-driven hook that includes a specific number or shocking fact.
-2. Focus on facts, numbers, and technical insights. No generic "amazing" or "incredible" hype.
-3. Voiceover text only — no stage directions.
-4. End with: "Subscribe to Evcarix for real EV data."
+1. Script length: 20-40 seconds (approximately 50-90 words for normal speaking speed).
+2. Start with a data-driven hook that includes a specific number or shocking fact.
+3. Focus on facts, numbers, and technical insights. No generic "amazing" or "incredible" hype.
+4. Voiceover text only — no stage directions.
+5. End with: "Subscribe to Evcarix for real EV data."
 5. Please respond ONLY in American English.
 6. CRITICAL: Use regions like USA, Europe, China ONLY. NEVER use Turkey or Turkish-specific examples.
 7. Include real-world data points from Google research: battery percentages, range numbers, cost figures, kW charging speeds, market share stats.
