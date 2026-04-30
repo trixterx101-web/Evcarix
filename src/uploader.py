@@ -57,15 +57,32 @@ class YouTubeUploader:
         else:
             shorts_title = title[:97]
         
-        # Tags listesine Shorts ekle
+        # Tags listesine Shorts ekle ve validasyon yap
         final_tags = list(tags) if tags else []
-        for must_have in ["Shorts", "EVShorts", "ElectricCarShorts"]:
+        for must_have in ["shorts", "ev", "electric vehicle"]:
             if must_have not in final_tags:
                 final_tags.append(must_have)
+
+        # YouTube tag validasyon: geçersiz karakterleri temizle
+        valid_tags = []
+        for tag in final_tags:
+            # Hashtag ve özel karakterleri kaldır
+            tag = str(tag).replace("#", "").replace(",", "").strip()
+            # Sadece harf, sayı, boşluk ve tire izin ver
+            tag = ''.join(c for c in tag if c.isalnum() or c in (' ', '-')).strip()
+            # Küçük harfe çevir (YouTube case-insensitive)
+            tag = tag.lower()
+            # Minimum 2 karakter, maksimum 30 karakter
+            if len(tag) >= 2 and len(tag) <= 30:
+                valid_tags.append(tag)
+
+        # Tekrarları kaldır
+        final_tags = list(dict.fromkeys(valid_tags))
+
         # YouTube tag limiti: 500 karakter
         tag_str = ",".join(final_tags)
         if len(tag_str) > 500:
-            final_tags = final_tags[:15]  # sadece ilk 15 etiketi al
+            final_tags = final_tags[:15]
 
         body = {
             "snippet": {

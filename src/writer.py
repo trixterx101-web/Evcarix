@@ -448,9 +448,20 @@ SENARYO: [script text]
                 raw_tags = raw_tags[1:-1]
             tag_list = [t.strip().strip('"').strip("'") for t in raw_tags.split(",") if t.strip()]
 
+            # YouTube validasyon: hashtag'leri kaldır, geçersiz karakterleri temizle
+            valid_tags = []
+            for tag in tag_list:
+                # Hashtag kaldır
+                tag = tag.replace("#", "").strip()
+                # Sadece harf, sayı, boşluk ve tire izin ver
+                tag = ''.join(c for c in tag if c.isalnum() or c in (' ', '-')).strip()
+                # Minimum 2 karakter, maksimum 30 karakter
+                if len(tag) >= 2 and len(tag) <= 30:
+                    valid_tags.append(tag)
+
             # YouTube 500 karakter limitini gözet
             final_tags, char_count = [], 0
-            for tag in tag_list:
+            for tag in valid_tags:
                 addition = len(tag) + (1 if final_tags else 0)  # +1 virgül için
                 if char_count + addition <= 490:
                     final_tags.append(tag)
