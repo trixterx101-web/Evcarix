@@ -15,8 +15,8 @@ STABILITY_API_KEY = os.getenv("STABILITY_API_KEY")
 REPLICATE_API_KEY = os.getenv("REPLICATE_API_KEY")
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
 PIXABAY_API_KEY = os.getenv("PIXABAY_API_KEY")
-KLING_API_KEY = os.getenv("KLING_API_KEY")
-RUNWAY_API_KEY = os.getenv("RUNWAY_API_KEY")
+KLING_ACCESS_KEY = os.getenv("KLING_ACCESS_KEY")
+KLING_SECRET_KEY = os.getenv("KLING_SECRET_KEY")
 
 # ── YouTube Configuration ──────────────────────────────────────────────────────
 YOUTUBE_CLIENT_SECRET_PATH = os.getenv("YOUTUBE_CLIENT_SECRET_PATH", "client_secret.json")
@@ -58,26 +58,26 @@ def validate_config():
         "PEXELS_API_KEY": PEXELS_API_KEY,
         "PIXABAY_API_KEY": PIXABAY_API_KEY,
     }
-    
+
     missing_keys = [k for k, v in required_keys.items() if not v]
     if missing_keys:
         print(f"⚠️  Missing required API keys: {', '.join(missing_keys)}")
         print("Please add them to your .env file")
         return False
-    
+
     # Optional keys warnings
     optional_keys = {
         "STABILITY_API_KEY": STABILITY_API_KEY,
         "REPLICATE_API_KEY": REPLICATE_API_KEY,
-        "KLING_API_KEY": KLING_API_KEY,
-        "RUNWAY_API_KEY": RUNWAY_API_KEY,
+        "KLING_ACCESS_KEY": KLING_ACCESS_KEY,
+        "KLING_SECRET_KEY": KLING_SECRET_KEY,
     }
-    
+
     missing_optional = [k for k, v in optional_keys.items() if not v]
     if missing_optional:
         print(f"ℹ️  Optional API keys not set: {', '.join(missing_optional)}")
         print("Some features may be limited")
-    
+
     return True
 
 if __name__ == "__main__":
