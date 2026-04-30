@@ -7,6 +7,7 @@ from moviepy.editor import (
 )
 import PIL.Image
 from io import BytesIO
+from pathlib import Path
 
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
@@ -288,151 +289,72 @@ class AutoEditor:
     def generate_premium_thumbnail(self, video_path, title, output_path,
                                    channel_name="EVCARIX", slogan="NO HYPE. JUST NUMBERS. ⚡"):
         """
-        YouTube için profesyonel AI HD thumbnail üretir (Pollinations ile).
+        YouTube için profesyonel AI HD thumbnail üretir (thumbnail_generator.py ile).
         - 1080x1920 (9:16) HD format
-        - AI generated background (Pollinations)
-        - Büyük kırmızı kutulu başlık (max 2 satır)
-        - Kanal branding
+        - AI layout generation (Groq)
+        - Speed lines, gradient backgrounds
+        - Battery bar and lightning bolt graphics
+        - Glow and outline effects
         """
-        W, H = 1080, 1920
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+        from thumbnail_generator import generate_thumbnail, ai_generate
 
-        # ── Arka plan: Pollinations AI ile 4K HD görsel üret ──
-        bg = None
+        # Get Groq API key from environment
+        groq_api_key = os.environ.get("GROQ_API_KEY")
+        if not groq_api_key:
+            print("[Thumbnail] Warning: GROQ_API_KEY not set, using default layout")
+
+        # Use AI to generate thumbnail layout from title
         try:
-            import requests
-            # AI prompt: Konu başlığına göre özelleştirilmiş
-            ai_prompt = f"professional {title}, electric vehicle, modern technology, cinematic lighting, high quality, 4K resolution, photography style"
-            encoded_prompt = requests.utils.quote(ai_prompt)
-            # 4K çözünürlük (3840x2160) ile üret, sonra 9:16'ya resize et
-            pollinations_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=3840&height=2160&nologo=true&seed={random.randint(1, 1000)}"
-            print(f"[Thumbnail] AI görsel üretiliyor: Pollinations 4K HD...")
-            response = requests.get(pollinations_url, timeout=60)
-            if response.status_code == 200:
-                bg = Image.open(BytesIO(response.content)).convert("RGB").resize((W, H))
-                print(f"[Thumbnail] 4K AI görsel başarıyla indirildi ve 9:16'ya resize edildi")
+            print(f"[Thumbnail] Generating AI layout for: {title}")
+            params = ai_generate(title, groq_api_key)
+            print(f"[Thumbnail] AI params: {params}")
         except Exception as e:
-            print(f"[Thumbnail] AI görsel alınamadı: {e}")
+            print(f"[Thumbnail] AI generation failed: {e}, using defaults")
+            params = {
+                "title": title.upper()[:20],
+                "subtitle": "Watch to find out",
+                "stat": "",
+                "accent": "red",
+                "show_battery": False,
+                "battery_pct": 50,
+                "show_bolt": False,
+            }
 
-        # ── AI başarısız olursa gradient fallback ──
-        if bg is None:
-            bg = Image.new("RGB", (W, H), (0, 0, 0))
-            pixels = bg.load()
-            for y in range(H):
-                t = y / H
-                r = int(10 + 60 * t + 20 * np.sin(t * np.pi))
-                g = int(15 - 8 * t)
-                b = int(45 - 30 * t + 15 * np.sin(t * np.pi))
-                for x in range(W):
-                    vignette = 1.0 - 0.25 * abs((x / W) - 0.5)
-                    pixels[x, y] = (int(r * vignette), int(g * vignette), int(b * vignette))
-
-        # ── EV temalı dekoratif şekiller ──
-        deco = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        deco_draw = ImageDraw.Draw(deco)
-        # Sağ üst köşe: büyük yarı-saydam pil/şimşek sembolü (basit geometri)
-        # Şimşek çizgisi
-        lightning_points = [(W - 180, 80), (W - 220, 180), (W - 160, 180), (W - 200, 280)]
-        deco_draw.polygon(lightning_points, fill=(255, 220, 0, 30))
-        # Sol alt: dairesel halka
-        deco_draw.ellipse([(-60, H - 200), (140, H)], outline=(0, 255, 150, 25), width=8)
-        # Sağ alt: küçük çizgiler (data/grafik hissi)
-        for i in range(5):
-            x1 = W - 300 + i * 40
-            h = 60 + i * 25
-            deco_draw.rectangle([x1, H - 120 - h, x1 + 20, H - 120], fill=(0, 200, 255, 20))
-        bg = Image.alpha_composite(bg.convert("RGBA"), deco).convert("RGB")
-        draw = ImageDraw.Draw(bg)
-
-        # ── Font yükleme — Evcarix kanal tarzı (Impact/Anton benzeri) ──
-        title_font = self._load_font("bold", 120)  # Büyük ve kalın
-        ch_font = self._load_font("bold", 50)      # Kanal adı
-        sl_font = self._load_font("regular", 30)
-
-        # ── Başlık metni — en fazla 2 satır, ortada ──
-        max_title_w = W - 120
-        words = title.split()
-        lines, current = [], ""
-        for w in words:
-            test = (current + " " + w).strip()
-            bbox = draw.textbbox((0, 0), test, font=title_font)
-            if bbox[2] - bbox[0] > max_title_w:
-                if current:
-                    lines.append(current)
-                current = w
-            else:
-                current = test
-        if current:
-            lines.append(current)
-        lines = lines[:2]
-
-        line_h = title_font.size + 18
-        total_text_h = len(lines) * line_h + (len(lines) - 1) * 18
-        y_title = (H - total_text_h) // 2 - 80
-
-        for line in lines:
-            bbox = draw.textbbox((0, 0), line, font=title_font)
+        # Generate thumbnail using the new system
+        try:
+            thumbnail_path = generate_thumbnail(
+                title=params.get("title", title),
+                subtitle=params.get("subtitle", ""),
+                stat=params.get("stat", ""),
+                accent=params.get("accent", "red"),
+                output_path=output_path,
+                show_battery=params.get("show_battery", False),
+                battery_pct=params.get("battery_pct", 30),
+                show_bolt=params.get("show_bolt", False),
+                channel_tag=channel_name,
+            )
+            print(f"[Thumbnail] Premium thumbnail saved: {thumbnail_path}")
+            return thumbnail_path
+        except Exception as e:
+            print(f"[Thumbnail] Generation failed: {e}")
+            # Fallback to simple text on dark background
+            W, H = 1080, 1920
+            bg = Image.new("RGB", (W, H), (5, 5, 10))
+            draw = ImageDraw.Draw(bg)
+            title_font = self._load_font("bold", 120)
+            bbox = draw.textbbox((0, 0), title, font=title_font)
             lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
             x = (W - lw) // 2
-
-            # Evcarix kanal tarzı: Çok kalın siyah outline + Glow efekt
-            # Önce glow (kırmızı/sarı tonlarında)
-            for dx in [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6]:
-                for dy in [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6]:
-                    glow_intensity = 100 - abs(dx) * 10 - abs(dy) * 10
-                    if glow_intensity > 0:
-                        draw.text((x + dx, y_title + dy), line, font=title_font, fill=(255, 0, 0, glow_intensity))
-
-            # Koyu siyah outline
+            y = (H - lh) // 2
             for dx in [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]:
                 for dy in [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]:
-                    draw.text((x + dx, y_title + dy), line, font=title_font, fill=(0, 0, 0, 255))
-
-            # Ana metin — beyaz
-            draw.text((x, y_title), line, font=title_font, fill=(255, 255, 255))
-            y_title += line_h + 18  # Satırlar arası boşluk
-
-        # ── Alt bant (kanal + slogan) ──
-        band_h = 110
-        band_y = H - band_h
-        band = Image.new("RGBA", (W, band_h), (0, 0, 0, 200))
-        bg_rgba = bg.convert("RGBA")
-        bg_rgba.paste(band, (0, band_y), band)
-        bg = bg_rgba.convert("RGB")
-        draw = ImageDraw.Draw(bg)
-
-        # Kanal adı — parlak yeşil
-        cb = draw.textbbox((0, 0), channel_name, font=ch_font)
-        cx = (W - (cb[2] - cb[0])) // 2
-        for dx in [-2, -1, 0, 1, 2]:
-            for dy in [-2, -1, 0, 1, 2]:
-                draw.text((cx + dx, band_y + 16 + dy), channel_name, font=ch_font, fill=(0, 0, 0))
-        draw.text((cx, band_y + 16), channel_name, font=ch_font, fill=(0, 255, 120))
-
-        # Slogan — beyaz
-        sb = draw.textbbox((0, 0), slogan, font=sl_font)
-        sx = (W - (sb[2] - sb[0])) // 2
-        draw.text((sx, band_y + 68), slogan, font=sl_font, fill=(230, 230, 230))
-
-        # ── Sol üst köşe EV rozet ──
-        try:
-            badge_text = "⚡ EV"
-            badge_font = self._load_font("bold", 34)
-            bb = draw.textbbox((0, 0), badge_text, font=badge_font)
-            bw, bh = bb[2] - bb[0] + 28, bb[3] - bb[1] + 14
-            badge_x, badge_y = 35, 35
-            badge_bg = Image.new("RGBA", (bw, bh), (0, 255, 150, 200))
-            bg_rgba2 = bg.convert("RGBA")
-            bg_rgba2.paste(badge_bg, (badge_x, badge_y), badge_bg)
-            bg = bg_rgba2.convert("RGB")
-            draw = ImageDraw.Draw(bg)
-            draw.text((badge_x + 14, badge_y + 7), badge_text, font=badge_font, fill=(0, 0, 0))
-        except Exception:
-            pass
-
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        bg.save(output_path, "JPEG", quality=95)
-        print(f"[Editor] Premium Thumbnail kaydedildi: {output_path}")
-        return output_path
+                    draw.text((x + dx, y + dy), title, font=title_font, fill=(0, 0, 0))
+            draw.text((x, y), title, font=title_font, fill=(255, 255, 255))
+            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+            bg.save(output_path, "PNG", quality=95)
+            return output_path
 
     def assemble_long_video(self, video_paths, audio_path, script_text, output_filename, bg_music_path=None):
         """Yatay uzun video montajı (Full HD 1920x1080)."""
