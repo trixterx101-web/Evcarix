@@ -1,0 +1,94 @@
+name: Generate All Content
+
+on:
+  # Run manually from GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      category:
+        description: 'Category filter (leave empty for all)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - battery
+          - range
+          - charging
+          - ownership
+          - comparison
+          - market
+          - infrastructure
+          - education
+          - tools
+      priority:
+        description: 'Priority filter'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - high
+          - medium
+          - new
+      force:
+        description: 'Regenerate even if output exists'
+        required: false
+        default: false
+        type: boolean
+
+  # Also run every Monday at 06:00 UTC — generate any new/missing topics
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to commit output files back to repo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build argument string
+        id: args
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.category }}" ]; then
+            ARGS="$ARGS --category ${{ github.event.inputs.category }}"
+          fi
+          if [ -n "${{ github.event.inputs.priority }}" ]; then
+            ARGS="$ARGS --priority ${{ github.event.inputs.priority }}"
+          fi
+          if [ "${{ github.event.inputs.force }}" == "true" ]; then
+            ARGS="$ARGS --force"
+          fi
+          echo "args=$ARGS" >> $GITHUB_OUTPUT
+
+      - name: Generate content
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python scripts/generate_content.py ${{ steps.args.outputs.args }}
+
+      - name: Commit generated files
+        run: |
+          git config user.name  "Evcarix Bot"
+          git config user.email "bot@evcarix.com"
+          git add output/
+          if git diff --cached --quiet; then
+            echo "Nothing new to commit."
+          else
+            COUNT=$(git diff --cached --name-only | grep -c '\.json' || true)
+            git commit -m "🤖 Generated content: $COUNT topic(s) [$(date -u +%Y-%m-%d)]"
+            git push
+          fi

@@ -1,0 +1,54 @@
+name: Generate Single Topic
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic_id:
+        description: 'Topic ID (1-67, see data/topics.csv)'
+        required: true
+        type: number
+      force:
+        description: 'Regenerate even if output exists'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  generate-single:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate topic
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          FORCE_FLAG=""
+          if [ "${{ github.event.inputs.force }}" == "true" ]; then
+            FORCE_FLAG="--force"
+          fi
+          python scripts/generate_content.py --id ${{ github.event.inputs.topic_id }} $FORCE_FLAG
+
+      - name: Commit result
+        run: |
+          git config user.name  "Evcarix Bot"
+          git config user.email "bot@evcarix.com"
+          git add output/
+          if git diff --cached --quiet; then
+            echo "Nothing new to commit."
+          else
+            git commit -m "🤖 Generated topic #${{ github.event.inputs.topic_id }} [$(date -u +%Y-%m-%d)]"
+            git push

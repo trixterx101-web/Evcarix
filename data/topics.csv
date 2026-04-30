@@ -1,0 +1,68 @@
+id,category_id,category_title,topic,priority
+1,battery,Pil Bilimi & Teknoloji,LFP vs NMC vs NCA — gerçek dünya farkı,high
+2,battery,Pil Bilimi & Teknoloji,Solid-state pil: gerçekçi zaman çizelgesi,high
+3,battery,Pil Bilimi & Teknoloji,Pil degradasyon bilimi nasıl çalışır?,high
+4,battery,Pil Bilimi & Teknoloji,BMS (Pil Yönetim Sistemi) tam açıklama,medium
+5,battery,Pil Bilimi & Teknoloji,Pil ısıtma sistemleri karşılaştırması,high
+6,battery,Pil Bilimi & Teknoloji,Şarj döngüsü gerçekte nedir?,medium
+7,battery,Pil Bilimi & Teknoloji,Sıcak hava pilin ömrünü nasıl etkiler?,high
+8,battery,Pil Bilimi & Teknoloji,Pil kalibrasyon miti — doğru mu?,medium
+9,battery,Pil Bilimi & Teknoloji,1 milyon km LFP — veri analizi,high
+10,range,Menzil & Verimlilik Testleri,Kış menzil kaybı — tam veri seti,high
+11,range,Menzil & Verimlilik Testleri,Yaz vs kış menzil karşılaştırması,high
+12,range,Menzil & Verimlilik Testleri,Otoyol vs şehir menzil farkı,high
+13,range,Menzil & Verimlilik Testleri,Klima menzili yüzde kaç düşürür?,medium
+14,range,Menzil & Verimlilik Testleri,Hız ve menzil ilişkisi — eğri analizi,medium
+15,range,Menzil & Verimlilik Testleri,EV tüketim dökümleri (kWh/100km),high
+16,range,Menzil & Verimlilik Testleri,Rejeneratif frenleme ne kadar katkı sağlar?,medium
+17,range,Menzil & Verimlilik Testleri,Araç ağırlığı ve menzil ilişkisi,new
+18,range,Menzil & Verimlilik Testleri,Sürüş stili verimliliği nasıl etkiler?,medium
+19,charging,Şarj Teknolojisi,800V vs 400V — gerçek fark ne?,high
+20,charging,Şarj Teknolojisi,Hızlı şarj pili gerçekten mahveder mi?,high
+21,charging,Şarj Teknolojisi,CCS vs CHAdeMO vs Tesla — durum 2026,high
+22,charging,Şarj Teknolojisi,Şarj güç kaybı — kablo uzunluğu etkisi,new
+23,charging,Şarj Teknolojisi,Bi-directional şarj (V2G/V2H) gerçekçi mi?,new
+24,charging,Şarj Teknolojisi,Ev şarjı vs hızlı şarj maliyet analizi,high
+25,charging,Şarj Teknolojisi,Şarj ağı güvenilirlik testi — Avrupa,high
+26,charging,Şarj Teknolojisi,Güneş enerjisi + EV kombinasyonu hesabı,new
+27,charging,Şarj Teknolojisi,Geceleri şarj vs gündüz şarj,medium
+28,ownership,Sahiplik Maliyeti,5 yılda toplam EV vs dizel maliyeti,high
+29,ownership,Sahiplik Maliyeti,İkinci el EV değer kaybı verileri,high
+30,ownership,Sahiplik Maliyeti,Sigorta maliyeti gerçekten daha mı yüksek?,high
+31,ownership,Sahiplik Maliyeti,EV bakım maliyeti: fren - lastik - servis,high
+32,ownership,Sahiplik Maliyeti,Batarya değiştirme maliyeti 2026,medium
+33,ownership,Sahiplik Maliyeti,100.000+ km sonrası gerçek kullanıcı verileri,high
+34,ownership,Sahiplik Maliyeti,Yazılım güncellemesi performansı etkiler mi?,medium
+35,ownership,Sahiplik Maliyeti,Fren sistemi ömrü — EV avantajı,medium
+36,ownership,Sahiplik Maliyeti,Garanti gerçekte ne kapsar?,high
+37,comparison,Araç Karşılaştırmaları,Aynı segmentte EV karşılaştırması — sadece veri,high
+38,comparison,Araç Karşılaştırmaları,Platform mimarisi farkları gerçekte ne değiştirir?,medium
+39,comparison,Araç Karşılaştırmaları,70 araç — 2 indeks: büyük vs küçük analizi,high
+40,comparison,Araç Karşılaştırmaları,Motor tipi: tek eksen vs çift eksen veri,medium
+41,comparison,Araç Karşılaştırmaları,Bütçe EV karşılaştırması — 30.000 Euro altı,new
+42,comparison,Araç Karşılaştırmaları,Aile arabası: EV hangisi daha iyi?,new
+43,comparison,Araç Karşılaştırmaları,SUV menzil karşılaştırması — gerçek test,high
+44,comparison,Araç Karşılaştırmaları,Türkiye pazarında EV seçim rehberi,new
+45,market,Pazar & Sektör Verileri,Ülkeye göre EV adaptasyon istatistikleri,new
+46,market,Pazar & Sektör Verileri,Marka pazar payı değişimi — 2024 vs 2025,new
+47,market,Pazar & Sektör Verileri,Çin EV markaları Avrupa'ya geliyor — veri,high
+48,market,Pazar & Sektör Verileri,EV satışları neden yavaşladı? — analiz,high
+49,market,Pazar & Sektör Verileri,Teşvik kaldırıldığında ne olur? — veri,medium
+50,market,Pazar & Sektör Verileri,EV fiyat deflasyonu — trend analizi,new
+51,market,Pazar & Sektör Verileri,İkinci el pazar büyüklüğü ve fırsatlar,new
+52,infrastructure,Altyapı & Şebeke,Şarj istasyonu güvenilirlik testi — sonuçlar,high
+53,infrastructure,Altyapı & Şebeke,Türkiye şarj altyapısı haritası ve eksikler,new
+54,infrastructure,Altyapı & Şebeke,Apartman şarjı — çözümler ve maliyetler,new
+55,infrastructure,Altyapı & Şebeke,Şarj süresi hesaplama aracı,medium
+56,infrastructure,Altyapı & Şebeke,EV şebekeyi çöker mi? — gerçek hesap,high
+57,infrastructure,Altyapı & Şebeke,Yenilenebilir + EV kombinasyonu analizi,new
+58,infrastructure,Altyapı & Şebeke,Akıllı şarj (smart charging) nedir - fark eder mi?,medium
+59,education,Eğitim & Teknik Açıklamalar,Isı pompası nasıl çalışır — görsel açıklama,high
+60,education,Eğitim & Teknik Açıklamalar,PTC vs ısı pompası tam karşılaştırma,high
+61,education,Eğitim & Teknik Açıklamalar,One-pedal sürüş nasıl çalışır?,medium
+62,education,Eğitim & Teknik Açıklamalar,EV termal yönetim sistemi açıklaması,medium
+63,education,Eğitim & Teknik Açıklamalar,Sürüklenme (drag) ve menzil ilişkisi,new
+64,education,Eğitim & Teknik Açıklamalar,Şarj eğrisi neden düşer? — teknik açıklama,high
+65,education,Eğitim & Teknik Açıklamalar,SOH (State of Health) nedir - nasıl ölçülür?,medium
+66,education,Eğitim & Teknik Açıklamalar,EV inverter teknolojisi açıklaması,new
+67,education,Eğitim & Teknik Açıklamalar,WLTP vs EPA vs gerçek menzil farkı,high
