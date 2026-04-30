@@ -6,6 +6,7 @@ from moviepy.editor import (
     CompositeVideoClip, ColorClip, concatenate_videoclips, ImageClip
 )
 import PIL.Image
+from io import BytesIO
 
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
@@ -287,34 +288,36 @@ class AutoEditor:
     def generate_premium_thumbnail(self, video_path, title, output_path,
                                    channel_name="EVCARIX", slogan="NO HYPE. JUST NUMBERS. ⚡"):
         """
-        YouTube için profesyonel AI-style thumbnail üretir.
-        - 1280x720, koyu gradient arka plan (mavi→mor→turuncu)
-        - Büyük sarı/beyaz başlık (max 2 satır)
-        - EV temalı şekiller (Pillow ile çizilmiş ikonlar)
-        - Kanal branding (alt bant)
+        YouTube için profesyonel AI HD thumbnail üretir (Pollinations ile).
+        - 1080x1920 (9:16) HD format
+        - AI generated background (Pollinations)
+        - Büyük kırmızı kutulu başlık (max 2 satır)
+        - Kanal branding
         """
         W, H = 1080, 1920
 
-        # ── Arka plan: videodan frame varsa kullan, yoksa gradient ──
+        # ── Arka plan: Pollinations AI ile HD görsel üret ──
         bg = None
-        if video_path and os.path.exists(video_path):
-            try:
-                from moviepy.editor import VideoFileClip
-                with VideoFileClip(video_path) as vc:
-                    mid_t = vc.duration / 2 if vc.duration else 0
-                    frame = vc.get_frame(mid_t)
-                    bg = Image.fromarray(frame).convert("RGB").resize((W, H))
-                    print(f"[Thumbnail] Video frame kullanılıyor: {video_path}")
-            except Exception as e:
-                print(f"[Thumbnail] Video frame alınamadı: {e}")
+        try:
+            import requests
+            # AI prompt: EV/technology themed background
+            ai_prompt = f"electric vehicle technology, modern car charging, battery science, high quality, cinematic, 9:16 vertical, professional"
+            encoded_prompt = requests.utils.quote(ai_prompt)
+            pollinations_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={W}&height={H}&nologo=true&seed={random.randint(1, 1000)}"
+            print(f"[Thumbnail] AI görsel üretiliyor: Pollinations HD 9:16...")
+            response = requests.get(pollinations_url, timeout=30)
+            if response.status_code == 200:
+                bg = Image.open(BytesIO(response.content)).convert("RGB").resize((W, H))
+                print(f"[Thumbnail] AI görsel başarıyla indirildi")
+        except Exception as e:
+            print(f"[Thumbnail] AI görsel alınamadı: {e}")
 
+        # ── AI başarısız olursa gradient fallback ──
         if bg is None:
-            # Gradient arka plan (daha canlı koyu mavi → mor → parlak kırmızı)
             bg = Image.new("RGB", (W, H), (0, 0, 0))
             pixels = bg.load()
             for y in range(H):
                 t = y / H
-                # Üst: koyu mavi-lacivert → Orta: parlak mor → Alt: canlı kırmızı
                 r = int(10 + 60 * t + 20 * np.sin(t * np.pi))
                 g = int(15 - 8 * t)
                 b = int(45 - 30 * t + 15 * np.sin(t * np.pi))
