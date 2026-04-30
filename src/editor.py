@@ -296,19 +296,20 @@ class AutoEditor:
         """
         W, H = 1080, 1920
 
-        # ── Arka plan: Pollinations AI ile HD görsel üret ──
+        # ── Arka plan: Pollinations AI ile 4K HD görsel üret ──
         bg = None
         try:
             import requests
-            # AI prompt: EV/technology themed background
-            ai_prompt = f"electric vehicle technology, modern car charging, battery science, high quality, cinematic, 9:16 vertical, professional"
+            # AI prompt: Konu başlığına göre özelleştirilmiş
+            ai_prompt = f"professional {title}, electric vehicle, modern technology, cinematic lighting, high quality, 4K resolution, photography style"
             encoded_prompt = requests.utils.quote(ai_prompt)
-            pollinations_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={W}&height={H}&nologo=true&seed={random.randint(1, 1000)}"
-            print(f"[Thumbnail] AI görsel üretiliyor: Pollinations HD 9:16...")
-            response = requests.get(pollinations_url, timeout=30)
+            # 4K çözünürlük (3840x2160) ile üret, sonra 9:16'ya resize et
+            pollinations_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=3840&height=2160&nologo=true&seed={random.randint(1, 1000)}"
+            print(f"[Thumbnail] AI görsel üretiliyor: Pollinations 4K HD...")
+            response = requests.get(pollinations_url, timeout=60)
             if response.status_code == 200:
                 bg = Image.open(BytesIO(response.content)).convert("RGB").resize((W, H))
-                print(f"[Thumbnail] AI görsel başarıyla indirildi")
+                print(f"[Thumbnail] 4K AI görsel başarıyla indirildi ve 9:16'ya resize edildi")
         except Exception as e:
             print(f"[Thumbnail] AI görsel alınamadı: {e}")
 
