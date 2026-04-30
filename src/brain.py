@@ -47,10 +47,10 @@ class EvcarixBrain:
         return [h["topic"] for h in self._load_history()]
 
     # ───────────────────────────────────────────────────────────────
-    # KONU HAVUZU — 80+ veri-odaklı EV konusu, kategorilere ayrılmış
+    # KONU HAVUZU — 67 veri-odaklı EV konusu, 9 kategorilere ayrılmış
     # ───────────────────────────────────────────────────────────────
     _TOPIC_POOL = {
-        # ── 1. Pil Bilimi & Teknoloji (Temel, 9 konu) ────────────────────
+        # ── 1. Pil Bilimi & Teknoloji (8 konu) ──────────────────────────
         "battery_science": [
             "LFP vs NMC vs NCA real-world degradation after 100000 miles data",
             "Solid-state battery realistic timeline and energy density roadmap",
@@ -59,10 +59,9 @@ class EvcarixBrain:
             "Battery heating systems comparison active vs passive thermal",
             "What is a charge cycle really counting partial charges",
             "Hot weather battery lifespan impact data Celsius analysis",
-            "Battery calibration myth or fact charge to 100 test",
             "LFP battery after 100000 miles real data analysis",
         ],
-        # ── 2. Menzil & Verimlilik Testleri (Mevcut, 9 konu) ─────────────
+        # ── 2. Menzil & Verimlilik Testleri (8 konu) ─────────────────────
         "range_tests": [
             "Winter range loss complete data set Norway vs Canada vs US",
             "Summer vs winter range comparison same car same route test",
@@ -72,9 +71,8 @@ class EvcarixBrain:
             "EV consumption breakdown kWh per 100km real driving data",
             "Regenerative braking how much range does it actually add percent",
             "Vehicle weight and range relationship kg per km data",
-            "Driving style impact on EV efficiency aggressive vs eco data",
         ],
-        # ── 3. Şarj Teknolojisi (Popüler, 9 konu) ─────────────────────────
+        # ── 3. Şarj Teknolojisi (8 konu) ────────────────────────────────
         "charging": [
             "800V vs 400V real charging speed difference minutes saved data",
             "Does fast charging actually kill your battery 5 year study",
@@ -84,9 +82,8 @@ class EvcarixBrain:
             "Home charging vs DC fast charging cost per mile comparison",
             "Charging network reliability test Europe Electrify America data",
             "Solar energy plus EV combination payback period calculation",
-            "Night charging vs daytime charging cost and grid impact data",
         ],
-        # ── 4. Sahiplik Maliyeti (Yüksek İlgi, 9 konu) ───────────────────
+        # ── 4. Sahiplik Maliyeti (8 konu) ───────────────────────────────
         "cost_ownership": [
             "5 year total cost EV vs diesel compact sedan real numbers USA",
             "Used EV depreciation value loss data by brand and model",
@@ -95,10 +92,9 @@ class EvcarixBrain:
             "Battery replacement cost 2026 actual price out of warranty",
             "Home solar plus EV charging payback period calculation USA Europe",
             "Public charging subscription plans worth it or cost per kWh analysis",
-            "Used EV battery health check before buying guide SOH test",
             "EV tax incentives 2026 USA Europe China comparison amounts",
         ],
-        # ── 5. Araç Karşılaştırmaları (Mevcut, 8 konu) ────────────────────
+        # ── 5. Araç Karşılaştırmaları (7 konu) ──────────────────────────
         "comparisons": [
             "Same segment EV comparison data only specs vs real world",
             "Platform architecture differences what actually changes EV",
@@ -106,10 +102,9 @@ class EvcarixBrain:
             "Motor type single axle vs dual axle torque data comparison",
             "Budget EV comparison under 30000 dollars Europe and USA",
             "Family car EV which is better space safety cost data",
-            "SUV range comparison real world tested highway data",
             "Global EV buying guide 2026 best value by region data",
         ],
-        # ── 6. Pazar & Sektör Verileri (Yeni, 7 konu) ─────────────────────
+        # ── 6. Pazar & Sektör Verileri (7 konu) ─────────────────────────
         "market_data": [
             "EV adoption statistics by country USA Europe China data",
             "Brand market share change 2024 vs 2025 global data",
@@ -119,7 +114,7 @@ class EvcarixBrain:
             "EV price deflation trend analysis cost per kWh data",
             "Used EV market size and opportunity pricing data",
         ],
-        # ── 7. Altyapı & Şebeke (Yeni, 7 konu) ────────────────────────────
+        # ── 7. Altyapı & Şebeke (7 konu) ────────────────────────────────
         "infrastructure": [
             "Charging station reliability test results uptime data",
             "Europe charging infrastructure map gaps and coverage data",
@@ -129,7 +124,7 @@ class EvcarixBrain:
             "Renewable energy plus EV combination analysis carbon data",
             "Smart charging V1G V2G does it really matter cost data",
         ],
-        # ── 8. Eğitim & Teknik Açıklamalar (Temel, 9 konu) ────────────────
+        # ── 8. Eğitim & Teknik Açıklamalar (7 konu) ────────────────────────
         "education": [
             "Heat pump how does it work visual explanation efficiency data",
             "PTC heater vs heat pump full comparison range impact data",
@@ -138,10 +133,8 @@ class EvcarixBrain:
             "Aerodynamic drag and range relationship Cd A coefficient data",
             "Why does charging curve drop battery chemistry explained",
             "SOH State of Health what is it how measured accuracy data",
-            "EV inverter technology explained SiC vs IGBT efficiency data",
-            "WLTP vs EPA vs real world range difference explained data",
         ],
-        # ── 9. İnteraktif Araçlar & Hesaplayıcılar (Yeni Alan, 7 konu) ─────
+        # ── 9. İnteraktif Araçlar & Hesaplayıcılar (7 konu) ────────────────
         "interactive_tools": [
             "Range calculator by temperature interactive data visualization",
             "EV vs diesel cost comparator total 5 year calculation tool",

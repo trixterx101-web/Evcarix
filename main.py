@@ -71,8 +71,8 @@ class EvcarixOrchestrator:
         )
         ai_fallback_images = []
         if len(video_paths) < 2:
-            print("⚠️ Stok video az — AI görüntü fallback devreye giriyor...")
-            ai_fallback_images = self.media_engine.generate_ai_fallback_images(topic, count=3)
+            print("⚠️ Stok video az — AI görüntü fallback devreye giriyor (Pollinations HD)...")
+            ai_fallback_images = self.media_engine.generate_ai_fallback_images(topic, count=5, output_dir=f"assets/ai_fallback/{ts}")
 
         # ── 3. Seslendirme ────────────────────────────────────────
         print("\n[3/6] Seslendirme yapılıyor...")

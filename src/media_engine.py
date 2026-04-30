@@ -210,11 +210,11 @@ class MediaEngine:
             return []
 
         pixabay_queries_map = {
-            "battery_science": ["lithium battery", "battery technology", "laboratory research", "battery cell"],
-            "range_tests": ["electric car driving", "highway driving", "winter road", "dashboard speedometer"],
-            "charging": ["EV charging", "charging station", "Tesla supercharger", "electric plug"],
+            "battery_science": ["lithium battery cell", "battery laboratory", "battery technology", "battery factory production"],
+            "range_tests": ["electric car highway driving", "winter road driving", "dashboard speedometer", "electric vehicle test"],
+            "charging": ["EV charging station", "Tesla supercharger", "electric car charging", "DC fast charging"],
             "cost_ownership": ["car dealership", "car insurance", "money calculator", "business finance"],
-            "comparisons": ["electric vehicles", "car showroom", "car comparison", "cars parked"],
+            "comparisons": ["electric vehicles comparison", "car showroom", "car comparison test", "cars parked"],
             "market_data": ["business analytics", "stock market", "factory production", "global network"],
             "infrastructure": ["power grid", "solar panels", "smart city", "charging network"],
             "education": ["electric motor", "heat pump", "engineering technology", "wind tunnel"],

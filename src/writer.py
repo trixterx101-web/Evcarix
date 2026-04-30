@@ -59,7 +59,8 @@ class CreativeWriter:
             f"4. Power words: Exposed, Hidden, Cost, Savings, Failure, Why, Lie, Truth, Freeze, Burn, Drain, Broken\n"
             f"5. AVOID overused patterns like 'Real Data', 'Tested', 'vs' if they appear in history\n"
             f"6. American English ONLY. No hype words like 'amazing', 'incredible', 'insane'\n"
-            f"7. Return ONLY a JSON array of exactly 5 strings, no numbering\n"
+            f"7. CRITICAL: NEVER mention Turkey or Turkish-specific examples. Use USA, Europe, China examples only.\n"
+            f"8. Return ONLY a JSON array of exactly 5 strings, no numbering\n"
             f"{history_block}\n"
             f"Topic: {topic}\n"
             f"Example format: [\"Title 1\", \"Title 2\", ...]"
@@ -232,7 +233,9 @@ Requirements:
 3. Voiceover text only — no stage directions.
 4. End with: "Subscribe to Evcarix for real EV data."
 5. Please respond ONLY in American English.
-6. IMPORTANT: Use regions like USA, Europe, China — NEVER use Turkey or Turkish-specific examples.
+6. CRITICAL: Use regions like USA, Europe, China ONLY. NEVER use Turkey or Turkish-specific examples.
+7. Include real-world data points from Google research: battery percentages, range numbers, cost figures, kW charging speeds, market share stats.
+8. Reference specific car brands and models from global markets (Tesla, BYD, BMW, Mercedes, VW, Ford, Hyundai, Kia, etc.).
 
 Return in this format:
 SES: [male/female]
@@ -252,7 +255,9 @@ Requirements:
 1. Deep dive into technical details with specific numbers, percentages, and real-world data.
 2. Maintain a professional, educational, and analytical tone.
 3. Please respond ONLY in American English.
-4. IMPORTANT: Use regions like USA, Europe, China — NEVER use Turkey or Turkish-specific examples.
+4. CRITICAL: Use regions like USA, Europe, China ONLY. NEVER use Turkey or Turkish-specific examples.
+5. Include real-world data points from Google research: battery percentages, range numbers, cost figures, kW charging speeds, market share stats.
+6. Reference specific car brands and models from global markets (Tesla, BYD, BMW, Mercedes, VW, Ford, Hyundai, Kia, etc.).
 
 Return in this format:
 SES: [male/female]
@@ -339,7 +344,9 @@ SENARYO: [script text]
             f"4. Add a CTA: '{cta}'\n"
             f"5. Include naturally embedded long-tail keyword phrases (2-3 words each) related to the topic\n"
             f"6. Add 'Timestamps:' section with 3 estimated timestamps for key moments\n"
-            f"7. Max 400 words. American English only. Never mention Turkey or Turkish-specific examples.\n"
+            f"7. Max 400 words. American English only.\n"
+            f"8. CRITICAL: Use global examples ONLY (USA, Europe, China). NEVER mention Turkey or Turkish-specific examples.\n"
+            f"9. Include real data points: battery percentages, range numbers, cost figures, kW speeds, market share stats.\n"
             f"Return only the description text, no extra formatting."
         )
 
@@ -414,7 +421,9 @@ SENARYO: [script text]
             f"3. 6 long-tail specific tags (e.g., 'tesla model 3 range test 2024', 'lfp battery degradation 100k miles')\n"
             f"4. 3 trending / search-volume tags (ev news 2025, electric vehicle comparison, ev battery test)\n"
             f"5. 2 niche tags for channel discovery (evcarix, no hype just numbers)\n"
-            f"6. Total must be under 490 characters when joined with commas — prioritize long-tail for ranking\n\n"
+            f"6. Total must be under 490 characters when joined with commas — prioritize long-tail for ranking\n"
+            f"7. CRITICAL: Use global brands and regions ONLY (USA, Europe, China, Tesla, BYD, BMW, etc.). NEVER include Turkey-specific tags.\n"
+            f"8. Include data-driven tags with numbers (100k miles, 800V, 10-80%, etc.)\n\n"
             f"Return ONLY a comma-separated list of tags. No hashtags. No numbering. American English only."
         )
 

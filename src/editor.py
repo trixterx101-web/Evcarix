@@ -309,16 +309,17 @@ class AutoEditor:
                 print(f"[Thumbnail] Video frame alınamadı: {e}")
 
         if bg is None:
-            # Gradient arka plan (koyu mavi → mor → turuncu-kırmızı)
+            # Gradient arka plan (daha canlı koyu mavi → mor → parlak kırmızı)
             bg = Image.new("RGB", (W, H), (0, 0, 0))
             pixels = bg.load()
             for y in range(H):
                 t = y / H
-                r = int(5 + 40 * t + 15 * np.sin(t * np.pi))
-                g = int(10 - 5 * t)
-                b = int(35 - 25 * t + 10 * np.sin(t * np.pi))
+                # Üst: koyu mavi-lacivert → Orta: parlak mor → Alt: canlı kırmızı
+                r = int(10 + 60 * t + 20 * np.sin(t * np.pi))
+                g = int(15 - 8 * t)
+                b = int(45 - 30 * t + 15 * np.sin(t * np.pi))
                 for x in range(W):
-                    vignette = 1.0 - 0.3 * abs((x / W) - 0.5)
+                    vignette = 1.0 - 0.25 * abs((x / W) - 0.5)
                     pixels[x, y] = (int(r * vignette), int(g * vignette), int(b * vignette))
 
         # ── EV temalı dekoratif şekiller ──
@@ -339,9 +340,9 @@ class AutoEditor:
         draw = ImageDraw.Draw(bg)
 
         # ── Font yükleme — dikey 9:16 için optimize boyutlar ──
-        title_font = self._load_font("bold", 96)
-        ch_font = self._load_font("bold", 44)
-        sl_font = self._load_font("regular", 26)
+        title_font = self._load_font("bold", 108)  # Daha büyük ve dikkat çekici
+        ch_font = self._load_font("bold", 48)     # Kanal adı daha belirgin
+        sl_font = self._load_font("regular", 28)
 
         # ── Başlık metni — en fazla 2 satır, ortada ──
         max_title_w = W - 120
@@ -369,10 +370,10 @@ class AutoEditor:
             lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
             x = (W - lw) // 2
 
-            # Kırmızı kutu arka plan (Shorts tarzı text box)
-            pad_x, pad_y = 24, 16
+            # Kırmızı kutu arka plan (Shorts tarzı text box) - daha parlak
+            pad_x, pad_y = 28, 20
             box_rect = [x - pad_x, y_title - pad_y, x + lw + pad_x, y_title + lh + pad_y]
-            draw.rectangle(box_rect, fill=(220, 20, 20))  # Canlı kırmızı
+            draw.rectangle(box_rect, fill=(255, 30, 30))  # Ultra parlak kırmızı
 
             # Beyaz bold metin kutunun ortasında
             draw.text((x, y_title), line, font=title_font, fill=(255, 255, 255))
