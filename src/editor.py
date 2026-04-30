@@ -73,27 +73,20 @@ class AutoEditor:
 
         line_h = self.font_bold.size + 14
         total_h = len(lines) * line_h + 30
-        box_w = max_w + 50
-        box_h = total_h + 20
 
-        # Alt-orta konum: Y=950-1050 civarı (video ortasının altı, Shorts güvenli bölge)
-        y_start = 980
+        # Alt bölge: video alt kısmında, Shorts güvenli bölge üstünde
+        y_start = 1350
 
-        # Yarı saydam siyah arka plan kutusu
-        box_x = (width - box_w) // 2
-        box_img = Image.new("RGBA", (box_w, box_h), (0, 0, 0, 200))
-        img.paste(box_img, (box_x, y_start - 15), box_img)
-
-        # Metin satırlarını çiz
+        # Metin satırlarını çiz — kutu yok, sadece kalın siyah outline + beyaz metin
         text_y = y_start
         for line in lines:
             bbox = draw.textbbox((0, 0), line, font=font)
             line_w = bbox[2] - bbox[0]
             x = (width - line_w) // 2
 
-            # Çok kalın siyah outline/shadow (Shorts tarzı)
-            for dx in [-3, -2, -1, 0, 1, 2, 3]:
-                for dy in [-3, -2, -1, 0, 1, 2, 3]:
+            # Ultra kalın siyah outline/shadow (görseldeki gibi)
+            for dx in range(-4, 5):
+                for dy in range(-4, 5):
                     draw.text((x + dx, text_y + dy), line, font=font, fill=(0, 0, 0, 255))
 
             # Ana metin — BİLDİR (beyaz, bold, net)
