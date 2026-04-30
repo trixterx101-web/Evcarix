@@ -289,72 +289,51 @@ class AutoEditor:
     def generate_premium_thumbnail(self, video_path, title, output_path,
                                    channel_name="EVCARIX", slogan="NO HYPE. JUST NUMBERS. ⚡"):
         """
-        YouTube için profesyonel AI HD thumbnail üretir (thumbnail_generator.py ile).
-        - 1080x1920 (9:16) HD format
-        - AI layout generation (Groq)
-        - Speed lines, gradient backgrounds
-        - Battery bar and lightning bolt graphics
-        - Glow and outline effects
+        YouTube için basit placeholder thumbnail üretir (9:16 format).
+        - 1080x1920 (9:16) format
+        - Koyu gradient arka plan
+        - Başlık metni ortada
+        - Kullanıcı manuel olarak arka plan görselini değiştirebilir
         """
-        import sys
-        sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-        from thumbnail_generator import generate_thumbnail, ai_generate
+        W, H = 1080, 1920
 
-        # Get Groq API key from environment
-        groq_api_key = os.environ.get("GROQ_API_KEY")
-        if not groq_api_key:
-            print("[Thumbnail] Warning: GROQ_API_KEY not set, using default layout")
+        # Koyu gradient arka plan
+        bg = Image.new("RGB", (W, H), (5, 5, 10))
+        pixels = bg.load()
+        for y in range(H):
+            t = y / H
+            r = int(10 + 30 * t)
+            g = int(10 + 15 * t)
+            b = int(20 + 20 * t)
+            for x in range(W):
+                pixels[x, y] = (r, g, b)
 
-        # Use AI to generate thumbnail layout from title
-        try:
-            print(f"[Thumbnail] Generating AI layout for: {title}")
-            params = ai_generate(title, groq_api_key)
-            print(f"[Thumbnail] AI params: {params}")
-        except Exception as e:
-            print(f"[Thumbnail] AI generation failed: {e}, using defaults")
-            params = {
-                "title": title.upper()[:20],
-                "subtitle": "Watch to find out",
-                "stat": "",
-                "accent": "red",
-                "show_battery": False,
-                "battery_pct": 50,
-                "show_bolt": False,
-            }
+        draw = ImageDraw.Draw(bg)
 
-        # Generate thumbnail using the new system
-        try:
-            thumbnail_path = generate_thumbnail(
-                title=params.get("title", title),
-                subtitle=params.get("subtitle", ""),
-                stat=params.get("stat", ""),
-                accent=params.get("accent", "red"),
-                output_path=output_path,
-                show_battery=params.get("show_battery", False),
-                battery_pct=params.get("battery_pct", 30),
-                show_bolt=params.get("show_bolt", False),
-                channel_tag=channel_name,
-            )
-            print(f"[Thumbnail] Premium thumbnail saved: {thumbnail_path}")
-            return thumbnail_path
-        except Exception as e:
-            print(f"[Thumbnail] Generation failed: {e}")
-            # Fallback to simple text on dark background
-            W, H = 1080, 1920
-            bg = Image.new("RGB", (W, H), (5, 5, 10))
-            draw = ImageDraw.Draw(bg)
-            title_font = self._load_font("bold", 120)
-            bbox = draw.textbbox((0, 0), title, font=title_font)
-            lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
-            x = (W - lw) // 2
-            y = (H - lh) // 2
-            for dx in [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]:
-                for dy in [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]:
-                    draw.text((x + dx, y + dy), title, font=title_font, fill=(0, 0, 0))
-            draw.text((x, y), title, font=title_font, fill=(255, 255, 255))
-            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-            bg.save(output_path, "PNG", quality=95)
-            return output_path
+        # Başlık metni - ortada
+        title_font = self._load_font("bold", 100)
+        bbox = draw.textbbox((0, 0), title, font=title_font)
+        lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        x = (W - lw) // 2
+        y = (H - lh) // 2
+
+        # Siyah outline
+        for dx in [-4, -3, -2, -1, 0, 1, 2, 3, 4]:
+            for dy in [-4, -3, -2, -1, 0, 1, 2, 3, 4]:
+                draw.text((x + dx, y + dy), title, font=title_font, fill=(0, 0, 0))
+
+        # Beyaz metin
+        draw.text((x, y), title, font=title_font, fill=(255, 255, 255))
+
+        # Kanal adı (alt)
+        ch_font = self._load_font("bold", 40)
+        draw.text((W // 2, H - 60), channel_name, font=ch_font, fill=(200, 200, 200), anchor="mm")
+
+        # Kaydet
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        bg.save(output_path, "PNG", quality=95)
+        print(f"[Thumbnail] Placeholder thumbnail saved: {output_path}")
+        return output_path
 
     def assemble_long_video(self, video_paths, audio_path, script_text, output_filename, bg_music_path=None):
         """Yatay uzun video montajı (Full HD 1920x1080)."""
