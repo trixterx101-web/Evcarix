@@ -58,12 +58,14 @@ class CreativeWriter:
             f"3. Hook types: myth-busting, hidden truth, unexpected comparison, shocking data reveal, common mistake\n"
             f"4. Power words: Exposed, Hidden, Cost, Savings, Failure, Why, Lie, Truth, Freeze, Burn, Drain, Broken\n"
             f"5. AVOID overused patterns like 'Real Data', 'Tested', 'vs' if they appear in history\n"
-            f"6. American English ONLY. No hype words like 'amazing', 'incredible', 'insane'\n"
-            f"7. CRITICAL: NEVER mention Turkey or Turkish-specific examples. Use USA, Europe, China examples only.\n"
-            f"8. Return ONLY a JSON array of exactly 5 strings, no numbering\n"
+            f"6. CRITICAL: Return titles in BOTH Turkish and English (5 Turkish, 5 English - total 10 titles)\n"
+            f"7. Turkish titles: Use Turkish language, Turkish keywords (Elektrikli Araba, EV, Menzil, Şarj, Batarya)\n"
+            f"8. English titles: American English ONLY. No hype words like 'amazing', 'incredible', 'insane'\n"
+            f"9. CRITICAL: NEVER mention Turkey or Turkish-specific examples in English titles. Use USA, Europe, China examples only.\n"
+            f"10. Return ONLY a JSON array of exactly 10 strings: first 5 Turkish, then 5 English. No numbering\n"
             f"{history_block}\n"
             f"Topic: {topic}\n"
-            f"Example format: [\"Title 1\", \"Title 2\", ...]"
+            f"Example format: [\"TR Title 1\", \"TR Title 2\", \"TR Title 3\", \"TR Title 4\", \"TR Title 5\", \"EN Title 1\", \"EN Title 2\", ...]"
         )
 
         if GEMINI_AVAILABLE and self.gemini_client:
@@ -222,13 +224,13 @@ class CreativeWriter:
 Topic: {topic}
 Category: {category or "general"}
 Channel Concept: {evcarix_mission}
-Format: YouTube Short (20-40 seconds)
+Format: YouTube Short (45-60 seconds)
 Language: American English ONLY.
 
 Category-specific instructions: {cat_extra}
 
 Requirements:
-1. Script length: 20-40 seconds (approximately 50-90 words for normal speaking speed).
+1. Script length: 45-60 seconds (approximately 110-150 words for normal speaking speed).
 2. Start with a data-driven hook that includes a specific number or shocking fact.
 3. Focus on facts, numbers, and technical insights. No generic "amazing" or "incredible" hype.
 4. Voiceover text only — no stage directions.

@@ -343,10 +343,10 @@ class AutoEditor:
         bg = Image.alpha_composite(bg.convert("RGBA"), deco).convert("RGB")
         draw = ImageDraw.Draw(bg)
 
-        # ── Font yükleme — dikey 9:16 için optimize boyutlar ──
-        title_font = self._load_font("bold", 108)  # Daha büyük ve dikkat çekici
-        ch_font = self._load_font("bold", 48)     # Kanal adı daha belirgin
-        sl_font = self._load_font("regular", 28)
+        # ── Font yükleme — Evcarix kanal tarzı (Impact/Anton benzeri) ──
+        title_font = self._load_font("bold", 120)  # Büyük ve kalın
+        ch_font = self._load_font("bold", 50)      # Kanal adı
+        sl_font = self._load_font("regular", 30)
 
         # ── Başlık metni — en fazla 2 satır, ortada ──
         max_title_w = W - 120
@@ -374,12 +374,20 @@ class AutoEditor:
             lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
             x = (W - lw) // 2
 
-            # Koyu siyah outline/shadow (YouTube kanal tarzı)
-            for dx in [-4, -3, -2, -1, 0, 1, 2, 3, 4]:
-                for dy in [-4, -3, -2, -1, 0, 1, 2, 3, 4]:
+            # Evcarix kanal tarzı: Çok kalın siyah outline + Glow efekt
+            # Önce glow (kırmızı/sarı tonlarında)
+            for dx in [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6]:
+                for dy in [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6]:
+                    glow_intensity = 100 - abs(dx) * 10 - abs(dy) * 10
+                    if glow_intensity > 0:
+                        draw.text((x + dx, y_title + dy), line, font=title_font, fill=(255, 0, 0, glow_intensity))
+
+            # Koyu siyah outline
+            for dx in [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]:
+                for dy in [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]:
                     draw.text((x + dx, y_title + dy), line, font=title_font, fill=(0, 0, 0, 255))
 
-            # Ana metin — beyaz, bold
+            # Ana metin — beyaz
             draw.text((x, y_title), line, font=title_font, fill=(255, 255, 255))
             y_title += line_h + 18  # Satırlar arası boşluk
 

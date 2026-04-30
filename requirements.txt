@@ -10,3 +10,8 @@ feedparser
 pandas
 Pillow
 groq
+stability-sdk
+replicate
+pexelsapi
+numpy
+opencv-python
