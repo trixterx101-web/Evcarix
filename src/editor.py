@@ -373,12 +373,12 @@ class AutoEditor:
             lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
             x = (W - lw) // 2
 
-            # Kırmızı kutu arka plan (Shorts tarzı text box) - daha parlak
-            pad_x, pad_y = 28, 20
-            box_rect = [x - pad_x, y_title - pad_y, x + lw + pad_x, y_title + lh + pad_y]
-            draw.rectangle(box_rect, fill=(255, 30, 30))  # Ultra parlak kırmızı
+            # Koyu siyah outline/shadow (YouTube kanal tarzı)
+            for dx in [-4, -3, -2, -1, 0, 1, 2, 3, 4]:
+                for dy in [-4, -3, -2, -1, 0, 1, 2, 3, 4]:
+                    draw.text((x + dx, y_title + dy), line, font=title_font, fill=(0, 0, 0, 255))
 
-            # Beyaz bold metin kutunun ortasında
+            # Ana metin — beyaz, bold
             draw.text((x, y_title), line, font=title_font, fill=(255, 255, 255))
             y_title += line_h + 18  # Satırlar arası boşluk
 
