@@ -5,56 +5,174 @@ import datetime
 from src.trend_engine import TrendEngine
 from src.writer import CreativeWriter
 
+CONTENT_HISTORY_FILE = "content_history.json"
+HISTORY_LIMIT = 60  # Son 60 konu/başlık tekrar edilmez
+
 
 class EvcarixBrain:
     def __init__(self):
         self.trend_engine = TrendEngine()
         self.writer = CreativeWriter()
 
-    def get_daily_config(self, slot="evening"):
-        """
-        Her gün 2 farklı video için farklı konular seçer.
-        slot: 'evening' (18:00 TR) | 'night' (21:00 TR)
-        """
-        weekday = datetime.datetime.now().strftime("%A")
+    # ───────────────────────────────────────────────────────────────
+    # İÇERİK GEÇMİŞİ — Başlık & Konu tekrarını önlemek için
+    # ───────────────────────────────────────────────────────────────
+    def _load_history(self):
+        if os.path.exists(CONTENT_HISTORY_FILE):
+            try:
+                with open(CONTENT_HISTORY_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                return []
+        return []
 
-        # Her gün için 2 konu: [sabah/akşam, gece]
-        schedule = {
-            "Monday": [
-                {"type": "short", "topic": "Solid-State Battery: Real Data vs Promises",        "duration": 55},
-                {"type": "short", "topic": "Next-Gen EV Range: 600+ Mile Cars Are Coming",       "duration": 50},
-            ],
-            "Tuesday": [
-                {"type": "short", "topic": "BYD vs Tesla: Real-World Range Comparison",          "duration": 55},
-                {"type": "short", "topic": "Hyundai IONIQ 6 vs Tesla Model 3: True Efficiency",  "duration": 50},
-            ],
-            "Wednesday": [
-                {"type": "short", "topic": "LFP vs NMC Battery: Which Lasts Longer?",           "duration": 55},
-                {"type": "short", "topic": "EV Battery Degradation: 200,000 Mile Real Data",    "duration": 50},
-            ],
-            "Thursday": [
-                {"type": "short", "topic": "Winter EV Range: 0°C Real-World Test Results",      "duration": 55},
-                {"type": "short", "topic": "Heat Pump vs Resistance Heater: EV Range Impact",   "duration": 50},
-            ],
-            "Friday": [
-                {"type": "short", "topic": "True Cost of EV Ownership: 100k Mile Analysis",     "duration": 55},
-                {"type": "short", "topic": "EV Charging Cost vs Gasoline: Real Numbers 2024",   "duration": 50},
-            ],
-            "Saturday": [
-                {"type": "short", "topic": "Fastest Charging EVs: 10-80% Speed Comparison",    "duration": 55},
-                {"type": "short", "topic": "800V vs 400V Charging: Does It Matter?",            "duration": 50},
-            ],
-            "Sunday": [
-                {"type": "short", "topic": "Best Range EVs Under $40k: Real-World Test",        "duration": 55},
-                {"type": "short", "topic": "Global EV Battery Supply Chain: What's Changing",   "duration": 50},
-            ],
+    def _save_history(self, plan):
+        history = self._load_history()
+        entry = {
+            "timestamp": plan["timestamp"],
+            "slot": plan["slot"],
+            "topic": plan["topic"],
+            "title": plan["title"],
+            "script_preview": plan["script"][:200] if plan.get("script") else ""
         }
+        history.append(entry)
+        history = history[-HISTORY_LIMIT:]
+        with open(CONTENT_HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
 
-        day_slots = schedule.get(weekday, schedule["Monday"])
-        # slot'a göre doğru konu
-        if slot == "night":
-            return day_slots[1] if len(day_slots) > 1 else day_slots[0]
-        return day_slots[0]
+    def _get_used_titles(self):
+        return [h["title"] for h in self._load_history()]
+
+    def _get_used_topics(self):
+        return [h["topic"] for h in self._load_history()]
+
+    # ───────────────────────────────────────────────────────────────
+    # KONU HAVUZU — 80+ veri-odaklı EV konusu, kategorilere ayrılmış
+    # ───────────────────────────────────────────────────────────────
+    _TOPIC_POOL = {
+        # ── 1. Pil Bilimi & Teknoloji (Temel, 9 konu) ────────────────────
+        "battery_science": [
+            "LFP vs NMC vs NCA real-world degradation after 100000 miles data",
+            "Solid-state battery realistic timeline and energy density roadmap",
+            "How battery degradation science actually works SOC cycles",
+            "BMS battery management system deep dive explained",
+            "Battery heating systems comparison active vs passive thermal",
+            "What is a charge cycle really counting partial charges",
+            "Hot weather battery lifespan impact data Celsius analysis",
+            "Battery calibration myth or fact charge to 100 test",
+            "LFP battery after 100000 miles real data analysis",
+        ],
+        # ── 2. Menzil & Verimlilik Testleri (Mevcut, 9 konu) ─────────────
+        "range_tests": [
+            "Winter range loss complete data set Norway vs Canada vs US",
+            "Summer vs winter range comparison same car same route test",
+            "Highway vs city range difference 70mph vs 25mph real data",
+            "How much does AC climate reduce EV range percentage data",
+            "Speed and range relationship curve analysis 30 to 80mph",
+            "EV consumption breakdown kWh per 100km real driving data",
+            "Regenerative braking how much range does it actually add percent",
+            "Vehicle weight and range relationship kg per km data",
+            "Driving style impact on EV efficiency aggressive vs eco data",
+        ],
+        # ── 3. Şarj Teknolojisi (Popüler, 9 konu) ─────────────────────────
+        "charging": [
+            "800V vs 400V real charging speed difference minutes saved data",
+            "Does fast charging actually kill your battery 5 year study",
+            "CCS vs CHAdeMO vs Tesla connector situation 2026 market share",
+            "Charging power loss cable length effect volts drop data",
+            "Bi-directional charging V2G V2H realistic grid backup analysis",
+            "Home charging vs DC fast charging cost per mile comparison",
+            "Charging network reliability test Europe Electrify America data",
+            "Solar energy plus EV combination payback period calculation",
+            "Night charging vs daytime charging cost and grid impact data",
+        ],
+        # ── 4. Sahiplik Maliyeti (Yüksek İlgi, 9 konu) ───────────────────
+        "cost_ownership": [
+            "5 year total cost EV vs diesel compact sedan real numbers USA",
+            "Used EV depreciation value loss data by brand and model",
+            "Insurance cost comparison EV vs gas car is it really higher",
+            "EV maintenance cost brakes tires service real 100000 mile data",
+            "Battery replacement cost 2026 actual price out of warranty",
+            "Home solar plus EV charging payback period calculation USA Europe",
+            "Public charging subscription plans worth it or cost per kWh analysis",
+            "Used EV battery health check before buying guide SOH test",
+            "EV tax incentives 2026 USA Europe China comparison amounts",
+        ],
+        # ── 5. Araç Karşılaştırmaları (Mevcut, 8 konu) ────────────────────
+        "comparisons": [
+            "Same segment EV comparison data only specs vs real world",
+            "Platform architecture differences what actually changes EV",
+            "70 EVs big vs small index analysis price range efficiency",
+            "Motor type single axle vs dual axle torque data comparison",
+            "Budget EV comparison under 30000 dollars Europe and USA",
+            "Family car EV which is better space safety cost data",
+            "SUV range comparison real world tested highway data",
+            "Global EV buying guide 2026 best value by region data",
+        ],
+        # ── 6. Pazar & Sektör Verileri (Yeni, 7 konu) ─────────────────────
+        "market_data": [
+            "EV adoption statistics by country USA Europe China data",
+            "Brand market share change 2024 vs 2025 global data",
+            "Chinese EV brands entering Europe sales volume data",
+            "Why did EV sales slow down analysis supply demand data",
+            "What happens if EV incentives end USA Europe China data",
+            "EV price deflation trend analysis cost per kWh data",
+            "Used EV market size and opportunity pricing data",
+        ],
+        # ── 7. Altyapı & Şebeke (Yeni, 7 konu) ────────────────────────────
+        "infrastructure": [
+            "Charging station reliability test results uptime data",
+            "Europe charging infrastructure map gaps and coverage data",
+            "Apartment building EV charging solutions and cost analysis",
+            "EV charging time calculator real vs advertised minutes",
+            "Does EV charging crash the grid real math demand data",
+            "Renewable energy plus EV combination analysis carbon data",
+            "Smart charging V1G V2G does it really matter cost data",
+        ],
+        # ── 8. Eğitim & Teknik Açıklamalar (Temel, 9 konu) ────────────────
+        "education": [
+            "Heat pump how does it work visual explanation efficiency data",
+            "PTC heater vs heat pump full comparison range impact data",
+            "One-pedal driving how does it work efficiency gain data",
+            "EV thermal management system explained coolant loop data",
+            "Aerodynamic drag and range relationship Cd A coefficient data",
+            "Why does charging curve drop battery chemistry explained",
+            "SOH State of Health what is it how measured accuracy data",
+            "EV inverter technology explained SiC vs IGBT efficiency data",
+            "WLTP vs EPA vs real world range difference explained data",
+        ],
+        # ── 9. İnteraktif Araçlar & Hesaplayıcılar (Yeni Alan, 7 konu) ─────
+        "interactive_tools": [
+            "Range calculator by temperature interactive data visualization",
+            "EV vs diesel cost comparator total 5 year calculation tool",
+            "EV charging cost calculator home vs public vs solar data",
+            "Battery degradation predictor based on usage pattern data",
+            "Charging speed comparison graph 10 to 80 percent data",
+            "Range loss animated explanation temperature speed data",
+            "Market share interactive visualization global regions data",
+        ],
+    }
+
+    def _pick_topic(self, slot="evening"):
+        """Havuzdan rastgele, tekrar etmeyen, çeşitli kategoriden konu seçer.
+        Returns: (topic, category) tuple."""
+        used_topics = self._get_used_topics()
+        used_lower = [t.lower() for t in used_topics]
+
+        # Her kategoriden birer aday seç, tekrar olmayanları filtrele
+        candidates = []
+        for cat, topics in self._TOPIC_POOL.items():
+            fresh = [t for t in topics if t.lower() not in used_lower]
+            if fresh:
+                candidates.append((random.choice(fresh), cat))
+
+        if candidates:
+            return random.choice(candidates)
+
+        # Hepsi kullanılmışsa — en eski konulardan başlayarak tekrar izin ver
+        all_pairs = [(t, c) for c, topics in self._TOPIC_POOL.items() for t in topics]
+        random.shuffle(all_pairs)
+        return all_pairs[0]
 
     def _get_metadata_variation(self):
         """Her çalışmada biraz farklı metadata yapısı üretmek için varyasyon seçer."""
@@ -69,43 +187,69 @@ class EvcarixBrain:
                 "data-driven",   # Numbers first
                 "question",      # Curiosity gap
                 "shocking",      # Surprising fact
+                "myth-busting",  # Common misconception
+                "comparison",    # Side by side
             ]),
             "emoji_set": random.choice([
                 ["⚡", "🔋", "📊"],
                 ["🚗", "⚡", "🔌"],
                 ["📈", "🔋", "🏎️"],
+                ["❄️", "🔥", "📉"],
             ])
         }
 
+    def _clean_topic(self, text):
+        """Hashtag, URL ve gereksiz karakterleri temizler."""
+        import re
+        text = re.sub(r'#\w+', '', text)
+        text = re.sub(r'https?://\S+', '', text)
+        text = re.sub(r'\s+', ' ', text)
+        text = text.strip(' :;|')
+        return text
+
     def create_daily_plan(self, slot="evening"):
         print("Evcarix Brain: Plan oluşturuluyor...")
-        config = self.get_daily_config(slot=slot)
-        variation = self._get_metadata_variation()
+        config = {"type": "short", "duration": 55}  # Shorts formatı
 
-        # Trend seç
+        # Trend haberleri çek (LLM için context)
         news_df = self.trend_engine.get_latest_news()
-        specific_topic = self.trend_engine.select_trending_topic(news_df)
-        full_topic = f"{config['topic']}: {specific_topic}"
-        print(f"Konu seçildi: {full_topic.encode('ascii', 'ignore').decode('ascii')}")
+        trending_topic = self.trend_engine.select_trending_topic(news_df)
+        if trending_topic:
+            trending_topic = self._clean_topic(trending_topic)
 
-        # Başlık üret
-        titles = self.writer.generate_title(specific_topic)
+        # Ana konu seçimi — havuz + trend haber karışımı
+        pool_topic, pool_category = self._pick_topic(slot)
+        # Trend haber varsa %40, yoksa havuz %100
+        specific_topic = trending_topic if (random.random() < 0.4 and trending_topic) else pool_topic
+        topic_category = "trend" if (specific_topic == trending_topic and trending_topic) else pool_category
+        full_topic = specific_topic
+
+        used_titles = self._get_used_titles()
+        print(f"Konu seçildi: {full_topic.encode('ascii', 'ignore').decode('ascii')}")
+        print(f"Geçmiş başlık sayısı: {len(used_titles)}")
+
+        # Başlık üret — geçmiş başlıkları vererek tekrarı önle
+        titles = self.writer.generate_title(specific_topic, history_titles=used_titles)
         best_title = titles[0] if titles else specific_topic
         print(f"Başlık: {best_title.encode('ascii', 'ignore').decode('ascii')}")
 
-        # Senaryo üret
-        writer_output = self.writer.generate_script(full_topic, format_type=config['type'])
+        # Senaryo üret — kategoriye göre özel prompt
+        writer_output = self.writer.generate_script(
+            full_topic, format_type=config['type'], category=topic_category
+        )
 
-        # Etiket üret
-        tags_list = self.writer.generate_tags(specific_topic, best_title)
+        # Etiket üret — kategoriye göre SEO etiketleri
+        tags_list = self.writer.generate_tags(specific_topic, best_title, category=topic_category)
         print(f"Etiketler: {len(tags_list)} adet")
 
-        # Açıklama üret — CTA varyasyonunu geç
+        # Açıklama üret — kategoriye göre SEO açıklaması
+        variation = self._get_metadata_variation()
         description = self.writer.generate_description(
             topic=specific_topic,
             title=best_title,
             tags_list=tags_list,
-            cta_override=variation["cta_style"]
+            cta_override=variation["cta_style"],
+            category=topic_category
         )
 
         plan = {
@@ -114,6 +258,7 @@ class EvcarixBrain:
             "config":     config,
             "topic":      specific_topic,
             "full_topic": full_topic,
+            "category":   topic_category,
             "title":      best_title,
             "all_titles": titles,
             "script":     writer_output['script'],
@@ -122,6 +267,9 @@ class EvcarixBrain:
             "tags":       tags_list,
             "variation":  variation,
         }
+
+        # Geçmişe kaydet
+        self._save_history(plan)
 
         with open("daily_plan.json", "w", encoding="utf-8") as f:
             json.dump(plan, f, ensure_ascii=False, indent=4)

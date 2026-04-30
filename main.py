@@ -66,11 +66,13 @@ class EvcarixOrchestrator:
             query=search_query,
             output_dir=f"assets/temp_videos/{ts}",
             count=5,
-            orientation="portrait"
+            orientation="portrait",
+            category=plan.get("category", "general")
         )
-        if not video_paths:
-            print("Hata: Hiç video indirilemedi. Çıkılıyor.")
-            return
+        ai_fallback_images = []
+        if len(video_paths) < 2:
+            print("⚠️ Stok video az — AI görüntü fallback devreye giriyor...")
+            ai_fallback_images = self.media_engine.generate_ai_fallback_images(topic, count=3)
 
         # ── 3. Seslendirme ────────────────────────────────────────
         print("\n[3/6] Seslendirme yapılıyor...")
@@ -83,24 +85,27 @@ class EvcarixOrchestrator:
         )
         word_timings = voice_result['word_timings']
 
-        # ── 4. Video montajı ──────────────────────────────────────
-        print("\n[4/6] Video montajlanıyor...")
+        # ── 4. Premium Thumbnail (önce oluştur, video sonuna frame eklemek için) ──
+        print("\n[4/6] Premium Thumbnail oluşturuluyor...")
+        thumbnail_path = f"output/thumbnails/thumb_{ts}.jpg"
+        os.makedirs("output/thumbnails", exist_ok=True)
+        self.editor.generate_premium_thumbnail(
+            video_path="",  # Artık kullanılmıyor — Pillow gradient
+            title=title,
+            output_path=thumbnail_path
+        )
+
+        # ── 5. Video montajı (thumbnail frame'i sona eklenecek) ──
+        print("\n[5/6] Video montajlanıyor...")
         output_filename = f"shorts_{ts}.mp4"
         final_video_path = self.editor.assemble_short(
             video_paths=video_paths,
             audio_path=audio_path,
             word_timings=word_timings,
-            output_filename=output_filename
-        )
-
-        # ── 5. Premium Thumbnail ──────────────────────────────────
-        print("\n[5/6] Premium Thumbnail oluşturuluyor...")
-        thumbnail_path = f"output/thumbnails/thumb_{ts}.jpg"
-        os.makedirs("output/thumbnails", exist_ok=True)
-        self.editor.generate_premium_thumbnail(
-            video_path=final_video_path,
-            title=title,
-            output_path=thumbnail_path
+            output_filename=output_filename,
+            ai_fallback_images=ai_fallback_images if ai_fallback_images else None,
+            thumbnail_path=thumbnail_path,
+            category=plan.get("category", "general")
         )
 
         # ── 6. YouTube'a yükle ────────────────────────────────────
@@ -119,11 +124,14 @@ class EvcarixOrchestrator:
                 print(f"      ✅ Yüklendi! Video ID: {video_id}")
                 print(f"      🔗 https://www.youtube.com/watch?v={video_id}")
 
-                # Thumbnail yükle
+                # Thumbnail yükle — YouTube processing süresi için bekle
                 if os.path.exists(thumbnail_path):
-                    # Thumbnail yüklemesi öncesi de küçük bekleme
-                    await asyncio.sleep(random.randint(3, 10))
-                    self.uploader.set_thumbnail(video_id, thumbnail_path)
+                    thumb_delay = random.randint(60, 120)
+                    print(f"      Thumbnail yüklemesi öncesi {thumb_delay}sn bekleniyor (processing süresi)...")
+                    await asyncio.sleep(thumb_delay)
+                    thumb_ok = self.uploader.set_thumbnail(video_id, thumbnail_path)
+                    if not thumb_ok:
+                        print("      ⚠️ Thumbnail yüklenemedi, YouTube otomatik kare kullanacak.")
 
             except Exception as e:
                 print(f"      ❌ YouTube yükleme hatası: {e}")

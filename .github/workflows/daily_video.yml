@@ -1,10 +1,10 @@
 name: Evcarix Daily Shorts
 
-# TR Saati 18:00 = UTC 15:00  |  TR Saati 21:00 = UTC 18:00
+# TR Saati 15:00 = UTC 12:00  |  TR Saati 18:00 = UTC 15:00
 on:
   schedule:
+    - cron: '0 12 * * *'   # TR 15:00 — Gündüz prime time
     - cron: '0 15 * * *'   # TR 18:00 — Akşam prime time
-    - cron: '0 18 * * *'   # TR 21:00 — Gece prime time
   workflow_dispatch:
     inputs:
       slot:
@@ -57,19 +57,18 @@ jobs:
           YOUTUBE_API_KEY:           ${{ secrets.YOUTUBE_API_KEY }}
           YOUTUBE_REGION:            US
           YOUTUBE_CLIENT_SECRET_FILE: "client_secret.json"
-          YOUTUBE_TOKEN_DATA:        ${{ secrets.YOUTUBE_TOKEN }}
-          YOUTUBE_CLIENT_SECRET_DATA: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_TOKEN_JSON:        ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
           # Slot bilgisi: script hangi yayın diliminde çalıştığını bilsin
-          # workflow_dispatch -> inputs.slot, cron 15:00 UTC -> evening, cron 18:00 UTC -> night
+          # workflow_dispatch -> inputs.slot, cron 12:00 UTC -> evening, cron 15:00 UTC -> night
           UPLOAD_SLOT: >-
             ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.slot ||
-                github.event.schedule == '0 15 * * *' && 'evening' ||
-                github.event.schedule == '0 18 * * *' && 'night' ||
+                github.event.schedule == '0 12 * * *' && 'evening' ||
+                github.event.schedule == '0 15 * * *' && 'night' ||
                 'evening' }}
         run: |
-          # Kimlik dosyalarını oluştur
-          python -c "import os; open('token.json', 'w').write(os.environ['YOUTUBE_TOKEN_DATA'])"
-          python -c "import os; open('client_secret.json', 'w').write(os.environ['YOUTUBE_CLIENT_SECRET_DATA'])"
+          # Kimlik dosyalarını secrets'den oluştur
+          python src/setup_secrets.py
           # Üretim & yükleme
           python main.py
 
@@ -82,4 +81,6 @@ jobs:
           path: |
             output/
             daily_plan.json
-          retention-days: 7
+            content_history.json
+            used_topics.json
+          retention-days: 14

@@ -34,18 +34,33 @@ class CreativeWriter:
     # ─────────────────────────────────────────────────────────────────
     # BAŞLIK — Viral CTR Optimizasyonu
     # ─────────────────────────────────────────────────────────────────
-    def generate_title(self, topic):
-        """YouTube viral CTR optimizasyonlu başlık üretir (5 adet)."""
+    def generate_title(self, topic, history_titles=None):
+        """YouTube viral CTR optimizasyonlu başlık üretir (5 adet).
+        history_titles: Önceki videolarda kullanılan başlıklar — tekrarı önlemek için.
+        """
+        history_block = ""
+        if history_titles:
+            recent = history_titles[-20:]  # Son 20 başlık yeterli
+            history_block = (
+                "\nCRITICAL: These titles were recently used on the channel. "
+                "NEVER repeat these patterns, numbers, phrases, or formats. "
+                "Create COMPLETELY DIFFERENT hooks, angles, and vocabulary:\n"
+                + "\n".join(f"- {t}" for t in recent)
+                + "\n"
+            )
+
         prompt = (
-            f"You are a top YouTube growth strategist specializing in electric vehicles. "
-            f"Write viral, high click-through-rate YouTube Shorts titles.\n"
+            f"You are the #1 YouTube Shorts growth strategist for electric vehicle channels. "
+            f"Your titles get 15%+ CTR. Write 5 viral, click-magnet titles for Evcarix.\n"
             f"Rules:\n"
-            f"1. Each title must be under 70 characters\n"
-            f"2. Use specific numbers/stats when possible (e.g. '347 miles', '80% in 18 min')\n"
-            f"3. Create curiosity gap or tension (surprising facts, comparisons, shocking results)\n"
-            f"4. Use power words: Real, Tested, Proven, Exposed, Shocking, Hidden, vs, Miles, Range\n"
-            f"5. American English ONLY. No hype words like 'amazing' or 'incredible'\n"
-            f"6. Return ONLY a JSON array of exactly 5 strings, no numbering\n\n"
+            f"1. Each title MUST be under 70 characters\n"
+            f"2. Use SPECIFIC numbers or shocking data points (NOT generic 'real data')\n"
+            f"3. Hook types: myth-busting, hidden truth, unexpected comparison, shocking data reveal, common mistake\n"
+            f"4. Power words: Exposed, Hidden, Cost, Savings, Failure, Why, Lie, Truth, Freeze, Burn, Drain, Broken\n"
+            f"5. AVOID overused patterns like 'Real Data', 'Tested', 'vs' if they appear in history\n"
+            f"6. American English ONLY. No hype words like 'amazing', 'incredible', 'insane'\n"
+            f"7. Return ONLY a JSON array of exactly 5 strings, no numbering\n"
+            f"{history_block}\n"
             f"Topic: {topic}\n"
             f"Example format: [\"Title 1\", \"Title 2\", ...]"
         )
@@ -62,6 +77,16 @@ class CreativeWriter:
             except Exception as e:
                 print(f"[Writer] generate_title hatası (Gemini): {e}")
 
+        def _is_duplicate(title, history_set):
+            t = title.lower().strip()
+            for h in history_set:
+                # %30'dan fazla ortak kelime varsa duplicate
+                t_words = set(t.split())
+                h_words = set(h.lower().split())
+                if len(t_words) > 0 and len(t_words & h_words) / len(t_words) > 0.3:
+                    return True
+            return False
+
         if self.groq_client:
             try:
                 completion = self.groq_client.chat.completions.create(
@@ -70,30 +95,57 @@ class CreativeWriter:
                         {"role": "system", "content": "You are a YouTube growth expert. Return only valid JSON arrays of title strings. American English only. Use numbers, data, and power words."},
                         {"role": "user", "content": prompt}
                     ],
-                    temperature=0.85, max_tokens=400,
+                    temperature=0.65, max_tokens=400,
                 )
                 text = completion.choices[0].message.content.strip().replace("```json", "").replace("```", "").strip()
                 titles = json.loads(text)
                 if isinstance(titles, list) and titles:
-                    return titles
+                    history_set = set(h.lower() for h in (history_titles or []))
+                    fresh = [t for t in titles if not _is_duplicate(t, history_set)]
+                    if fresh:
+                        return fresh[:5]
+                    else:
+                        print("[Writer] Tüm Groq title'ları history'de var, fallback kullanılıyor.")
             except Exception as e:
                 print(f"[Writer] generate_title hatası (Groq): {e}")
 
-        # Fallback — data-driven format
-        return [
-            f"We Tested {topic}: The Real Numbers",
-            f"{topic}: What They Don't Tell You",
-            f"Shocking {topic} Data After 100k Miles",
-            f"{topic} vs The Competition (Real Test)",
-            f"{topic}: Is The Hype Real?"
+        # Fallback — data-driven format, topic'e göre dinamik, history'den kaçınan
+        import random as _rand
+        history_set = set(h.lower() for h in (history_titles or []))
+        fallback_pool = [
+            f"Hidden Truth About {topic}",
+            f"{topic} Exposed: Real Data",
+            f"Why {topic} Actually Matters",
+            f"The Real Cost of {topic}",
+            f"{topic}: Engineers Hate This Fact",
+            f"Can {topic} Survive 200k Miles?",
+            f"{topic} vs Reality (Tested)",
+            f"Why {topic} Drains Range in Winter",
+            f"The Dirty Secret Behind {topic}",
+            f"{topic}: What Dealers Won't Say",
+            f"Is {topic} Worth It? Real Math",
+            f"{topic} After 5 Years: Brutal Truth",
         ]
+        # Topic uzunsa kısalt
+        short_topic = topic.split(":")[0].split("?")[0].strip()
+        if len(short_topic) < len(topic):
+            fallback_pool += [
+                f"{short_topic}: Engineers Exposed",
+                f"{short_topic} Winter Test Results",
+                f"{short_topic} True Cost Revealed",
+            ]
+        # History'de olmayanları seç, yoksa rastgele 5
+        fresh_fallback = [t for t in fallback_pool if not _is_duplicate(t, history_set)]
+        pool = fresh_fallback if fresh_fallback else fallback_pool
+        _rand.shuffle(pool)
+        return pool[:5]
 
     # ─────────────────────────────────────────────────────────────────
     # SENARYO
     # ─────────────────────────────────────────────────────────────────
-    def generate_script(self, topic, format_type="short"):
-        """Video senaryosu ve ses tercihi oluşturur."""
-        prompt = self._get_prompt(topic, format_type)
+    def generate_script(self, topic, format_type="short", category=None):
+        """Video senaryosu ve ses tercihi oluşturur. category: topic kategorisi."""
+        prompt = self._get_prompt(topic, format_type, category)
 
         if self.groq_client:
             try:
@@ -108,26 +160,79 @@ class CreativeWriter:
 
         raise Exception("Hiçbir LLM API anahtarı bulunamadı!")
 
-    def _get_prompt(self, topic, format_type):
+    def _get_prompt(self, topic, format_type, category=None):
         evcarix_mission = (
             "Evcarix is a data-driven electric vehicle channel focused on real-world EV performance and battery science. "
             "We test electric cars beyond marketing claims — measuring true driving range, battery efficiency, winter range loss, "
             "cold weather performance, charging speed, charging costs, and long-term EV ownership experience. "
             "Mission: No hype. Just numbers."
         )
+        # Kategoriye göre özel talimatlar
+        category_instructions = {
+            "interactive_tools": (
+                "This is an INTERACTIVE TOOL / CALCULATOR video. Structure the script as step-by-step calculations. "
+                "Walk the viewer through each input, formula, and result. Use phrases like 'Enter this number', 'Multiply by', 'The result is'. "
+                "Focus on practical utility — viewers should feel they just used a calculator."
+            ),
+            "cost_ownership": (
+                "This is a COST & OWNERSHIP analysis video. Structure as a financial breakdown. "
+                "Present real dollar or euro amounts. Compare 5-year total cost, maintenance, insurance, depreciation. "
+                "Use phrases like 'Total cost of ownership', 'Annual savings', 'Break-even point'."
+            ),
+            "market_data": (
+                "This is a MARKET & INDUSTRY DATA video. Present large-scale statistics and trends. "
+                "Reference specific countries: USA, Europe, China. Use market share percentages, sales volumes, growth rates. "
+                "Use phrases like 'Market share grew by X%', 'In 2025, China sold X million EVs'."
+            ),
+            "comparisons": (
+                "This is a HEAD-TO-HEAD COMPARISON video. Structure as direct A vs B analysis. "
+                "Present side-by-side specs: range, price, efficiency, charging speed, weight, motor power. "
+                "Use phrases like 'Car A wins on range', 'But Car B charges faster', 'The winner depends on'."
+            ),
+            "education": (
+                "This is a TECHNICAL EXPLAINER video. Explain HOW something works using simple analogies and visuals. "
+                "Break down complex concepts into digestible steps. Use phrases like 'Imagine a pipe', 'Think of it like', 'Here's why'."
+            ),
+            "battery_science": (
+                "This is BATTERY SCIENCE deep-dive. Reference specific chemistries: LFP, NMC, NCA, solid-state. "
+                "Use degradation percentages, cycle counts, temperature effects, real lab test data. "
+                "Use phrases like 'After 1000 cycles, capacity dropped to X%', 'LFP lasts longer but charges slower'."
+            ),
+            "range_tests": (
+                "This is a REAL-WORLD RANGE TEST video. Reference specific speeds, temperatures, and road conditions. "
+                "Compare advertised EPA/WLTP range vs actual measured range. Use kWh/100km or miles/kWh. "
+                "Use phrases like 'We drove 300 miles at 70mph', 'Real range was 18% less than EPA'."
+            ),
+            "charging": (
+                "This is a CHARGING TECHNOLOGY video. Reference kW speeds, charge curves, minutes to 80%. "
+                "Compare 400V vs 800V, home vs DC fast charging, connector types. "
+                "Use phrases like '10 to 80 percent in 18 minutes', 'Peak power lasted 5 minutes before tapering'."
+            ),
+            "infrastructure": (
+                "This is an INFRASTRUCTURE & GRID video. Reference charger counts, reliability percentages, coverage maps. "
+                "Discuss grid capacity, smart charging, apartment charging challenges. "
+                "Use phrases like 'The network has 95% uptime', 'Apartment dwellers face a 3-year payback'."
+            ),
+        }
+        cat_extra = category_instructions.get(category, "Focus on real data, numbers, and measurable facts. No marketing hype.")
+
         if format_type == "short":
             return f"""
 Topic: {topic}
+Category: {category or "general"}
 Channel Concept: {evcarix_mission}
 Format: YouTube Short (Maximum 55 seconds)
 Language: American English ONLY.
 
+Category-specific instructions: {cat_extra}
+
 Requirements:
-1. Start with a data-driven hook (e.g., "The real range of {topic} will surprise you").
+1. Start with a data-driven hook that includes a specific number or shocking fact.
 2. Focus on facts, numbers, and technical insights. No generic "amazing" or "incredible" hype.
 3. Voiceover text only — no stage directions.
 4. End with: "Subscribe to Evcarix for real EV data."
 5. Please respond ONLY in American English.
+6. IMPORTANT: Use regions like USA, Europe, China — NEVER use Turkey or Turkish-specific examples.
 
 Return in this format:
 SES: [male/female]
@@ -136,14 +241,18 @@ SENARYO: [script text]
         else:
             return f"""
 Topic: {topic}
+Category: {category or "general"}
 Channel Concept: {evcarix_mission}
 Format: Long Video (6-8 minutes)
 Language: American English ONLY.
 
+Category-specific instructions: {cat_extra}
+
 Requirements:
-1. Deep dive into technical details, battery chemistry, or real-world performance metrics.
+1. Deep dive into technical details with specific numbers, percentages, and real-world data.
 2. Maintain a professional, educational, and analytical tone.
 3. Please respond ONLY in American English.
+4. IMPORTANT: Use regions like USA, Europe, China — NEVER use Turkey or Turkish-specific examples.
 
 Return in this format:
 SES: [male/female]
@@ -181,30 +290,56 @@ SENARYO: [script text]
     # ─────────────────────────────────────────────────────────────────
     # AÇIKLAMA — AI Destekli SEO Optimizasyonu
     # ─────────────────────────────────────────────────────────────────
-    def generate_description(self, topic, title, tags_list, cta_override=None):
+    def generate_description(self, topic, title, tags_list, cta_override=None, category=None):
         """YouTube SEO için optimize edilmiş, başlıkla bire bir örtüşen açıklama üretir."""
         hashtags = " ".join([f"#{t.replace(' ', '').replace('-', '')}" for t in tags_list[:10]])
         cta = cta_override or "Subscribe to Evcarix for real EV data every day."
 
         channel_about = (
             "\n🔋 About Evcarix:\n"
-            "Data-driven electric vehicle channel. Real-world range tests, battery degradation,\n"
-            "winter EV performance, charging speed analysis, and true ownership costs.\n"
-            "Mission: No hype. Just numbers. ⚡\n"
-            "Subscribe for honest EV data every day."
+            "Evcarix is a data-driven electric vehicle channel focused on real-world EV performance and battery science.\n"
+            "We test electric cars beyond marketing claims — measuring true driving range, battery efficiency, winter range loss,\n"
+            "cold weather performance, charging speed, charging costs, and long-term EV ownership experience.\n"
+            "On this channel you'll find real-world EV range tests, winter vs summer EV performance comparisons,\n"
+            "EV battery degradation analysis, LFP vs NMC battery comparisons, fast charging impact explained,\n"
+            "EV efficiency & consumption breakdowns, and electric vehicle technology explained clearly.\n"
+            "Our mission is simple: No hype. Just numbers. ⚡\n"
+            "If you care about real electric vehicle data, battery performance, and honest EV analysis — welcome to Evcarix."
         )
+
+        cat_hint = {
+            "interactive_tools": "This is an interactive calculator / tool video. Emphasize practical utility, step-by-step logic, and data-driven decision making.",
+            "cost_ownership": "This is a cost and ownership analysis video. Emphasize dollar/euro amounts, total cost of ownership, savings, and financial breakdown.",
+            "market_data": "This is a market and industry data video. Emphasize global statistics, market share percentages, sales volumes, and regional comparisons (USA, Europe, China).",
+            "comparisons": "This is a head-to-head comparison video. Emphasize side-by-side specs, direct A vs B data, and clear winner logic.",
+            "education": "This is a technical explainer video. Emphasize how-it-works logic, analogies, and educational value.",
+            "battery_science": "This is a battery science deep-dive. Emphasize chemistry data, degradation percentages, cycle counts, and lab results.",
+            "range_tests": "This is a real-world range test video. Emphasize measured miles/km, speed conditions, weather impact, and EPA vs real data.",
+            "charging": "This is a charging technology video. Emphasize kW speeds, minutes to 80%, cost per kWh, and infrastructure data.",
+            "infrastructure": "This is an infrastructure & grid video. Emphasize charger counts, uptime stats, coverage maps, and smart charging.",
+        }.get(category, "Focus on real data, numbers, and measurable facts.")
 
         prompt = (
             f"Write a highly SEO-optimized YouTube description for a Shorts video.\n"
             f"Video title: '{title}'\n"
             f"Topic: {topic}\n"
-            f"Channel: Evcarix — data-driven EV channel, no hype, just numbers\n\n"
+            f"Content type: {category or 'general'}\n"
+            f"Content guidance: {cat_hint}\n"
+            f"Channel: Evcarix — data-driven electric vehicle channel focused on real-world EV performance and battery science. "
+            f"We test electric cars beyond marketing claims — measuring true driving range, battery efficiency, winter range loss, "
+            f"cold weather performance, charging speed, charging costs, and long-term EV ownership experience. "
+            f"On this channel you'll find real-world EV range tests, winter vs summer EV performance comparisons, "
+            f"EV battery degradation analysis, LFP vs NMC battery comparisons, fast charging impact explained, "
+            f"EV efficiency and consumption breakdowns, and electric vehicle technology explained clearly. "
+            f"Our mission is simple: No hype. Just numbers.\n\n"
             f"Requirements:\n"
             f"1. First 2 lines must be a strong hook matching the title (shown in search preview)\n"
-            f"2. Add 'What you'll learn:' bullet list with 4 specific data-driven points\n"
-            f"3. Add a CTA: '{cta}'\n"
-            f"4. Include naturally embedded keyword phrases related to the topic\n"
-            f"5. Max 350 words. American English only.\n"
+            f"2. Add 'What you'll learn:' bullet list with 4-5 specific data-driven points aligned to the content type\n"
+            f"3. Add a short 'Why Evcarix' paragraph with channel mission\n"
+            f"4. Add a CTA: '{cta}'\n"
+            f"5. Include naturally embedded long-tail keyword phrases (2-3 words each) related to the topic\n"
+            f"6. Add 'Timestamps:' section with 3 estimated timestamps for key moments\n"
+            f"7. Max 400 words. American English only. Never mention Turkey or Turkish-specific examples.\n"
             f"Return only the description text, no extra formatting."
         )
 
@@ -228,12 +363,17 @@ SENARYO: [script text]
         if not seo_body:
             seo_body = (
                 f"{title}\n\n"
-                f"We test {topic} beyond marketing claims — real numbers only.\n\n"
+                f"We test {topic} beyond marketing claims — measuring true driving range, battery efficiency, "
+                f"and real-world performance with no hype. Just numbers.\n\n"
                 f"What you'll learn:\n"
-                f"• Real-world range data\n"
-                f"• Battery efficiency metrics\n"
+                f"• Real-world range and efficiency data\n"
+                f"• Battery degradation and chemistry insights\n"
                 f"• True ownership cost breakdown\n"
-                f"• How it compares to rivals\n\n"
+                f"• How it compares to rivals in head-to-head tests\n\n"
+                f"Timestamps:\n"
+                f"0:00 Hook & Introduction\n"
+                f"0:15 Key Data Points\n"
+                f"0:35 Conclusion & Verdict\n\n"
                 f"{cta}"
             )
 
@@ -246,19 +386,35 @@ SENARYO: [script text]
     # ─────────────────────────────────────────────────────────────────
     # ETİKETLER — YouTube 500 Karakter Limiti Gözetilerek
     # ─────────────────────────────────────────────────────────────────
-    def generate_tags(self, topic, title):
+    def generate_tags(self, topic, title, category=None):
         """YouTube SEO için optimize edilmiş etiket listesi üretir (maks. 500 karakter)."""
+        cat_tags = {
+            "interactive_tools": "interactive EV calculator, EV cost calculator, range calculator, EV tool, EV comparison tool, EV data tool",
+            "cost_ownership": "EV total cost of ownership, EV vs gas cost, EV depreciation, EV insurance cost, EV maintenance cost, EV ownership cost 2026",
+            "market_data": "EV market share 2025, EV sales data, EV industry statistics, EV adoption rate, global EV sales, EV market analysis",
+            "comparisons": "EV comparison 2026, head to head EV test, EV specs compared, EV vs EV, electric car comparison",
+            "education": "how EV works, EV explained, EV technology explained, electric vehicle tutorial, EV battery explained",
+            "battery_science": "EV battery degradation, LFP vs NMC, EV battery chemistry, solid state battery, EV battery health, battery cycle life",
+            "range_tests": "EV range test, real world EV range, EPA vs real range, EV efficiency test, EV winter range, EV highway range",
+            "charging": "EV charging speed, DC fast charging, EV charging cost, EV charging curve, 800V charging, home charging vs fast charging",
+            "infrastructure": "EV charging network, charging infrastructure, EV grid impact, smart charging, EV charging stations Europe",
+        }.get(category, "EV data, real world EV test, electric vehicle analysis")
+
         prompt = (
-            f"You are a YouTube SEO expert. Generate the BEST possible tags for a YouTube Shorts video.\n"
+            f"You are a YouTube SEO expert with 10 years experience ranking EV videos. "
+            f"Generate the BEST possible tags for a YouTube Shorts video.\n"
             f"Video title: '{title}'\n"
             f"Topic: {topic}\n"
-            f"Channel niche: Electric vehicles, battery technology, EV performance data\n\n"
+            f"Content category: {category or 'general'}\n"
+            f"Channel niche: Electric vehicles, battery technology, EV performance data, real-world range tests\n"
+            f"Category-specific tag suggestions (use some of these): {cat_tags}\n\n"
             f"Tag strategy:\n"
-            f"1. Start with 3 broad tags (ev, electric car, electric vehicle)\n"
-            f"2. Add 5 medium-competition tags specific to the topic\n"
-            f"3. Add 4 long-tail specific tags (e.g., 'tesla model 3 range test 2024')\n"
-            f"4. Add 2 trending tags (ev news, electric car 2024)\n"
-            f"5. Total must be under 490 characters when joined with commas\n\n"
+            f"1. 3 broad tags (ev, electric car, electric vehicle)\n"
+            f"2. 6 medium-competition tags specific to the topic (model names, technologies)\n"
+            f"3. 6 long-tail specific tags (e.g., 'tesla model 3 range test 2024', 'lfp battery degradation 100k miles')\n"
+            f"4. 3 trending / search-volume tags (ev news 2025, electric vehicle comparison, ev battery test)\n"
+            f"5. 2 niche tags for channel discovery (evcarix, no hype just numbers)\n"
+            f"6. Total must be under 490 characters when joined with commas — prioritize long-tail for ranking\n\n"
             f"Return ONLY a comma-separated list of tags. No hashtags. No numbering. American English only."
         )
 
