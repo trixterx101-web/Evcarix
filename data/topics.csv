@@ -42,7 +42,7 @@ id,category_id,category_title,topic,priority
 41,comparison,Araç Karşılaştırmaları,Bütçe EV karşılaştırması — 30.000 Euro altı,new
 42,comparison,Araç Karşılaştırmaları,Aile arabası: EV hangisi daha iyi?,new
 43,comparison,Araç Karşılaştırmaları,SUV menzil karşılaştırması — gerçek test,high
-44,comparison,Araç Karşılaştırmaları,Türkiye pazarında EV seçim rehberi,new
+44,comparison,Araç Karşılaştırmaları,Amerika pazarında EV seçim rehberi,new
 45,market,Pazar & Sektör Verileri,Ülkeye göre EV adaptasyon istatistikleri,new
 46,market,Pazar & Sektör Verileri,Marka pazar payı değişimi — 2024 vs 2025,new
 47,market,Pazar & Sektör Verileri,Çin EV markaları Avrupa'ya geliyor — veri,high
@@ -51,7 +51,7 @@ id,category_id,category_title,topic,priority
 50,market,Pazar & Sektör Verileri,EV fiyat deflasyonu — trend analizi,new
 51,market,Pazar & Sektör Verileri,İkinci el pazar büyüklüğü ve fırsatlar,new
 52,infrastructure,Altyapı & Şebeke,Şarj istasyonu güvenilirlik testi — sonuçlar,high
-53,infrastructure,Altyapı & Şebeke,Türkiye şarj altyapısı haritası ve eksikler,new
+53,infrastructure,Altyapı & Şebeke,Amerika şarj altyapısı haritası ve eksikler,new
 54,infrastructure,Altyapı & Şebeke,Apartman şarjı — çözümler ve maliyetler,new
 55,infrastructure,Altyapı & Şebeke,Şarj süresi hesaplama aracı,medium
 56,infrastructure,Altyapı & Şebeke,EV şebekeyi çöker mi? — gerçek hesap,high

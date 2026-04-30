@@ -35,7 +35,7 @@ TOPICS_CSV    = DATA_DIR / "topics.csv"
 
 SYSTEM_PROMPT = """You are an elite YouTube SEO specialist for "Evcarix" — a data-driven EV channel.
 Channel motto: "No hype. Just numbers." — Real test data, shocking statistics, no marketing fluff.
-Primary audience: Turkish EV enthusiasts + international viewers.
+Primary audience: American EV enthusiasts + international viewers.
 
 Return ONLY a valid JSON object with these exact fields (no markdown, no code blocks, no extra text):
 {
