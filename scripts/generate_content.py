@@ -29,6 +29,7 @@ except ImportError:
 MODEL      = "llama-3.3-70b-versatile"
 MAX_TOKENS = 2048
 DELAY_SEC  = 3
+MAX_TOPICS = 5            # max topics per run (workflow runs daily)
 BASE       = Path(__file__).parent.parent
 OUTPUT_DIR = BASE / "output"
 TOPICS_CSV = BASE / "data" / "topics.csv"
@@ -235,6 +236,7 @@ def generate(client: Groq, topic: dict, max_retries: int = 2) -> dict:
                     )}
                 ],
                 temperature=0.7,
+                timeout=30,
             )
 
             raw = response.choices[0].message.content
@@ -276,6 +278,12 @@ def generate(client: Groq, topic: dict, max_retries: int = 2) -> dict:
                     time.sleep(wait_time)
                 else:
                     raise Exception(f"Rate limit exceeded after {max_retries} attempts")
+            elif "timeout" in error_str.lower() or "timed out" in error_str.lower():
+                print(f"  API timeout (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+                else:
+                    raise Exception(f"API timed out after {max_retries} attempts")
             else:
                 print(f"  Error (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
@@ -341,6 +349,7 @@ def main():
     ap.add_argument("--force",    action="store_true")
     ap.add_argument("--dry-run",  action="store_true")
     ap.add_argument("--summary",  action="store_true")
+    ap.add_argument("--limit",    type=int, default=0, help="Max topics to generate (0=all)")
     args = ap.parse_args()
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -360,6 +369,12 @@ def main():
     if args.category:  topics = [t for t in topics if t["category_id"] == args.category]
     if args.priority:  topics = [t for t in topics if t["priority"] == args.priority]
     if not args.force: topics = [t for t in topics if not is_done(t["id"], t["topic"])]
+
+    # Limit topics per run
+    limit = args.limit if args.limit > 0 else MAX_TOPICS
+    if len(topics) > limit:
+        print(f"  Limiting to {limit} topics (use --limit 0 for all)")
+        topics = topics[:limit]
 
     if not topics:
         print("No topics to generate. Use --force to regenerate.")
