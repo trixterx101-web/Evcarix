@@ -325,10 +325,6 @@ class AutoEditor:
         # Beyaz metin
         draw.text((x, y), title, font=title_font, fill=(255, 255, 255))
 
-        # Kanal adı (alt)
-        ch_font = self._load_font("bold", 40)
-        draw.text((W // 2, H - 60), channel_name, font=ch_font, fill=(200, 200, 200), anchor="mm")
-
         # Kaydet
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         bg.save(output_path, "PNG", quality=95)
