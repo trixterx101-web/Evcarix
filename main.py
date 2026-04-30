@@ -87,7 +87,7 @@ class EvcarixOrchestrator:
 
         # ── 4. Premium Thumbnail (önce oluştur, video sonuna frame eklemek için) ──
         print("\n[4/6] Premium Thumbnail oluşturuluyor...")
-        thumbnail_path = f"output/thumbnails/thumb_{ts}.jpg"
+        thumbnail_path = f"output/thumbnails/thumb_{ts}.png"
         os.makedirs("output/thumbnails", exist_ok=True)
         # İlk videoyu thumbnail arka planı için kullan
         first_video = video_paths[0] if video_paths else ""

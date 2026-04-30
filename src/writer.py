@@ -233,10 +233,10 @@ Requirements:
 3. Focus on facts, numbers, and technical insights. No generic "amazing" or "incredible" hype.
 4. Voiceover text only — no stage directions.
 5. End with: "Subscribe to Evcarix for real EV data."
-5. Please respond ONLY in American English.
-6. CRITICAL: Use regions like USA, Europe, China ONLY. NEVER use Turkey or Turkish-specific examples.
-7. Include real-world data points from Google research: battery percentages, range numbers, cost figures, kW charging speeds, market share stats.
-8. Reference specific car brands and models from global markets (Tesla, BYD, BMW, Mercedes, VW, Ford, Hyundai, Kia, etc.).
+6. Please respond ONLY in American English.
+7. CRITICAL: Use regions like USA, Europe, China ONLY. NEVER use Turkey or Turkish-specific examples.
+8. Include real-world data points from Google research: battery percentages, range numbers, cost figures, kW charging speeds, market share stats.
+9. Reference specific car brands and models from global markets (Tesla, BYD, BMW, Mercedes, VW, Ford, Hyundai, Kia, etc.).
 
 Return in this format:
 SES: [male/female]
@@ -288,7 +288,7 @@ SENARYO: [script text]
         script = text
         if "SES:" in text:
             voice_part = text.split("SES:")[1].split("\n")[0].strip().lower()
-            voice = "female" if any(w in voice_part for w in ["female", "kadın"]) else "male"
+            voice = "female" if any(w in voice_part for w in ["female"]) else "male"
             if "SENARYO:" in text:
                 script = text.split("SENARYO:")[1].strip()
         return {"voice": voice, "script": script}

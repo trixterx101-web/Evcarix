@@ -354,7 +354,7 @@ class MediaEngine:
 
     def generate_thumbnail(self, video_path, title, output_path,
                            channel_name="EVCARIX", slogan="No hype. Just numbers."):
-        """Çarpıcı thumbnail oluşturur."""
+        """9:16 (1080x1920) dikey thumbnail oluşturur."""
         from PIL import Image, ImageDraw, ImageFont
         from moviepy.editor import VideoFileClip
         try:
@@ -363,13 +363,13 @@ class MediaEngine:
             frame = clip.get_frame(frame_time)
             clip.close()
 
-            img = Image.fromarray(frame).resize((1280, 720))
+            img = Image.fromarray(frame).resize((1080, 1920))
 
             # Premium Gradient Overlay (Darker & Smoother)
             overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
             ov_draw = ImageDraw.Draw(overlay)
             for y in range(img.height):
-                alpha = int(220 * (y / img.height)**1.5) # Non-linear for better look
+                alpha = int(220 * (y / img.height)**1.5)
                 ov_draw.rectangle([(0, y), (img.width, y + 1)], fill=(0, 0, 0, alpha))
             img = img.convert("RGBA")
             img = Image.alpha_composite(img, overlay).convert("RGB")
@@ -388,7 +388,7 @@ class MediaEngine:
                         return ImageFont.truetype(p, size)
                 return ImageFont.load_default()
 
-            title_font = get_font("Roboto-Bold", 85) # Larger hook
+            title_font = get_font("Roboto-Bold", 100)
             ch_font = get_font("Roboto-Bold", 45)
             sl_font = get_font("Roboto-Regular", 32)
 
@@ -398,7 +398,7 @@ class MediaEngine:
             for w in words:
                 test = (current + " " + w).strip()
                 bbox = draw.textbbox((0, 0), test, font=title_font)
-                if bbox[2] - bbox[0] > 1100:
+                if bbox[2] - bbox[0] > 1000:
                     lines.append(current)
                     current = w
                 else:
@@ -411,13 +411,13 @@ class MediaEngine:
             for line in lines:
                 bbox = draw.textbbox((0, 0), line, font=title_font)
                 x = (img.width - (bbox[2] - bbox[0])) // 2
-                
+
                 # Kalın Stroke (Outline)
                 stroke_w = 6
                 for dx in range(-stroke_w, stroke_w + 1):
                     for dy in range(-stroke_w, stroke_w + 1):
                         draw.text((x + dx, y_start + dy), line, font=title_font, fill=(0, 0, 0))
-                
+
                 # Ana metin
                 draw.text((x, y_start), line, font=title_font, fill=(255, 235, 0))
                 y_start += 120
@@ -425,8 +425,11 @@ class MediaEngine:
             # Kanal & Misyon (Altta bant şeklinde)
             footer_h = 160
             footer_bg = Image.new("RGBA", (img.width, footer_h), (0, 0, 0, 220))
-            img.paste(footer_bg, (0, img.height - footer_h), footer_bg)
-            
+            img_rgba = img.convert("RGBA")
+            img_rgba.paste(footer_bg, (0, img.height - footer_h), footer_bg)
+            img = img_rgba.convert("RGB")
+            draw = ImageDraw.Draw(img)
+
             # Kanal adı (Vurgulu Yeşil)
             cb = draw.textbbox((0, 0), channel_name, font=ch_font)
             cx = (img.width - (cb[2] - cb[0])) // 2
@@ -438,7 +441,7 @@ class MediaEngine:
             draw.text((sx, img.height - 65), slogan.upper(), font=sl_font, fill=(255, 255, 255))
 
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            img.save(output_path, "JPEG", quality=98) 
+            img.save(output_path, "PNG")
             print(f"[MediaEngine] Premium Thumbnail kaydedildi: {output_path}")
             return output_path
         except Exception as e:

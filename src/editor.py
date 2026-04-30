@@ -327,7 +327,7 @@ class AutoEditor:
 
         # Kaydet
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        bg.save(output_path, "PNG", quality=95)
+        bg.save(output_path, "PNG")
         print(f"[Thumbnail] Placeholder thumbnail saved: {output_path}")
         return output_path
 

@@ -6,7 +6,7 @@ Evcarix YouTube Shorts thumbnail generator (9:16 format)
 Usage:
     python thumbnail_generator.py --title "EV Range Lost 40%?" --subtitle "Real Winter Test" --accent red --output thumb.png
     python thumbnail_generator.py --json '{"title":"FAST CHARGING","subtitle":"Damages Battery?!","accent":"cyan","stat":"-30%"}'
-    python thumbnail_generator.py --claude "winter ev range loss topic"   # AI generates layout
+    python thumbnail_generator.py --groq "winter ev range loss topic"   # AI generates layout
 """
 
 import argparse
@@ -160,7 +160,7 @@ def generate_thumbnail(
     # ── Channel tag (top-left) ───────────────────────────────────────────────
     font_tag = load_font(FONT_MEDIUM, 38)
     tag_x, tag_y = 54, 60
-    draw.rectangle([tag_x - 8, tag_y - 8, tag_x + 240, tag_y + 48], fill=(0, 0, 0, 180))
+    draw.rectangle([tag_x - 8, tag_y - 8, tag_x + 240, tag_y + 48], fill=(0, 0, 0))
     draw.rectangle([tag_x - 8, tag_y - 8, tag_x - 2, tag_y + 48], fill=pal["accent"])
     draw.text((tag_x + 8, tag_y + 20), channel_tag, font=font_tag, fill=(220, 220, 220), anchor="lm")
 
@@ -215,7 +215,7 @@ def generate_thumbnail(
     # ── Save ─────────────────────────────────────────────────────────────────
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    img.save(str(out), "PNG", quality=95)
+    img.save(str(out), "PNG")
     print(f"✅ Thumbnail saved → {out}  ({W}x{H})")
     return str(out)
 
