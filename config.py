@@ -36,11 +36,11 @@ THUMBNAIL_HEIGHT = 1920  # 9:16 vertical format
 THUMBNAIL_QUALITY = "4K"  # SDXL/Flux quality
 
 # ── Language Settings ───────────────────────────────────────────────────────────
-DEFAULT_LANGUAGE = "tr"  # Turkish
-SUPPORTED_LANGUAGES = ["tr", "en"]
+DEFAULT_LANGUAGE = "en"  # English ONLY
+SUPPORTED_LANGUAGES = ["en"]
 
 # ── Content Settings ─────────────────────────────────────────────────────────────
-ENABLE_TURKISH_TITLES = True  # Generate Turkish titles alongside English
+ENABLE_TURKISH_TITLES = False  # English ONLY
 ENABLE_GLOBAL_CONTENT = True  # Use USA, Europe, China examples only (no Turkey)
 ENABLE_AI_VIDEO_FALLBACK = False  # Kling AI/Runway (requires API key)
 ENABLE_STABILITY_AI = False  # Stability AI for thumbnails (requires API key)
