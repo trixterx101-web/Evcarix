@@ -89,8 +89,10 @@ class EvcarixOrchestrator:
         print("\n[4/6] Premium Thumbnail oluşturuluyor...")
         thumbnail_path = f"output/thumbnails/thumb_{ts}.jpg"
         os.makedirs("output/thumbnails", exist_ok=True)
+        # İlk videoyu thumbnail arka planı için kullan
+        first_video = video_paths[0] if video_paths else ""
         self.editor.generate_premium_thumbnail(
-            video_path="",  # Artık kullanılmıyor — Pillow gradient
+            video_path=first_video,
             title=title,
             output_path=thumbnail_path
         )
