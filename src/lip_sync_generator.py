@@ -87,19 +87,29 @@ class LipSyncGenerator:
                 "accent_color": "#FF0000"
             }
     
-    def text_to_speech(self, text, output_path, lang="en"):
-        """Convert text to speech using existing VoiceEngine"""
+    async def text_to_speech(self, text, output_path, lang="en"):
+        """Convert text to speech using edge-tts VoiceEngine"""
         try:
-            # Use existing MediaEngine voice generation
-            result = self.media_engine.generate_voiceover(
-                text=text,
-                output_path=output_path,
-                voice_type="female",
-                rate="+0%"
-            )
-            if result and os.path.exists(output_path):
-                print(f"[LipSync] ✅ TTS tamamlandı (mevcut VoiceEngine)")
+            import edge_tts
+            
+            voice = "tr-TR-AhmetNeural" if lang == "tr" else "en-US-AvaNeural"
+            communicate = edge_tts.Communicate(text, voice)
+            
+            os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+            
+            with open(output_path, "wb") as f:
+                async for chunk in communicate.stream():
+                    if chunk["type"] == "audio":
+                        f.write(chunk["data"])
+            
+            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                print(f"[LipSync] ✅ TTS tamamlandı (edge-tts)")
                 return True
+            else:
+                print(f"[LipSync] ❌ TTS başarısız - dosya boş")
+                return False
+        except ImportError:
+            print("[LipSync] edge-tts yüklü değil")
             return False
         except Exception as e:
             print(f"[LipSync] TTS hatası: {e}")
@@ -226,7 +236,7 @@ class LipSyncGenerator:
         # Step 2: Text-to-speech
         print("\n[2/5] Seslendirme yapılıyor...")
         audio_path = os.path.join(output_dir, "audio.wav")
-        tts_success = self.text_to_speech(script_data['script'], audio_path, lang)
+        tts_success = await self.text_to_speech(script_data['script'], audio_path, lang)
         if not tts_success:
             print("[LipSync] ❌ TTS başarısız")
             return None
