@@ -8,6 +8,7 @@ from src.brain import EvcarixBrain
 from src.media_engine import MediaEngine
 from src.editor import AutoEditor
 from src.uploader import YouTubeUploader
+from src.lip_sync_generator import LipSyncGenerator
 
 load_dotenv()
 
@@ -17,8 +18,12 @@ class EvcarixOrchestrator:
         self.brain = EvcarixBrain()
         self.media_engine = MediaEngine()
         self.editor = AutoEditor()
+        self.lip_sync = LipSyncGenerator()
         self.uploader = None
 
+        self.use_lip_sync = os.getenv("USE_LIP_SYNC", "false").lower() == "true"
+        self.character_image = os.getenv("CHARACTER_IMAGE", "assets/character.jpg")
+        
         secret_path = os.getenv("YOUTUBE_CLIENT_SECRET_FILE", "client_secret.json")
         if os.path.exists(secret_path):
             try:
@@ -57,6 +62,44 @@ class EvcarixOrchestrator:
         print(f"\n[1/6] Plan Hazır")
         print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}")
         print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
+
+        # ── Lip-Sync Mode Check ───────────────────────────────────────
+        if self.use_lip_sync and os.path.exists(self.character_image):
+            print(f"\n⚡ Lip-Sync Mode aktif - Karakter konuşan video oluşturuluyor...")
+            print(f"      Karakter: {self.character_image}")
+            
+            lip_sync_output_dir = f"assets/lip_sync/{ts}"
+            lip_sync_result = await self.lip_sync.generate_lipsync_video(
+                topic=topic,
+                character_image=self.character_image,
+                output_dir=lip_sync_output_dir,
+                lang="en"  # or "tr" for Turkish
+            )
+            
+            if lip_sync_result:
+                final_video_path = lip_sync_result["video"]
+                thumbnail_path = lip_sync_result["thumbnail"]
+                
+                # Upload to YouTube
+                if self.uploader and os.path.exists(final_video_path):
+                    print("\n[6/6] YouTube'a yükleniyor...")
+                    try:
+                        video_id = self.uploader.upload_video(
+                            final_video_path, title, description, tags
+                        )
+                        print(f"      ✅ Yüklendi! Video ID: {video_id}")
+                        print(f"      🔗 https://www.youtube.com/watch?v={video_id}")
+                    except Exception as e:
+                        print(f"      ❌ YouTube yükleme hatası: {e}")
+                
+                print(f"\n{'='*60}")
+                print(f"  ✅ TAMAMLANDI!")
+                print(f"  Video    : {final_video_path}")
+                print(f"  Başlık   : {title.encode('ascii', 'ignore').decode('ascii')}")
+                print(f"{'='*60}\n")
+                return
+            else:
+                print("⚠️ Lip-sync başarısız, normal moda geçiliyor...")
 
         # ── 2. AI Video Klip Üretimi ──────────────────────────────────
         print("\n[2/6] AI video klip üretimi (5-10 saniye)...")
