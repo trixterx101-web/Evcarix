@@ -189,12 +189,13 @@ class MediaEngine:
                         continue
                     sorted_files = sorted(video_files, key=lambda x: x.get('width', 0), reverse=True)
                     # Sadece portrait (dikey) videoları seç - 9:16 formatı için zorunlu
-                    portrait_files = [f for f in sorted_files if f.get('width', 0) < f.get('height', 0)]
+                    # Aspect ratio < 0.6 (yaklaşık 9:16'dan daha dikey)
+                    portrait_files = [f for f in sorted_files if f.get('width', 0) > 0 and (f.get('height', 0) / f.get('width', 1)) >= 1.6]
                     if portrait_files:
                         chosen = random.choice(portrait_files[:3]) if len(portrait_files) >= 3 else portrait_files[0]
                     else:
                         # Portrait yoksa atla
-                        print(f"[Pexels] ⚠️ Portrait video bulunamadı, atlanıyor")
+                        print(f"[Pexels] ⚠️ Portrait (9:16) video bulunamadı, atlanıyor")
                         continue
                     video_url = chosen['link']
                     clean_q = re.sub(r'[^\w\s-]', '', query).strip().replace(' ', '_')[:30]
@@ -272,12 +273,13 @@ class MediaEngine:
                 for i, hit in enumerate(hits[:count]):
                     videos_dict = hit.get('videos', {})
                     chosen_video = None
-                    # Portrait (dikey) video kontrolü
+                    # Portrait (dikey) video kontrolü - 9:16 için aspect ratio >= 1.6
                     for quality in ['large', 'medium', 'small', 'tiny']:
                         if quality in videos_dict and videos_dict[quality].get('url'):
                             vid = videos_dict[quality]
-                            # Portrait kontrol: width < height
-                            if vid.get('width', 0) < vid.get('height', 0):
+                            # Portrait kontrol: height/width >= 1.6 (yaklaşık 9:16)
+                            w, h = vid.get('width', 0), vid.get('height', 0)
+                            if w > 0 and h / w >= 1.6:
                                 chosen_video = vid
                                 break
                     if not chosen_video:
@@ -377,7 +379,7 @@ class MediaEngine:
             # For video generation, we'll use their image generation and then animate
             print(f"[Stability] Video üretimi için prompt: {prompt[:50]}...")
             
-            # Generate image first
+            # Generate image first - 9:16 format
             answers = stability_api.generate(
                 prompt=prompt,
                 steps=30,
@@ -419,7 +421,7 @@ class MediaEngine:
 
             print(f"[Replicate] Video üretimi için prompt: {prompt[:50]}...")
             
-            # Use Stable Video Diffusion or similar model
+            # Use Stable Video Diffusion or similar model - force 9:16 aspect ratio
             output = replicate.run(
                 "stability-ai/stable-video-diffusion:3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438",
                 input={
@@ -427,7 +429,9 @@ class MediaEngine:
                     "video_length": duration,
                     "sizing_strategy": "maintain_aspect_ratio",
                     "motion_bucket_id": 127,
-                    "frames_per_second": 6
+                    "frames_per_second": 6,
+                    "width": 1080,
+                    "height": 1920
                 }
             )
             

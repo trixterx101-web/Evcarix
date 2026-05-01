@@ -174,13 +174,23 @@ class AutoEditor:
                 clip = VideoFileClip(path)
                 w, h = clip.size
                 target_ratio = 9 / 16
+                
+                # Zorla 9:16 crop - letterbox yok
                 if w / h > target_ratio:
+                    # Geniş video: dikey ortadan crop
                     new_w = int(h * target_ratio)
-                    clip = clip.crop(x_center=w / 2, width=new_w)
-                else:
-                    new_h = int(w * target_ratio)
-                    clip = clip.crop(y_center=h / 2, height=new_h)
-                clip = clip.resize(width=1080)
+                    x1 = (w - new_w) // 2
+                    x2 = x1 + new_w
+                    clip = clip.crop(x1=x1, y1=0, x2=x2, y2=h)
+                elif w / h < target_ratio:
+                    # Dar video: yatay ortadan crop
+                    new_h = int(w / target_ratio)
+                    y1 = (h - new_h) // 2
+                    y2 = y1 + new_h
+                    clip = clip.crop(x1=0, y1=y1, x2=w, y2=y2)
+                
+                # Kesin olarak 1080x1920'a resize
+                clip = clip.resize((1080, 1920))
                 clips.append(clip)
             except Exception as e:
                 print(f"Klip hatası ({path}): {e}")
