@@ -157,11 +157,10 @@ class AutoEditor:
         return VideoClip(make_frame, duration=duration)
 
     def assemble_short(self, video_paths, audio_path, word_timings, output_filename,
-                       ai_fallback_images=None, thumbnail_path=None, category="general"):
+                       ai_fallback_images=None, category="general"):
         """
         Dikey Shorts video montajı — 1080x1920, tam senkron Pillow altyazıları.
         ai_fallback_images: Stok video yoksa kullanılacak AI görüntü path listesi.
-        thumbnail_path: Video sonuna eklenir (YouTube manuel thumbnail seçimi için).
         """
         audio = AudioFileClip(audio_path)
         target_duration = audio.duration
@@ -237,23 +236,6 @@ class AutoEditor:
             base_video = self._make_motion_background(target_duration)
 
         base_video = base_video.set_audio(audio)
-
-        # ── Thumbnail frame'i video sonuna ekle (YouTube manuel secim icin) ──
-        if thumbnail_path and os.path.exists(thumbnail_path):
-            try:
-                from moviepy.editor import ImageClip
-                thumb_dur = 3.0  # YouTube frame secimi icin yeterli sure
-                thumb_img = ImageClip(thumbnail_path).set_duration(thumb_dur)
-                # Dikey videoya letterbox olarak sigdir
-                # Thumbnail'i tam 9:16 ekrana sigdir (kirmizi/beyaz Shorts kutusu full screen)
-                thumb_img = thumb_img.resize((1080, 1920))
-                thumb_img = thumb_img.set_position(("center", "center"))
-                thumb_bg = ColorClip(size=(1080, 1920), color=(5, 5, 15)).set_duration(thumb_dur)
-                thumb_layer = CompositeVideoClip([thumb_bg, thumb_img], size=(1080, 1920))
-                base_video = concatenate_videoclips([base_video, thumb_layer], method="compose")
-                print(f"[Editor] Thumbnail frame video sonuna eklendi ({thumb_dur}s)")
-            except Exception as e:
-                print(f"[Editor] Thumbnail frame eklenemedi: {e}")
 
         # ── Altyazılar ──
         all_layers = [base_video]

@@ -101,20 +101,8 @@ class EvcarixOrchestrator:
         )
         word_timings = voice_result['word_timings']
 
-        # ── 5. Premium Thumbnail (önce oluştur, video sonuna frame eklemek için) ──
-        print("\n[5/6] Premium Thumbnail oluşturuluyor...")
-        thumbnail_path = f"output/thumbnails/thumb_{ts}.png"
-        os.makedirs("output/thumbnails", exist_ok=True)
-        # İlk videoyu thumbnail arka planı için kullan
-        first_video = all_video_clips[0] if all_video_clips else ""
-        self.editor.generate_premium_thumbnail(
-            video_path=first_video,
-            title=title,
-            output_path=thumbnail_path
-        )
-
-        # ── 6. Video montajı (thumbnail frame'i sona eklenecek) ──
-        print("\n[6/6] Video montajlanıyor...")
+        # ── 5. Video montajı ──
+        print("\n[5/6] Video montajlanıyor...")
         output_filename = f"shorts_{ts}.mp4"
         final_video_path = self.editor.assemble_short(
             video_paths=all_video_clips,
@@ -122,7 +110,6 @@ class EvcarixOrchestrator:
             word_timings=word_timings,
             output_filename=output_filename,
             ai_fallback_images=ai_fallback_images if ai_fallback_images else None,
-            thumbnail_path=thumbnail_path,
             category=plan.get("category", "general")
         )
 
@@ -142,15 +129,6 @@ class EvcarixOrchestrator:
                 print(f"      ✅ Yüklendi! Video ID: {video_id}")
                 print(f"      🔗 https://www.youtube.com/watch?v={video_id}")
 
-                # Thumbnail yükle — YouTube processing süresi için bekle
-                if os.path.exists(thumbnail_path):
-                    thumb_delay = random.randint(60, 120)
-                    print(f"      Thumbnail yüklemesi öncesi {thumb_delay}sn bekleniyor (processing süresi)...")
-                    await asyncio.sleep(thumb_delay)
-                    thumb_ok = self.uploader.set_thumbnail(video_id, thumbnail_path)
-                    if not thumb_ok:
-                        print("      ⚠️ Thumbnail yüklenemedi, YouTube otomatik kare kullanacak.")
-
             except Exception as e:
                 print(f"      ❌ YouTube yükleme hatası: {e}")
                 raise e # GitHub Actions'ın hata olduğunu anlaması için hatayı fırlatıyoruz
@@ -160,7 +138,6 @@ class EvcarixOrchestrator:
         print(f"\n{'='*60}")
         print(f"  ✅ TAMAMLANDI!")
         print(f"  Video    : {final_video_path}")
-        print(f"  Thumbnail: {thumbnail_path}")
         print(f"  Başlık   : {title.encode('ascii', 'ignore').decode('ascii')}")
         print(f"{'='*60}\n")
 
