@@ -249,13 +249,13 @@ class CreativeWriter:
 Topic: {topic}
 Category: {category or "general"}
 Channel Concept: {evcarix_mission}
-Format: YouTube Short (45-60 seconds)
+Format: YouTube Short (25-40 seconds)
 Language: American English ONLY.
 
 Category-specific instructions: {cat_extra}
 
 Requirements:
-1. Script length: 45-60 seconds (approximately 110-150 words for normal speaking speed).
+1. Script length: 25-40 seconds (approximately 60-100 words for normal speaking speed).
 2. Start with a data-driven hook that includes a specific number or shocking fact.
 3. Focus on facts, numbers, and technical insights. No generic "amazing" or "incredible" hype.
 4. Voiceover text only — no stage directions.

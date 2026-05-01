@@ -162,7 +162,7 @@ Every (VISUAL: ...) note in Shorts script MUST be selected ONLY from this list:
 {FORBIDDEN}
 
 ══════════════════════════════════════════
-SHORTS FORMAT: 9:16 VERTICAL · 60 SECONDS
+SHORTS FORMAT: 9:16 VERTICAL · 25-40 SECONDS
 ══════════════════════════════════════════
 Size: 1080x1920 pixels. Full screen data chart + text overlay.
 
@@ -171,7 +171,7 @@ Return ONLY JSON (no markdown, no explanation, no other text):
   "title": "Max 60 chars. Start with shocking data point or question. High CTR.",
   "description": "400-500 word YouTube description.\\n1) HOOK: Shocking stat above fold\\n2) WHAT YOU LEARN: 3 bullet points\\n3) KEY FINDINGS: 2 paragraphs\\n4) WHY IT MATTERS: 1 paragraph\\n5) CHANNEL: Evcarix - No hype. Just numbers.\\n6) 8 hashtags on last line",
   "tags": "Comma-separated tags. Total UNDER 500 characters. Order by search volume descending. 3 broad + 4 medium + 4 long-tail.",
-  "shorts_script": "[HOOK 0-3s]\\nSpoken: <text>\\n(VISUAL: <only from list>)\\n\\n[SHOCKING STAT 3-8s]\\nSpoken: <text>\\n(VISUAL: <only from list - big number overlay>)\\n\\n[MYTH vs REALITY 8-20s]\\nSpoken: <text>\\n(VISUAL: <only from list>)\\n\\n[DATA REVEAL 20-45s]\\nSpoken: <text>\\n(VISUAL: <only from list - chart or diagram>)\\n\\n[KEY TAKEAWAY 45-55s]\\nSpoken: <text>\\n(VISUAL: <only from list - key number overlay>)\\n\\n[CTA 55-60s]\\nSpoken: <subscribe hook tied to topic>\\n(VISUAL: subscribe animation + Evcarix logo)"
+  "shorts_script": "[HOOK 0-3s]\\nSpoken: <text>\\n(VISUAL: <only from list>)\\n\\n[SHOCKING STAT 3-8s]\\nSpoken: <text>\\n(VISUAL: <only from list - big number overlay>)\\n\\n[DATA REVEAL 8-25s]\\nSpoken: <text>\\n(VISUAL: <only from list - chart or diagram>)\\n\\n[KEY TAKEAWAY 25-35s]\\nSpoken: <text>\\n(VISUAL: <only from list - key number overlay>)\\n\\n[CTA 35-40s]\\nSpoken: <subscribe hook tied to topic>\\n(VISUAL: subscribe animation + Evcarix logo)"
 }}"""
 
 
@@ -409,7 +409,7 @@ def main():
 
     print(f"\n⚡ Evcarix Shorts Content Generator")
     print(f"   Model  : {MODEL}")
-    print(f"   Format : 9:16 vertical Shorts - 60 seconds")
+    print(f"   Format : 9:16 vertical Shorts - 25-40 seconds")
     print(f"   Topics : {len(topics)}")
     print(f"   Dry-run: {args.dry_run}\n")
 

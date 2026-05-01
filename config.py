@@ -24,8 +24,8 @@ YOUTUBE_TOKEN_PATH = os.getenv("YOUTUBE_TOKEN_PATH", "token.json")
 CHANNEL_ID = os.getenv("CHANNEL_ID", "UC_YOUR_CHANNEL_ID")
 
 # ── Video Settings ───────────────────────────────────────────────────────────────
-VIDEO_DURATION_MIN = 45  # seconds
-VIDEO_DURATION_MAX = 60  # seconds
+VIDEO_DURATION_MIN = 25  # seconds
+VIDEO_DURATION_MAX = 40  # seconds
 VIDEO_WIDTH = 1080
 VIDEO_HEIGHT = 1920  # 9:16 vertical format
 VIDEO_FPS = 30
