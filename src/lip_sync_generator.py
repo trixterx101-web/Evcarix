@@ -9,6 +9,7 @@ import requests
 import json
 from pathlib import Path
 from dotenv import load_dotenv
+from src.writer import Writer
 
 load_dotenv()
 
@@ -16,57 +17,54 @@ load_dotenv()
 class LipSyncGenerator:
     def __init__(self):
         self.wav2lip_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Wav2Lip")
-        self.elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY")
+        self.writer = Writer()  # Use existing Writer for script generation
+        from src.media_engine import MediaEngine
+        self.media_engine = MediaEngine()  # Use existing voice engine
         
     def generate_script(self, topic, lang="en"):
-        """Generate script using Anthropic Claude API"""
-        if not os.getenv("ANTHROPIC_API_KEY"):
-            print("[LipSync] ANTHROPIC_API_KEY bulunamadı, varsayılan script kullanılıyor.")
-            return self._default_script(topic, lang)
-        
+        """Generate script using existing Writer (Gemini/Groq)"""
         try:
-            response = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": os.getenv("ANTHROPIC_API_KEY"),
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json"
-                },
-                json={
-                    "model": "claude-sonnet-4-20250514",
-                    "max_tokens": 500,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": f"""Generate a short spoken script about: {topic}
-                            
-Requirements:
-- Max 80 words
-- Conversational {'Turkish' if lang == 'tr' else 'English'}
-- YouTube Shorts style (engaging, punchy)
-- Include a shocking stat or hook at the start
-
-Return JSON format:
-{{
-  "script": "the spoken text",
-  "title": "thumbnail title (max 60 chars)",
-  "subtitle": "thumbnail subtitle",
-  "stat": "key statistic",
-  "accent_color": "#hexcode"
-}}"""
-                        }
-                    ]
-                },
-                timeout=30
-            )
+            # Use Writer's generate_title to get a short script-like title
+            # This is a simple approach - we could add a dedicated script generation method
+            title = self.writer.generate_title(topic, max_length=80)
             
-            if response.status_code == 200:
-                result = response.json()
-                content = result.get("content", [{}])[0].get("text", "{}")
-                return json.loads(content)
-            else:
-                print(f"[LipSync] Claude API hatası: {response.status_code}")
-                return self._default_script(topic, lang)
+            # Generate a short script based on the topic
+            script_prompt = f"Write a short YouTube Shorts script about {topic}. Max 80 words. Conversational style."
+            
+            # Use Groq for quick script generation
+            from groq import Groq
+            groq_api_keys = [
+                os.getenv("GROQ_API_KEY"),
+                os.getenv("GROQ_API_KEY_2"),
+                os.getenv("GROQ_API_KEY_3")
+            ]
+            groq_api_keys = [k for k in groq_api_keys if k]
+            
+            for api_key in groq_api_keys:
+                try:
+                    client = Groq(api_key=api_key)
+                    response = client.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=[
+                            {"role": "system", "content": "You are a YouTube Shorts script writer. Keep it under 80 words, engaging and punchy."},
+                            {"role": "user", "content": script_prompt}
+                        ],
+                        max_tokens=200
+                    )
+                    script = response.choices[0].message.content.strip()
+                    
+                    return {
+                        "script": script,
+                        "title": title[:60],
+                        "subtitle": topic[:30],
+                        "stat": "95%",
+                        "accent_color": "#FF0000"
+                    }
+                except Exception as e:
+                    print(f"[LipSync] Groq hatası: {e}")
+                    continue
+            
+            return self._default_script(topic, lang)
         except Exception as e:
             print(f"[LipSync] Script generation hatası: {e}")
             return self._default_script(topic, lang)
@@ -91,54 +89,26 @@ Return JSON format:
             }
     
     def text_to_speech(self, text, output_path, lang="en"):
-        """Convert text to speech using ElevenLabs or edge-tts"""
-        # Try ElevenLabs first
-        if self.elevenlabs_api_key:
-            try:
-                voice_id = "21m00Tcm4TlvDq8ikWAM"  # Default voice
-                url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-                
-                response = requests.post(
-                    url,
-                    headers={
-                        "xi-api-key": self.elevenlabs_api_key,
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "text": text,
-                        "model_id": "eleven_multilingual_v2",
-                        "voice_settings": {
-                            "stability": 0.5,
-                            "similarity_boost": 0.75
-                        }
-                    },
-                    timeout=30
-                )
-                
-                if response.status_code == 200:
-                    with open(output_path, 'wb') as f:
-                        f.write(response.content)
-                    print(f"[LipSync] ✅ ElevenLabs TTS tamamlandı")
-                    return True
-            except Exception as e:
-                print(f"[LipSync] ElevenLabs hatası: {e}")
-        
-        # Fallback to edge-tts
+        """Convert text to speech using existing VoiceEngine"""
         try:
-            import edge_tts
+            # Use existing MediaEngine voice generation
             import asyncio
-            voice = "tr-TR-AhmetNeural" if lang == "tr" else "en-US-GuyNeural"
-            communicate = edge_tts.Communicate(text, voice)
             loop = asyncio.get_event_loop()
-            loop.run_until_complete(communicate.save(output_path))
-            print(f"[LipSync] ✅ edge-tts tamamlandı")
-            return True
-        except ImportError:
-            print("[LipSync] edge-tts yüklü değil")
+            result = loop.run_until_complete(
+                self.media_engine.generate_voiceover(
+                    text=text,
+                    output_path=output_path,
+                    voice_type="female",
+                    rate="+0%"
+                )
+            )
+            if result and os.path.exists(output_path):
+                print(f"[LipSync] ✅ TTS tamamlandı (mevcut VoiceEngine)")
+                return True
+            return False
         except Exception as e:
-            print(f"[LipSync] edge-tts hatası: {e}")
-        
-        return False
+            print(f"[LipSync] TTS hatası: {e}")
+            return False
     
     async def run_wav2lip(self, face_image, audio_path, output_path):
         """Run Wav2Lip inference"""
