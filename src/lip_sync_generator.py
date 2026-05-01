@@ -25,8 +25,7 @@ class LipSyncGenerator:
         """Generate script using existing Writer (Gemini/Groq)"""
         try:
             # Use Writer's generate_title to get a short script-like title
-            # This is a simple approach - we could add a dedicated script generation method
-            title = self.writer.generate_title(topic, max_length=80)
+            title = self.writer.generate_title(topic)
             
             # Generate a short script based on the topic
             script_prompt = f"Write a short YouTube Shorts script about {topic}. Max 80 words. Conversational style."
@@ -92,15 +91,11 @@ class LipSyncGenerator:
         """Convert text to speech using existing VoiceEngine"""
         try:
             # Use existing MediaEngine voice generation
-            import asyncio
-            loop = asyncio.get_event_loop()
-            result = loop.run_until_complete(
-                self.media_engine.generate_voiceover(
-                    text=text,
-                    output_path=output_path,
-                    voice_type="female",
-                    rate="+0%"
-                )
+            result = self.media_engine.generate_voiceover(
+                text=text,
+                output_path=output_path,
+                voice_type="female",
+                rate="+0%"
             )
             if result and os.path.exists(output_path):
                 print(f"[LipSync] ✅ TTS tamamlandı (mevcut VoiceEngine)")
@@ -231,7 +226,7 @@ class LipSyncGenerator:
         # Step 2: Text-to-speech
         print("\n[2/5] Seslendirme yapılıyor...")
         audio_path = os.path.join(output_dir, "audio.wav")
-        tts_success = await self.text_to_speech(script_data['script'], audio_path, lang)
+        tts_success = self.text_to_speech(script_data['script'], audio_path, lang)
         if not tts_success:
             print("[LipSync] ❌ TTS başarısız")
             return None
