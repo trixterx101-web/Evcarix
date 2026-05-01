@@ -91,7 +91,7 @@ class CreativeWriter:
         if self.groq_client:
             try:
                 completion = self.groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
                     messages=[
                         {"role": "system", "content": "You are a YouTube growth expert. Return only valid JSON arrays of title strings. American English only. Use numbers, data, and power words."},
                         {"role": "user", "content": prompt}
@@ -267,7 +267,7 @@ SENARYO: [script text]
 
     def _generate_with_groq(self, prompt):
         completion = self.groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": "You are a specialized technical EV analyst and scriptwriter for Evcarix. You focus on data, battery science, and real-world metrics without hype."},
                 {"role": "user", "content": prompt}
@@ -355,7 +355,7 @@ SENARYO: [script text]
         try:
             if self.groq_client:
                 completion = self.groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=500
                 )
@@ -432,7 +432,7 @@ SENARYO: [script text]
             raw_tags = ""
             if self.groq_client:
                 completion = self.groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=250
                 )

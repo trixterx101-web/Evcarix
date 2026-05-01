@@ -18,6 +18,8 @@ Kullanım:
 import os, csv, json, time, argparse, sys, re
 from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
 
 try:
     from groq import Groq
@@ -26,7 +28,7 @@ except ImportError:
     sys.exit(1)
 
 # ── Sabitler ───────────────────────────────────────────────────────────────────
-MODEL      = "llama-3.3-70b-versatile"
+MODEL      = "llama-3.1-8b-instant"
 MAX_TOKENS = 2048
 DELAY_SEC  = 3
 MAX_TOPICS = 5            # max topics per run (workflow runs daily)
@@ -218,7 +220,7 @@ def check_visuals(script: str, category_id: str) -> list[str]:
 
 
 # ── Üretim ────────────────────────────────────────────────────────────────────
-def generate(client: Groq, topic: dict, max_retries: int = 2) -> dict:
+def generate(client: Groq, topic: dict, max_retries: int = 3) -> dict:
     cat_id = topic["category_id"]
 
     for attempt in range(max_retries):
@@ -273,7 +275,7 @@ def generate(client: Groq, topic: dict, max_retries: int = 2) -> dict:
             if "rate_limit" in error_str.lower() or "429" in error_str:
                 print(f"  Rate limit hit (attempt {attempt + 1}/{max_retries}): Waiting...")
                 if attempt < max_retries - 1:
-                    wait_time = 30 * (attempt + 1)
+                    wait_time = 60 * (attempt + 1)
                     print(f"  Waiting {wait_time}s before retry...")
                     time.sleep(wait_time)
                 else:
