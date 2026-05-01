@@ -9,7 +9,7 @@ import requests
 import json
 from pathlib import Path
 from dotenv import load_dotenv
-from src.writer import Writer
+from src.writer import CreativeWriter
 
 load_dotenv()
 
@@ -17,7 +17,7 @@ load_dotenv()
 class LipSyncGenerator:
     def __init__(self):
         self.wav2lip_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Wav2Lip")
-        self.writer = Writer()  # Use existing Writer for script generation
+        self.writer = CreativeWriter()  # Use existing CreativeWriter for script generation
         from src.media_engine import MediaEngine
         self.media_engine = MediaEngine()  # Use existing voice engine
         
