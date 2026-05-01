@@ -3,6 +3,7 @@ import re
 import random
 import requests
 import urllib.parse
+from PIL import Image
 from src.voice_engine import VoiceEngine
 from dotenv import load_dotenv
 
@@ -14,6 +15,10 @@ class MediaEngine:
     def __init__(self):
         self.pexels_api_key = os.getenv("PEXELS_API_KEY")
         self.pixabay_api_key = os.getenv("PIXABAY_API_KEY")
+        self.stability_api_key = os.getenv("STABILITY_API_KEY")
+        self.replicate_api_key = os.getenv("REPLICATE_API_KEY")
+        self.kling_access_key = os.getenv("KLING_ACCESS_KEY")
+        self.kling_secret_key = os.getenv("KLING_SECRET_KEY")
         self.voice_engine = VoiceEngine()
 
     async def generate_voiceover(self, text, output_path, voice_type="female", rate="+10%"):
@@ -351,6 +356,252 @@ class MediaEngine:
             except Exception as e:
                 print(f"[Pollinations] Hata: {e}")
         return paths
+
+    # ─── Stability AI Video Generation ─────────────────────────────────────
+    def generate_stability_video(self, prompt, output_path, duration=5):
+        """Stability AI ile 5 saniyelik video üretir."""
+        if not self.stability_api_key:
+            print("[Stability] API key bulunamadı, atlanıyor.")
+            return None
+
+        try:
+            import stability_sdk
+            from stability_sdk import client
+
+            stability_api = client.StabilityInference(
+                key=self.stability_api_key,
+                verbose=True,
+            )
+
+            # Stability AI currently focuses on image-to-video or text-to-image
+            # For video generation, we'll use their image generation and then animate
+            print(f"[Stability] Video üretimi için prompt: {prompt[:50]}...")
+            
+            # Generate image first
+            answers = stability_api.generate(
+                prompt=prompt,
+                steps=30,
+                cfg_scale=8.0,
+                width=1080,
+                height=1920,
+                samples=1,
+                sampler=stability_sdk.samplers.KARRAS
+            )
+
+            for resp in answers:
+                for artifact in resp.artifacts:
+                    if artifact.type == stability_sdk.generation.TYPE_IMAGE:
+                        img_path = output_path.replace('.mp4', '_temp.png')
+                        with open(img_path, 'wb') as f:
+                            f.write(artifact.binary)
+                        print(f"[Stability] Görüntü oluşturuldu, animasyon yapılıyor...")
+                        
+                        # Animate the image using simple pan/zoom (simulated video)
+                        return self._animate_image_to_video(img_path, output_path, duration)
+            
+            return None
+        except ImportError:
+            print("[Stability] stability_sdk yüklü değil, atlanıyor.")
+            return None
+        except Exception as e:
+            print(f"[Stability] Hata: {e}")
+            return None
+
+    # ─── Replicate Video Generation ────────────────────────────────────────
+    def generate_replicate_video(self, prompt, output_path, duration=5):
+        """Replicate API ile video üretir (Stable Video Diffusion vb.)."""
+        if not self.replicate_api_key:
+            print("[Replicate] API key bulunamadı, atlanıyor.")
+            return None
+
+        try:
+            import replicate
+
+            print(f"[Replicate] Video üretimi için prompt: {prompt[:50]}...")
+            
+            # Use Stable Video Diffusion or similar model
+            output = replicate.run(
+                "stability-ai/stable-video-diffusion:3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438",
+                input={
+                    "input_image": None,  # Can use image-to-video
+                    "video_length": duration,
+                    "sizing_strategy": "maintain_aspect_ratio",
+                    "motion_bucket_id": 127,
+                    "frames_per_second": 6
+                }
+            )
+            
+            # Download the video
+            if output and len(output) > 0:
+                video_url = output[0] if isinstance(output, list) else output
+                r = requests.get(video_url, stream=True, timeout=120)
+                if r.status_code == 200:
+                    with open(output_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=1024 * 1024):
+                            if chunk:
+                                f.write(chunk)
+                    print(f"[Replicate] ✅ Video indirildi: {output_path}")
+                    return output_path
+            
+            return None
+        except ImportError:
+            print("[Replicate] replicate yüklü değil, atlanıyor.")
+            return None
+        except Exception as e:
+            print(f"[Replicate] Hata: {e}")
+            return None
+
+    # ─── Kling AI Video Generation ───────────────────────────────────────────
+    def generate_kling_video(self, prompt, output_path, duration=5):
+        """Kling AI ile video üretir."""
+        if not self.kling_access_key or not self.kling_secret_key:
+            print("[Kling] API key bulunamadı, atlanıyor.")
+            return None
+
+        try:
+            print(f"[Kling] Video üretimi için prompt: {prompt[:50]}...")
+            
+            # Kling AI video generation API
+            url = "https://api.klingai.com/v1/videos/generations"
+            headers = {
+                "Authorization": f"Bearer {self.kling_access_key}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "prompt": prompt,
+                "duration": duration,
+                "aspect_ratio": "9:16",
+                "model": "kling-v1"
+            }
+            
+            response = requests.post(url, headers=headers, json=data, timeout=60)
+            if response.status_code == 200:
+                result = response.json()
+                task_id = result.get("data", {}).get("task_id")
+                if task_id:
+                    # Poll for result
+                    import time
+                    max_wait = 300  # 5 minutes
+                    waited = 0
+                    while waited < max_wait:
+                        time.sleep(10)
+                        waited += 10
+                        status_url = f"https://api.klingai.com/v1/videos/generations/{task_id}"
+                        status_resp = requests.get(status_url, headers=headers, timeout=30)
+                        if status_resp.status_code == 200:
+                            status_data = status_resp.json()
+                            task_status = status_data.get("data", {}).get("status")
+                            if task_status == "succeed":
+                                video_url = status_data.get("data", {}).get("urls", [{}])[0].get("url")
+                                if video_url:
+                                    r = requests.get(video_url, stream=True, timeout=120)
+                                    if r.status_code == 200:
+                                        with open(output_path, 'wb') as f:
+                                            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                                                if chunk:
+                                                    f.write(chunk)
+                                        print(f"[Kling] ✅ Video indirildi: {output_path}")
+                                        return output_path
+                            elif task_status == "failed":
+                                print(f"[Kling] ❌ Video üretimi başarısız")
+                                break
+            
+            return None
+        except Exception as e:
+            print(f"[Kling] Hata: {e}")
+            return None
+
+    # ─── Helper: Animate Image to Video (Pan/Zoom Effect) ─────────────────
+    def _animate_image_to_video(self, image_path, output_path, duration=5):
+        """Statik görüntüyü pan/zoom efektiyle videoya çevirir."""
+        try:
+            from moviepy.editor import ImageClip
+            import numpy as np
+
+            img = Image.open(image_path)
+            w, h = img.size
+            
+            # Calculate crop dimensions for pan effect
+            if w / h > 9 / 16:
+                target_w = int(h * 9 / 16)
+                start_x = 0
+                end_x = w - target_w
+            else:
+                target_h = int(w * 16 / 9)
+                start_y = 0
+                end_y = h - target_h
+                img = img.resize((w, target_h))
+                w, h = img.size
+                target_w = int(h * 9 / 16)
+                start_x = 0
+                end_x = w - target_w
+
+            # Create video with pan effect
+            def make_frame(t):
+                progress = t / duration
+                current_x = int(start_x + (end_x - start_x) * progress)
+                crop = img.crop((current_x, 0, current_x + target_w, h))
+                crop = crop.resize((1080, 1920))
+                return np.array(crop)
+
+            from moviepy.editor import VideoClip
+            clip = VideoClip(make_frame, duration=duration)
+            clip.write_videofile(output_path, fps=24, codec='libx264', audio=False)
+            clip.close()
+            
+            # Cleanup temp image
+            if os.path.exists(image_path):
+                os.remove(image_path)
+            
+            return output_path
+        except Exception as e:
+            print(f"[Animation] Hata: {e}")
+            return None
+
+    # ─── Generate Multiple Video Clips from AI Services ───────────────────
+    def generate_ai_video_clips(self, topic, count=6, output_dir="assets/ai_videos", duration=5):
+        """Birden fazla AI video klip üretir (Stability, Replicate, Kling)."""
+        os.makedirs(output_dir, exist_ok=True)
+        clips = []
+        
+        prompts = [
+            f"futuristic electric car driving on highway at sunset, cinematic 4k, dramatic lighting, {topic}",
+            f"EV battery technology close up, laboratory, lithium cells, futuristic blue glow, {topic}",
+            f"electric vehicle charging station at night, city lights, cyberpunk aesthetic, {topic}",
+            f"Tesla or modern EV dashboard display, holographic interface, technology, {topic}",
+            f"aerial view of electric car on winding road, mountains, golden hour, cinematic, {topic}",
+            f"electric motor engine technology close up, heat visualization, futuristic, {topic}",
+        ]
+        
+        # Try each service for each clip
+        services = [
+            ("Stability", self.generate_stability_video),
+            ("Replicate", self.generate_replicate_video),
+            ("Kling", self.generate_kling_video),
+        ]
+        
+        for i in range(min(count, len(prompts))):
+            prompt = prompts[i % len(prompts)]
+            output_path = os.path.join(output_dir, f"ai_clip_{i}.mp4")
+            
+            # Try each service until one succeeds
+            for service_name, service_func in services:
+                try:
+                    print(f"[AI Videos] {service_name} deneniyor (klip {i+1}/{count})...")
+                    result = service_func(prompt, output_path, duration=duration)
+                    if result and os.path.exists(result):
+                        clips.append(result)
+                        print(f"[AI Videos] ✅ {service_name} ile klip {i+1} oluşturuldu")
+                        break
+                except Exception as e:
+                    print(f"[AI Videos] {service_name} hatası: {e}")
+                    continue
+            
+            if len(clips) <= i:
+                print(f"[AI Videos] ⚠️ Klip {i+1} oluşturulamadı")
+        
+        print(f"[AI Videos] Toplam {len(clips)}/{count} klip oluşturuldu")
+        return clips
 
     def generate_thumbnail(self, video_path, title, output_path,
                            channel_name="EVCARIX", slogan="No hype. Just numbers."):

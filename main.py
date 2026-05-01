@@ -58,24 +58,40 @@ class EvcarixOrchestrator:
         print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}")
         print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
 
-        # ── 2. Stok videolar ──────────────────────────────────────
-        print("\n[2/6] Stok videolar indiriliyor...")
-        import re
-        search_query = re.sub(r'[^\w\s]', '', topic).strip()
-        video_paths = self.media_engine.download_stock_videos(
-            query=search_query,
-            output_dir=f"assets/temp_videos/{ts}",
-            count=5,
-            orientation="portrait",
-            category=plan.get("category", "general")
+        # ── 2. AI Video Klip Üretimi ──────────────────────────────────
+        print("\n[2/6] AI video klip üretimi (5-10 saniye)...")
+        ai_video_clips = self.media_engine.generate_ai_video_clips(
+            topic=topic,
+            count=6,
+            output_dir=f"assets/ai_videos/{ts}",
+            duration=8  # 8 saniye per klip
         )
+
+        # ── 3. Stok videolar (AI yetersizse) ───────────────────────
+        video_paths = []
+        if len(ai_video_clips) < 4:
+            print("\n[3/6] AI videolar yetersiz, stok videolar indiriliyor...")
+            import re
+            search_query = re.sub(r'[^\w\s]', '', topic).strip()
+            video_paths = self.media_engine.download_stock_videos(
+                query=search_query,
+                output_dir=f"assets/temp_videos/{ts}",
+                count=5,
+                orientation="portrait",
+                category=plan.get("category", "general")
+            )
+        
+        # Combine AI clips and stock videos
+        all_video_clips = ai_video_clips + video_paths
+        random.shuffle(all_video_clips)
+        
         ai_fallback_images = []
-        if len(video_paths) < 2:
-            print("⚠️ Stok video az — AI görüntü fallback devreye giriyor (Pollinations HD)...")
+        if len(all_video_clips) < 2:
+            print("⚠️ Video kaynağı az — AI görüntü fallback devreye giriyor...")
             ai_fallback_images = self.media_engine.generate_ai_fallback_images(topic, count=5, output_dir=f"assets/ai_fallback/{ts}")
 
-        # ── 3. Seslendirme ────────────────────────────────────────
-        print("\n[3/6] Seslendirme yapılıyor...")
+        # ── 4. Seslendirme ────────────────────────────────────────
+        print("\n[4/6] Seslendirme yapılıyor...")
         audio_path = os.path.abspath(f"assets/voice_{ts}.mp3")
         voice_result = await self.media_engine.generate_voiceover(
             text=script,
@@ -85,23 +101,23 @@ class EvcarixOrchestrator:
         )
         word_timings = voice_result['word_timings']
 
-        # ── 4. Premium Thumbnail (önce oluştur, video sonuna frame eklemek için) ──
-        print("\n[4/6] Premium Thumbnail oluşturuluyor...")
+        # ── 5. Premium Thumbnail (önce oluştur, video sonuna frame eklemek için) ──
+        print("\n[5/6] Premium Thumbnail oluşturuluyor...")
         thumbnail_path = f"output/thumbnails/thumb_{ts}.png"
         os.makedirs("output/thumbnails", exist_ok=True)
         # İlk videoyu thumbnail arka planı için kullan
-        first_video = video_paths[0] if video_paths else ""
+        first_video = all_video_clips[0] if all_video_clips else ""
         self.editor.generate_premium_thumbnail(
             video_path=first_video,
             title=title,
             output_path=thumbnail_path
         )
 
-        # ── 5. Video montajı (thumbnail frame'i sona eklenecek) ──
-        print("\n[5/6] Video montajlanıyor...")
+        # ── 6. Video montajı (thumbnail frame'i sona eklenecek) ──
+        print("\n[6/6] Video montajlanıyor...")
         output_filename = f"shorts_{ts}.mp4"
         final_video_path = self.editor.assemble_short(
-            video_paths=video_paths,
+            video_paths=all_video_clips,
             audio_path=audio_path,
             word_timings=word_timings,
             output_filename=output_filename,
@@ -110,9 +126,9 @@ class EvcarixOrchestrator:
             category=plan.get("category", "general")
         )
 
-        # ── 6. YouTube'a yükle ────────────────────────────────────
+        # ── 7. YouTube'a yükle ────────────────────────────────────
         if self.uploader and os.path.exists(final_video_path):
-            print("\n[6/6] YouTube'a yükleniyor...")
+            print("\n[7/7] YouTube'a yükleniyor...")
 
             # İnsan gibi küçük bir bekleme (5-25 sn) yükleme öncesi
             pre_upload_delay = random.randint(5, 25)
