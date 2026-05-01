@@ -13,11 +13,16 @@ load_dotenv()
 
 class CreativeWriter:
     def __init__(self):
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY") if GEMINI_AVAILABLE else None
+        self.gemini_api_keys = []
+        if GEMINI_AVAILABLE:
+            for i in range(1, 4):
+                key = os.getenv(f"GEMINI_API_KEY_{i}") if i > 1 else os.getenv("GEMINI_API_KEY")
+                if key:
+                    self.gemini_api_keys.append(key)
         self.gemini_client = None
-        if GEMINI_AVAILABLE and self.gemini_api_key:
+        if GEMINI_AVAILABLE and self.gemini_api_keys:
             try:
-                self.gemini_client = genai.Client(api_key=self.gemini_api_key)
+                self.gemini_client = genai.Client(api_key=self.gemini_api_keys[0])
             except Exception as e:
                 print(f"[Writer] Gemini init hatası: {e}")
                 self.gemini_client = None
@@ -278,10 +283,24 @@ SENARYO: [script text]
         return self._parse_response(completion.choices[0].message.content)
 
     def _generate_with_gemini(self, prompt):
-        response = self.gemini_client.models.generate_content(
-            model='gemini-2.0-flash', contents=prompt
-        )
-        return self._parse_response(response.text)
+        for key_idx, api_key in enumerate(self.gemini_api_keys):
+            try:
+                client = genai.Client(api_key=api_key)
+                response = client.models.generate_content(
+                    model='gemini-2.0-flash', contents=prompt
+                )
+                return self._parse_response(response.text)
+            except Exception as e:
+                error_str = str(e)
+                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower():
+                    print(f"[Writer] Gemini key {key_idx + 1}/{len(self.gemini_api_keys)} quota exhausted, trying next...")
+                    if key_idx < len(self.gemini_api_keys) - 1:
+                        continue  # Try next key
+                    else:
+                        raise Exception(f"All Gemini API keys quota exhausted")
+                else:
+                    raise  # Re-raise other errors
+        raise Exception("No valid Gemini API keys available")
 
     def _parse_response(self, text):
         voice = "female"
@@ -360,11 +379,26 @@ SENARYO: [script text]
                     max_tokens=500
                 )
                 seo_body = completion.choices[0].message.content.strip()
-            elif GEMINI_AVAILABLE and self.gemini_client:
-                resp = self.gemini_client.models.generate_content(
-                    model='gemini-2.0-flash', contents=prompt
-                )
-                seo_body = resp.text.strip()
+            elif GEMINI_AVAILABLE and self.gemini_api_keys:
+                for key_idx, api_key in enumerate(self.gemini_api_keys):
+                    try:
+                        client = genai.Client(api_key=api_key)
+                        resp = client.models.generate_content(
+                            model='gemini-2.0-flash', contents=prompt
+                        )
+                        seo_body = resp.text.strip()
+                        break
+                    except Exception as e:
+                        error_str = str(e)
+                        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower():
+                            print(f"[Writer] Gemini key {key_idx + 1}/{len(self.gemini_api_keys)} quota exhausted (description), trying next...")
+                            if key_idx < len(self.gemini_api_keys) - 1:
+                                continue
+                            else:
+                                print(f"[Writer] All Gemini keys exhausted for description")
+                                break
+                        else:
+                            raise
         except Exception as e:
             print(f"[Writer] Description generation hatası: {e}")
 
@@ -437,11 +471,26 @@ SENARYO: [script text]
                     max_tokens=250
                 )
                 raw_tags = completion.choices[0].message.content.strip()
-            elif GEMINI_AVAILABLE and self.gemini_client:
-                resp = self.gemini_client.models.generate_content(
-                    model='gemini-2.0-flash', contents=prompt
-                )
-                raw_tags = resp.text.strip()
+            elif GEMINI_AVAILABLE and self.gemini_api_keys:
+                for key_idx, api_key in enumerate(self.gemini_api_keys):
+                    try:
+                        client = genai.Client(api_key=api_key)
+                        resp = client.models.generate_content(
+                            model='gemini-2.0-flash', contents=prompt
+                        )
+                        raw_tags = resp.text.strip()
+                        break
+                    except Exception as e:
+                        error_str = str(e)
+                        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower():
+                            print(f"[Writer] Gemini key {key_idx + 1}/{len(self.gemini_api_keys)} quota exhausted (tags), trying next...")
+                            if key_idx < len(self.gemini_api_keys) - 1:
+                                continue
+                            else:
+                                print(f"[Writer] All Gemini keys exhausted for tags")
+                                break
+                        else:
+                            raise
 
             # Temizlik
             raw_tags = raw_tags.replace("\n", "").replace("Tags:", "").replace("```", "").strip()
