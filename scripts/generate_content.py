@@ -220,78 +220,98 @@ def check_visuals(script: str, category_id: str) -> list[str]:
 
 
 # ── Üretim ────────────────────────────────────────────────────────────────────
-def generate(client: Groq, topic: dict, max_retries: int = 3) -> dict:
+def generate(topic: dict, api_keys: list, max_retries: int = 3) -> dict:
     cat_id = topic["category_id"]
 
-    for attempt in range(max_retries):
-        try:
-            response = client.chat.completions.create(
-                model=MODEL,
-                max_tokens=MAX_TOKENS,
-                messages=[
-                    {"role": "system", "content": build_system(cat_id)},
-                    {"role": "user", "content": (
-                        f"Category: {topic['category_title']}\n"
-                        f"Topic: {topic['topic']}\n"
-                        f"Priority: {topic['priority']}\n\n"
-                        "Generate complete YouTube Shorts content for this Evcarix video."
-                    )}
-                ],
-                temperature=0.7,
-                timeout=30,
-            )
+    for key_idx, api_key in enumerate(api_keys):
+        for attempt in range(max_retries):
+            try:
+                client = Groq(api_key=api_key)
+                response = client.chat.completions.create(
+                    model=MODEL,
+                    max_tokens=MAX_TOKENS,
+                    messages=[
+                        {"role": "system", "content": build_system(cat_id)},
+                        {"role": "user", "content": (
+                            f"Category: {topic['category_title']}\n"
+                            f"Topic: {topic['topic']}\n"
+                            f"Priority: {topic['priority']}\n\n"
+                            "Generate complete YouTube Shorts content for this Evcarix video."
+                        )}
+                    ],
+                    temperature=0.7,
+                    timeout=30,
+                )
 
-            raw = response.choices[0].message.content
-            if not raw:
-                raise ValueError("Empty response from API")
+                raw = response.choices[0].message.content
+                if not raw:
+                    raise ValueError("Empty response from API")
 
-            # markdown fence temizle
-            if raw.startswith("```"):
-                raw = raw.split("```", 2)[-1]
-                if raw.startswith("json"):
-                    raw = raw[4:]
-                raw = raw.rsplit("```", 1)[0].strip()
+                # markdown fence temizle
+                if raw.startswith("```"):
+                    raw = raw.split("```", 2)[-1]
+                    if raw.startswith("json"):
+                        raw = raw[4:]
+                    raw = raw.rsplit("```", 1)[0].strip()
 
-            if not raw:
-                raise ValueError("Empty response after cleaning")
+                if not raw:
+                    raise ValueError("Empty response after cleaning")
 
-            parsed = json.loads(raw)
-            parsed["tags"] = trim_tags(parsed.get("tags", ""))
+                parsed = json.loads(raw)
+                parsed["tags"] = trim_tags(parsed.get("tags", ""))
 
-            bad_visuals = check_visuals(parsed.get("shorts_script", ""), cat_id)
-            if bad_visuals:
-                parsed["_visual_warnings"] = bad_visuals
+                bad_visuals = check_visuals(parsed.get("shorts_script", ""), cat_id)
+                if bad_visuals:
+                    parsed["_visual_warnings"] = bad_visuals
 
-            return parsed
+                return parsed
 
-        except json.JSONDecodeError as e:
-            print(f"  JSON parse error (attempt {attempt + 1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
-                time.sleep(5 * (attempt + 1))
-            else:
-                raise
-        except Exception as e:
-            error_str = str(e)
-            if "rate_limit" in error_str.lower() or "429" in error_str:
-                print(f"  Rate limit hit (attempt {attempt + 1}/{max_retries}): Waiting...")
-                if attempt < max_retries - 1:
-                    wait_time = 60 * (attempt + 1)
-                    print(f"  Waiting {wait_time}s before retry...")
-                    time.sleep(wait_time)
-                else:
-                    raise Exception(f"Rate limit exceeded after {max_retries} attempts")
-            elif "timeout" in error_str.lower() or "timed out" in error_str.lower():
-                print(f"  API timeout (attempt {attempt + 1}/{max_retries})")
-                if attempt < max_retries - 1:
-                    time.sleep(5)
-                else:
-                    raise Exception(f"API timed out after {max_retries} attempts")
-            else:
-                print(f"  Error (attempt {attempt + 1}/{max_retries}): {e}")
+            except json.JSONDecodeError as e:
+                print(f"  JSON parse error (key {key_idx + 1}/{len(api_keys)}, attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     time.sleep(5 * (attempt + 1))
                 else:
-                    raise
+                    if key_idx < len(api_keys) - 1:
+                        print(f"  Trying next API key...")
+                        break
+                    else:
+                        raise
+            except Exception as e:
+                error_str = str(e)
+                if "rate_limit" in error_str.lower() or "429" in error_str:
+                    print(f"  Rate limit hit (key {key_idx + 1}/{len(api_keys)}, attempt {attempt + 1}/{max_retries}): Waiting...")
+                    if attempt < max_retries - 1:
+                        wait_time = 60 * (attempt + 1)
+                        print(f"  Waiting {wait_time}s before retry...")
+                        time.sleep(wait_time)
+                    else:
+                        if key_idx < len(api_keys) - 1:
+                            print(f"  Trying next API key...")
+                            break
+                        else:
+                            raise Exception(f"Rate limit exceeded after {max_retries} attempts on all keys")
+                elif "timeout" in error_str.lower() or "timed out" in error_str.lower():
+                    print(f"  API timeout (key {key_idx + 1}/{len(api_keys)}, attempt {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        time.sleep(5)
+                    else:
+                        if key_idx < len(api_keys) - 1:
+                            print(f"  Trying next API key...")
+                            break
+                        else:
+                            raise Exception(f"API timed out after {max_retries} attempts on all keys")
+                else:
+                    print(f"  Error (key {key_idx + 1}/{len(api_keys)}, attempt {attempt + 1}/{max_retries}): {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(5 * (attempt + 1))
+                    else:
+                        if key_idx < len(api_keys) - 1:
+                            print(f"  Trying next API key...")
+                            break
+                        else:
+                            raise
+
+    raise Exception("All Groq API keys exhausted or failed")
 
 
 def save_result(topic: dict, content: dict) -> Path:
@@ -356,8 +376,13 @@ def main():
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key and not args.dry_run and not args.summary:
+    api_keys = []
+    for i in range(1, 4):
+        key = os.environ.get(f"GROQ_API_KEY_{i}") if i > 1 else os.environ.get("GROQ_API_KEY")
+        if key:
+            api_keys.append(key)
+
+    if not api_keys and not args.dry_run and not args.summary:
         print("ERROR: GROQ_API_KEY environment variable not set.")
         sys.exit(1)
 
@@ -394,13 +419,12 @@ def main():
             print(f"  [{t['id']:>2}] {t['category_title']} ({wl} approved visuals) -> {t['topic']}")
         return
 
-    client = Groq(api_key=api_key)
     ok = fail = warn = 0
 
     for i, topic in enumerate(topics, 1):
         print(f"[{i}/{len(topics)}] {topic['topic'][:65]}")
         try:
-            content = generate(client, topic)
+            content = generate(topic, api_keys)
             path    = save_result(topic, content)
             w       = content.get("_visual_warnings", [])
             if w:

@@ -27,12 +27,16 @@ class CreativeWriter:
                 print(f"[Writer] Gemini init hatası: {e}")
                 self.gemini_client = None
 
-        self.groq_api_key = os.getenv("GROQ_API_KEY")
+        self.groq_api_keys = []
+        for i in range(1, 4):
+            key = os.getenv(f"GROQ_API_KEY_{i}") if i > 1 else os.getenv("GROQ_API_KEY")
+            if key:
+                self.groq_api_keys.append(key)
         self.groq_client = None
-        if self.groq_api_key:
+        if self.groq_api_keys:
             try:
                 from groq import Groq
-                self.groq_client = Groq(api_key=self.groq_api_key)
+                self.groq_client = Groq(api_key=self.groq_api_keys[0])
             except ImportError:
                 print("Groq kütüphanesi yüklü değil.")
 
@@ -93,25 +97,43 @@ class CreativeWriter:
                     return True
             return False
 
-        if self.groq_client:
+        if self.groq_api_keys:
             try:
-                completion = self.groq_client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
-                    messages=[
-                        {"role": "system", "content": "You are a YouTube growth expert. Return only valid JSON arrays of title strings. American English only. Use numbers, data, and power words."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.65, max_tokens=400,
-                )
-                text = completion.choices[0].message.content.strip().replace("```json", "").replace("```", "").strip()
-                titles = json.loads(text)
-                if isinstance(titles, list) and titles:
-                    history_set = set(h.lower() for h in (history_titles or []))
-                    fresh = [t for t in titles if not _is_duplicate(t, history_set)]
-                    if fresh:
-                        return fresh[:5]
-                    else:
-                        print("[Writer] Tüm Groq title'ları history'de var, fallback kullanılıyor.")
+                from groq import Groq
+                for key_idx, api_key in enumerate(self.groq_api_keys):
+                    try:
+                        client = Groq(api_key=api_key)
+                        completion = client.chat.completions.create(
+                            model="llama-3.1-8b-instant",
+                            messages=[
+                                {"role": "system", "content": "You are a YouTube growth expert. Return only valid JSON arrays of title strings. American English only. Use numbers, data, and power words."},
+                                {"role": "user", "content": prompt}
+                            ],
+                            temperature=0.65, max_tokens=400,
+                        )
+                        text = completion.choices[0].message.content.strip().replace("```json", "").replace("```", "").strip()
+                        titles = json.loads(text)
+                        if isinstance(titles, list) and titles:
+                            history_set = set(h.lower() for h in (history_titles or []))
+                            fresh = [t for t in titles if not _is_duplicate(t, history_set)]
+                            if fresh:
+                                return fresh[:5]
+                            else:
+                                print("[Writer] Tüm Groq title'ları history'de var, fallback kullanılıyor.")
+                        break
+                    except Exception as e:
+                        error_str = str(e)
+                        if "rate_limit" in error_str.lower() or "429" in error_str or "quota" in error_str.lower():
+                            print(f"[Writer] Groq key {key_idx + 1}/{len(self.groq_api_keys)} quota exhausted (title), trying next...")
+                            if key_idx < len(self.groq_api_keys) - 1:
+                                continue
+                            else:
+                                print(f"[Writer] All Groq keys exhausted for title")
+                                break
+                        else:
+                            raise
+            except ImportError:
+                print("Groq kütüphanesi yüklü değil.")
             except Exception as e:
                 print(f"[Writer] generate_title hatası (Groq): {e}")
 
@@ -271,16 +293,31 @@ SENARYO: [script text]
 """
 
     def _generate_with_groq(self, prompt):
-        completion = self.groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {"role": "system", "content": "You are a specialized technical EV analyst and scriptwriter for Evcarix. You focus on data, battery science, and real-world metrics without hype."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.6,
-            max_tokens=2048,
-        )
-        return self._parse_response(completion.choices[0].message.content)
+        from groq import Groq
+        for key_idx, api_key in enumerate(self.groq_api_keys):
+            try:
+                client = Groq(api_key=api_key)
+                completion = client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=[
+                        {"role": "system", "content": "You are a specialized technical EV analyst and scriptwriter for Evcarix. You focus on data, battery science, and real-world metrics without hype."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.6,
+                    max_tokens=2048,
+                )
+                return self._parse_response(completion.choices[0].message.content)
+            except Exception as e:
+                error_str = str(e)
+                if "rate_limit" in error_str.lower() or "429" in error_str or "quota" in error_str.lower():
+                    print(f"[Writer] Groq key {key_idx + 1}/{len(self.groq_api_keys)} quota exhausted (script), trying next...")
+                    if key_idx < len(self.groq_api_keys) - 1:
+                        continue
+                    else:
+                        raise Exception(f"All Groq API keys quota exhausted")
+                else:
+                    raise
+        raise Exception("No valid Groq API keys available")
 
     def _generate_with_gemini(self, prompt):
         for key_idx, api_key in enumerate(self.gemini_api_keys):
@@ -372,13 +409,32 @@ SENARYO: [script text]
 
         seo_body = ""
         try:
-            if self.groq_client:
-                completion = self.groq_client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=500
-                )
-                seo_body = completion.choices[0].message.content.strip()
+            if self.groq_api_keys:
+                try:
+                    from groq import Groq
+                    for key_idx, api_key in enumerate(self.groq_api_keys):
+                        try:
+                            client = Groq(api_key=api_key)
+                            completion = client.chat.completions.create(
+                                model="llama-3.1-8b-instant",
+                                messages=[{"role": "user", "content": prompt}],
+                                max_tokens=500
+                            )
+                            seo_body = completion.choices[0].message.content.strip()
+                            break
+                        except Exception as e:
+                            error_str = str(e)
+                            if "rate_limit" in error_str.lower() or "429" in error_str or "quota" in error_str.lower():
+                                print(f"[Writer] Groq key {key_idx + 1}/{len(self.groq_api_keys)} quota exhausted (description), trying next...")
+                                if key_idx < len(self.groq_api_keys) - 1:
+                                    continue
+                                else:
+                                    print(f"[Writer] All Groq keys exhausted for description")
+                                    break
+                            else:
+                                raise
+                except ImportError:
+                    pass
             elif GEMINI_AVAILABLE and self.gemini_api_keys:
                 for key_idx, api_key in enumerate(self.gemini_api_keys):
                     try:
@@ -464,13 +520,32 @@ SENARYO: [script text]
 
         try:
             raw_tags = ""
-            if self.groq_client:
-                completion = self.groq_client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=250
-                )
-                raw_tags = completion.choices[0].message.content.strip()
+            if self.groq_api_keys:
+                try:
+                    from groq import Groq
+                    for key_idx, api_key in enumerate(self.groq_api_keys):
+                        try:
+                            client = Groq(api_key=api_key)
+                            completion = client.chat.completions.create(
+                                model="llama-3.1-8b-instant",
+                                messages=[{"role": "user", "content": prompt}],
+                                max_tokens=250
+                            )
+                            raw_tags = completion.choices[0].message.content.strip()
+                            break
+                        except Exception as e:
+                            error_str = str(e)
+                            if "rate_limit" in error_str.lower() or "429" in error_str or "quota" in error_str.lower():
+                                print(f"[Writer] Groq key {key_idx + 1}/{len(self.groq_api_keys)} quota exhausted (tags), trying next...")
+                                if key_idx < len(self.groq_api_keys) - 1:
+                                    continue
+                                else:
+                                    print(f"[Writer] All Groq keys exhausted for tags")
+                                    break
+                            else:
+                                raise
+                except ImportError:
+                    pass
             elif GEMINI_AVAILABLE and self.gemini_api_keys:
                 for key_idx, api_key in enumerate(self.gemini_api_keys):
                     try:
