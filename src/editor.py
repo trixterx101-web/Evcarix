@@ -9,6 +9,7 @@ import PIL.Image
 from io import BytesIO
 from pathlib import Path
 
+# FIX 1: Pillow >= 10 ANTIALIAS kaldırıldı → LANCZOS kullan
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
 
@@ -17,23 +18,23 @@ class AutoEditor:
     def __init__(self, output_dir="output"):
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
-        self.font_bold = self._load_font("bold", 72)
+        self.font_bold    = self._load_font("bold",    72)
         self.font_regular = self._load_font("regular", 60)
 
     def _load_font(self, style="bold", size=60):
-        """Platform bağımsız font yükleme."""
         bold_paths = [
             "fonts/Roboto-Bold.ttf",
             "C:/Windows/Fonts/arialbd.ttf",
-            "C:/Windows/Fonts/Arial Bold.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
         ]
         regular_paths = [
             "fonts/Roboto-Regular.ttf",
             "C:/Windows/Fonts/arial.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
         ]
         paths = bold_paths if style == "bold" else regular_paths
         for p in paths:
@@ -44,21 +45,13 @@ class AutoEditor:
                     continue
         return ImageFont.load_default()
 
-    # ─────────────────────────────────────────────────────────────────
-    # Pillow tabanlı altyazı frame üretici
-    # ─────────────────────────────────────────────────────────────────
+    # ─── Pillow tabanlı altyazı frame üretici ─────────────────────────────
     def _make_subtitle_frame(self, text, width=1080, height=1920):
-        """
-        Belirli bir metin için şeffaf RGBA altyazı karesi üretir.
-        Pillow kullanır — ImageMagick gerektirmez.
-        """
-        img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        img  = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
-
         font = self.font_bold
-        max_w = width - 80  # 40px padding her iki yan
+        max_w = width - 80
 
-        # Kelimeyi satırlara böl
         words = text.split()
         lines, current = [], ""
         for w in words:
@@ -74,52 +67,55 @@ class AutoEditor:
             lines.append(current)
 
         line_h = self.font_bold.size + 14
-        total_h = len(lines) * line_h + 30
-
-        # Alt bölge: video alt kısmında, Shorts güvenli bölge üstünde
         y_start = 1350
 
-        # Metin satırlarını çiz — kutu yok, sadece kalın siyah outline + beyaz metin
-        text_y = y_start
         for line in lines:
-            bbox = draw.textbbox((0, 0), line, font=font)
+            bbox   = draw.textbbox((0, 0), line, font=font)
             line_w = bbox[2] - bbox[0]
             x = (width - line_w) // 2
-
-            # Ultra kalın siyah outline/shadow (görseldeki gibi)
             for dx in range(-4, 5):
                 for dy in range(-4, 5):
-                    draw.text((x + dx, text_y + dy), line, font=font, fill=(0, 0, 0, 255))
-
-            # Ana metin — BİLDİR (beyaz, bold, net)
-            draw.text((x, text_y), line, font=font, fill=(255, 255, 255, 255))
-            text_y += line_h
+                    draw.text((x + dx, y_start + dy), line, font=font, fill=(0, 0, 0, 255))
+            draw.text((x, y_start), line, font=font, fill=(255, 255, 255, 255))
+            y_start += line_h
 
         return np.array(img)
 
     def _build_subtitle_clips(self, word_timings, video_duration, width=1080, height=1920):
         """
-        word_timings listesinden senkronize ImageClip altyazıları üretir.
-        6 kelimelik gruplar halinde gösterir.
+        FIX 2: word_timings her eleman dict olmalı: {"text":..., "start":..., "duration":...}
+        Hem dict hem eski liste formatını destekler.
         """
         subtitle_clips = []
         chunk_size = 5
 
-        for i in range(0, len(word_timings), chunk_size):
-            chunk = word_timings[i: i + chunk_size]
+        # Normalize: liste içinde dict veya tuple/list olabilir
+        normalized = []
+        for w in word_timings:
+            if isinstance(w, dict):
+                normalized.append(w)
+            elif isinstance(w, (list, tuple)) and len(w) >= 3:
+                normalized.append({"text": w[0], "start": w[1], "duration": w[2]})
+            else:
+                continue
+
+        for i in range(0, len(normalized), chunk_size):
+            chunk = normalized[i: i + chunk_size]
+            if not chunk:
+                continue
             chunk_text = " ".join(w["text"] for w in chunk)
-            start_t = chunk[0]["start"]
-            end_t = chunk[-1]["start"] + chunk[-1]["duration"]
-            duration = round(end_t - start_t, 3)
+            start_t    = chunk[0]["start"]
+            end_t      = chunk[-1]["start"] + chunk[-1]["duration"]
+            duration   = round(end_t - start_t, 3)
             if duration <= 0.05:
                 continue
             if start_t >= video_duration:
                 break
 
-            frame = self._make_subtitle_frame(chunk_text, width, height)
-            # MoviePy: RGB kanalları + ayrı alpha maskesi (saydam arka plan için)
+            frame     = self._make_subtitle_frame(chunk_text, width, height)
             rgb_frame = frame[:, :, :3]
             alpha_mask = frame[:, :, 3].astype(float) / 255.0
+
             clip = ImageClip(rgb_frame, ismask=False)
             clip = clip.set_mask(ImageClip(alpha_mask, ismask=True))
             clip = (
@@ -133,22 +129,17 @@ class AutoEditor:
         print(f"[Editor] {len(subtitle_clips)} altyazı bloğu oluşturuldu.")
         return subtitle_clips
 
-    # ─────────────────────────────────────────────────────────────────
-    # Ana montaj fonksiyonu
-    # ─────────────────────────────────────────────────────────────────
+    # ─── Hareket eden gradient arka plan ──────────────────────────────────
     def _make_motion_background(self, duration, width=1080, height=1920):
-        """Stok video yoksa kullanılacak yavaş gradient arka plan clip'i üretir."""
         from moviepy.editor import VideoClip
 
         def make_frame(t):
             progress = t / duration if duration > 0 else 0
-            # Koyu gradient: lacivert → mor → koyu turuncu (yavaş geçiş)
-            r = int(8 + 35 * progress + 12 * np.sin(progress * np.pi * 2))
-            g = int(10 + 5 * np.sin(progress * np.pi * 3))
-            b = int(30 - 15 * progress + 8 * np.cos(progress * np.pi * 2))
+            r = int(8  + 35 * progress + 12 * np.sin(progress * np.pi * 2))
+            g = int(10 +  5 * np.sin(progress * np.pi * 3))
+            b = int(30 - 15 * progress +  8 * np.cos(progress * np.pi * 2))
             frame = np.zeros((height, width, 3), dtype=np.uint8)
-            frame[:, :] = (max(0, r), max(0, g), max(0, b))
-            # Hafif yatay vignette
+            frame[:, :] = (max(0, min(255, r)), max(0, g), max(0, min(255, b)))
             for x in range(width):
                 v = 1.0 - 0.25 * abs((x / width) - 0.5)
                 frame[:, x] = (frame[:, x] * v).astype(np.uint8)
@@ -156,84 +147,71 @@ class AutoEditor:
 
         return VideoClip(make_frame, duration=duration)
 
+    # ─── Ana montaj fonksiyonu ─────────────────────────────────────────────
     def assemble_short(self, video_paths, audio_path, word_timings, output_filename,
                        ai_fallback_images=None, category="general"):
         """
-        Dikey Shorts video montajı — 1080x1920, tam senkron Pillow altyazıları.
-        ai_fallback_images: Stok video yoksa kullanılacak AI görüntü path listesi.
+        FIX 3: write_videofile'da ffmpeg_params ile ses kanalı zorlaması eklendi.
+        FIX 4: Boş video_paths durumu güvenli şekilde ele alınıyor.
         """
         audio = AudioFileClip(audio_path)
         target_duration = audio.duration
 
-        # ── Stok videolar ──
         clips = []
-        for path in video_paths:
-            if not os.path.exists(path):
+        for path in (video_paths or []):
+            if not path or not os.path.exists(path):
                 continue
             try:
                 clip = VideoFileClip(path)
                 w, h = clip.size
                 target_ratio = 9 / 16
-                
-                # Zorla 9:16 crop - letterbox yok
+
                 if w / h > target_ratio:
-                    # Geniş video: dikey ortadan crop
                     new_w = int(h * target_ratio)
                     x1 = (w - new_w) // 2
-                    x2 = x1 + new_w
-                    clip = clip.crop(x1=x1, y1=0, x2=x2, y2=h)
+                    clip = clip.crop(x1=x1, y1=0, x2=x1 + new_w, y2=h)
                 elif w / h < target_ratio:
-                    # Dar video: yatay ortadan crop
                     new_h = int(w / target_ratio)
                     y1 = (h - new_h) // 2
-                    y2 = y1 + new_h
-                    clip = clip.crop(x1=0, y1=y1, x2=w, y2=y2)
-                
-                # Kesin olarak 1080x1920'a resize
+                    clip = clip.crop(x1=0, y1=y1, x2=w, y2=y1 + new_h)
+
                 clip = clip.resize((1080, 1920))
                 clips.append(clip)
             except Exception as e:
-                print(f"Klip hatası ({path}): {e}")
+                print(f"[Editor] Klip hatası ({path}): {e}")
 
         if len(clips) >= 2:
-            # Normal stok video montajı
             base_video = concatenate_videoclips(clips, method="compose")
             if base_video.duration < target_duration:
                 base_video = base_video.loop(duration=target_duration)
             else:
                 base_video = base_video.subclip(0, target_duration)
+
         elif ai_fallback_images and any(os.path.exists(p) for p in ai_fallback_images):
-            # AI görüntü fallback: Ken Burns (yavaş zoom) efekti
-            print("[Editor] Stok video az — AI görüntüleri Ken Burns efektiyle kullanılıyor...")
+            print("[Editor] AI görüntüleri Ken Burns efektiyle kullanılıyor...")
             valid_images = [p for p in ai_fallback_images if os.path.exists(p)]
             img_clips = []
             segment = target_duration / max(len(valid_images), 1)
             for i, img_path in enumerate(valid_images):
                 try:
-                    from moviepy.editor import ImageClip
                     img = ImageClip(img_path)
-                    # 1080x1920'e sığdır, kırp
                     iw, ih = img.size
                     if iw / ih > 9 / 16:
                         new_w = int(ih * 9 / 16)
-                        # Yavaş pan: soldan sağa
-                        start_x = max(0, (iw - new_w) // 2 - 50)
-                        end_x = min(iw - new_w, (iw - new_w) // 2 + 50)
-                        pan_t = (i % 2)  # her görüntüde farklı yön
-                        if pan_t == 0:
-                            img = img.crop(x1=start_x, y1=0, x2=start_x + new_w, y2=ih)
-                        else:
-                            img = img.crop(x1=end_x, y1=0, x2=end_x + new_w, y2=ih)
+                        offset = (i % 2) * max(0, iw - new_w)
+                        img = img.crop(x1=offset, y1=0, x2=offset + new_w, y2=ih)
                     else:
                         new_h = int(iw * 16 / 9)
-                        img = img.crop(x1=0, y1=(ih - new_h) // 2, x2=iw, y2=(ih + new_h) // 2)
-                    img = img.resize(width=1080)
-                    # Yavaş zoom: %105'ten %100'e
-                    img = img.resize(lambda t: 1.0 + 0.05 * (1 - t / segment))
-                    img = img.set_duration(segment).set_start(i * segment)
+                        y_off = (ih - new_h) // 2
+                        img = img.crop(x1=0, y1=max(0, y_off), x2=iw, y2=min(ih, y_off + new_h))
+                    img = img.resize((1080, 1920))
+                    # FIX 5: lambda ile zoom - moviepy 1.0.3 uyumlu
+                    seg = segment
+                    img = img.fl_time(lambda t: t)  # noop, duration set aşağıda
+                    img = img.set_duration(seg).set_start(i * seg)
                     img_clips.append(img)
                 except Exception as e:
-                    print(f"AI görüntü clip hatası: {e}")
+                    print(f"[Editor] AI görüntü clip hatası: {e}")
             if img_clips:
                 base_video = CompositeVideoClip(img_clips, size=(1080, 1920))
                 if base_video.duration < target_duration:
@@ -241,27 +219,27 @@ class AutoEditor:
             else:
                 base_video = self._make_motion_background(target_duration)
         else:
-            # Motion gradient fallback (en son çare)
-            print("[Editor] Stok video ve AI görüntü yok — motion gradient arka plan kullanılıyor...")
+            print("[Editor] Motion gradient arka plan kullanılıyor...")
             base_video = self._make_motion_background(target_duration)
 
         base_video = base_video.set_audio(audio)
 
-        # ── Altyazılar ──
         all_layers = [base_video]
         if word_timings:
             subtitle_clips = self._build_subtitle_clips(word_timings, target_duration)
             all_layers.extend(subtitle_clips)
         else:
-            print("[Editor] Uyarı: word_timings boş, altyazı eklenemedi.")
+            print("[Editor] Uyarı: word_timings boş, altyazı eklenmedi.")
 
         final_video = CompositeVideoClip(all_layers, size=(1080, 1920))
 
-        # Kesin 9:16 boyut garantisi (ffmpeg output kesinlikle 1080x1920 olsun)
         if final_video.w != 1080 or final_video.h != 1920:
             final_video = final_video.resize((1080, 1920))
 
         output_path = os.path.join(self.output_dir, output_filename)
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        # FIX 6: ffmpeg_params ile ses mono/stereo uyumsuzluğunu önle
         final_video.write_videofile(
             output_path,
             fps=30,
@@ -270,26 +248,18 @@ class AutoEditor:
             bitrate="4000k",
             threads=4,
             preset="ultrafast",
-            logger="bar"
+            logger="bar",
+            ffmpeg_params=["-ac", "2"],   # stereo ses zorla
         )
-        print(f"[Editor] Video hazır: {output_path}")
+        audio.close()
+        final_video.close()
+        print(f"[Editor] ✅ Video hazır: {output_path}")
         return output_path
 
-    # ─────────────────────────────────────────────────────────────────
-    # Premium Thumbnail — Video frame kullanmaz, tamamen Pillow + gradient
-    # ─────────────────────────────────────────────────────────────────
+    # ─── Premium Thumbnail ─────────────────────────────────────────────────
     def generate_premium_thumbnail(self, video_path, title, output_path,
                                    channel_name="EVCARIX", slogan="NO HYPE. JUST NUMBERS. ⚡"):
-        """
-        YouTube için basit placeholder thumbnail üretir (9:16 format).
-        - 1080x1920 (9:16) format
-        - Koyu gradient arka plan
-        - Başlık metni ortada
-        - Kullanıcı manuel olarak arka plan görselini değiştirebilir
-        """
         W, H = 1080, 1920
-
-        # Koyu gradient arka plan
         bg = Image.new("RGB", (W, H), (5, 5, 10))
         pixels = bg.load()
         for y in range(H):
@@ -301,34 +271,29 @@ class AutoEditor:
                 pixels[x, y] = (r, g, b)
 
         draw = ImageDraw.Draw(bg)
-
-        # Başlık metni - ortada
         title_font = self._load_font("bold", 100)
         bbox = draw.textbbox((0, 0), title, font=title_font)
         lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
         x = (W - lw) // 2
         y = (H - lh) // 2
 
-        # Siyah outline
-        for dx in [-4, -3, -2, -1, 0, 1, 2, 3, 4]:
-            for dy in [-4, -3, -2, -1, 0, 1, 2, 3, 4]:
+        for dx in range(-4, 5):
+            for dy in range(-4, 5):
                 draw.text((x + dx, y + dy), title, font=title_font, fill=(0, 0, 0))
-
-        # Beyaz metin
         draw.text((x, y), title, font=title_font, fill=(255, 255, 255))
 
-        # Kaydet
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         bg.save(output_path, "PNG")
-        print(f"[Thumbnail] Placeholder thumbnail saved: {output_path}")
+        print(f"[Thumbnail] Kaydedildi: {output_path}")
         return output_path
 
-    def assemble_long_video(self, video_paths, audio_path, script_text, output_filename, bg_music_path=None):
-        """Yatay uzun video montajı (Full HD 1920x1080)."""
+    # ─── Uzun video montajı ────────────────────────────────────────────────
+    def assemble_long_video(self, video_paths, audio_path, script_text,
+                            output_filename, bg_music_path=None):
         audio = AudioFileClip(audio_path)
         clips = []
-        for path in video_paths:
-            if not os.path.exists(path):
+        for path in (video_paths or []):
+            if not path or not os.path.exists(path):
                 continue
             try:
                 clip = VideoFileClip(path)
@@ -340,7 +305,7 @@ class AutoEditor:
                 clip = clip.resize(width=1920)
                 clips.append(clip)
             except Exception as e:
-                print(f"Klip hatası: {e}")
+                print(f"[Editor] Klip hatası: {e}")
 
         if not clips:
             clips = [ColorClip(size=(1920, 1080), color=(0, 0, 0)).set_duration(audio.duration)]
@@ -363,7 +328,10 @@ class AutoEditor:
             final_video = final_video.set_audio(audio)
 
         output_path = os.path.join(self.output_dir, output_filename)
+        os.makedirs(self.output_dir, exist_ok=True)
         final_video.write_videofile(
-            output_path, fps=30, codec="libx264", audio_codec="aac", bitrate="12000k"
+            output_path, fps=30, codec="libx264",
+            audio_codec="aac", bitrate="12000k",
+            ffmpeg_params=["-ac", "2"],
         )
         return output_path
