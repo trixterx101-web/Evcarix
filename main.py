@@ -21,7 +21,7 @@ class EvcarixOrchestrator:
         self.lip_sync = LipSyncGenerator()
         self.uploader = None
 
-        self.use_lip_sync = os.getenv("USE_LIP_SYNC", "true").lower() == "true"
+        self.use_lip_sync = os.getenv("USE_LIP_SYNC", "false").lower() == "true"
         self.character_image = os.getenv("CHARACTER_IMAGE", "assets/character.jpg")
         
         secret_path = os.getenv("YOUTUBE_CLIENT_SECRET_FILE", "client_secret.json")
