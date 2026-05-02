@@ -609,3 +609,115 @@ Uygulanan Kaynaklar:
 Uygulanan Pipeline'lar:
 - ✅ Daily Shorts (`run_daily_shorts_workflow`)
 - ✅ Weekly Long Video (`run_weekly_long_video_workflow`)
+
+---
+
+## 20. OEM Press Scraper
+
+**Dosya**: `src/oem_scraper.py`
+
+### 20.1 Amaç
+
+Pexels, Pixabay ve FreeVideoSources tükendiğinde, resmi EV üreticisi ve batarya teknolojisi şirketlerinin press/media sitelerinden telifsiz video çekmek. Tüm kaynaklar resmi press kit'ler — YouTube editoryal kullanım için güvenli.
+
+### 20.2 Kaynaklar (25 Toplam)
+
+**EV Manufacturers (15)**:
+- Tesla, BMW, Mercedes-Benz, Hyundai, Volkswagen
+- Rivian, Lucid, Polestar, Kia, Nissan, Ford, GM
+- Stellantis, Audi, Volvo
+
+**Battery & Technology Companies (7)**:
+- CATL, Panasonic, Samsung SDI, LG Energy Solution
+- QuantumScape, Solid Power, ChargePoint
+
+**Charging Infrastructure (3)**:
+- ABB E-mobility, Kempower, US DOE / Argonne Lab
+
+### 20.3 Çalışma Mantığı
+
+**Source Ranking**:
+- Topic keyword'larına göre kaynaklar puanlanır
+- En alakalı kaynaklar önce denenir
+- Rastgelelik ile çeşitlilik sağlanır
+
+**Generic Scraping Engine**:
+- HTML sayfası indirilir
+- `.mp4` linkleri çıkarılır (href, src, data-src, JSON blobs)
+- Relative URL'ler absolute'a çevrilir
+- Duplicate'ler temizlenir
+- Sırayla indirilir
+
+**Direct URL Support**:
+- Bazı kaynaklar (Tesla, DOE) direkt URL'ler sağlar
+- `_try_direct_urls()` ile hızlı indirme
+
+### 20.4 İndirme Sınırları
+
+**Boyut Sınırları**:
+- Minimum: 100KB
+- Maximum: 500MB
+- Content-Length kontrolü + streaming hard cap
+
+**Content-Type Kontrolü**:
+- `video/*` veya `octet-stream` kabul edilir
+- Diğer türler reddedilir
+
+**Cache**:
+- `assets/oem/oem_cache.json`
+- MD5 hash ile dosya adlandırma
+- Tekrar indirme önlenir
+
+### 20.5 Entegrasyon
+
+**MediaEngine Fallback Chain**:
+1. Pexels (kalite)
+2. Pexels (topic)
+3. Pixabay
+4. OEM Press Kit (legacy)
+5. NASA/DOE
+6. FreeVideoSources
+7. **OEM Scraper** ← yeni
+8. AI video + tekrar kullanım
+
+**Kod** (media_engine.py):
+```python
+from src.oem_scraper import OEMScraper
+
+# download_stock_videos() içinde:
+if len(all_paths) < count:
+    print("[MediaEngine] 🏭 OEM press sitelerinden video çekiliyor...")
+    try:
+        oem_scraper = OEMScraper()
+        topic_str = (plan.get("topic", "") or plan.get("title", "") or query) + " " + (plan.get("category_id", "") if plan else "")
+        oem_clips = oem_scraper.get_clips(
+            topic      = topic_str,
+            count      = count - len(all_paths),
+            video_type = os.environ.get("VIDEO_TYPE", "short"),
+        )
+        all_paths += oem_clips
+        print(f"[MediaEngine] OEM Scraper: +{len(oem_clips)} klip")
+    except Exception as e:
+        print(f"[MediaEngine] OEM Scraper hata: {e}")
+```
+
+### 20.6 Kullanım
+
+**Standalone Test**:
+```python
+from src.oem_scraper import OEMScraper
+scraper = OEMScraper()
+clips = scraper.get_clips(
+    topic="battery degradation LFP NMC",
+    count=3,
+    video_type="long"
+)
+```
+
+### 20.7 Güvenlik
+
+- Resmi press sitelerinden çekim — telifsiz
+- User-Agent header ile normal browser taklidi
+- Rate limiting: Kaynaklar arasında 1.5sn bekleme
+- Dosya boyutu sınırları ile aşırı indirme önlenir
+- Cache ile tekrar indirme önlenir

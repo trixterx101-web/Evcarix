@@ -10,6 +10,7 @@ import urllib.parse
 from PIL import Image
 from src.voice_engine import VoiceEngine
 from src.query_builder import get_queries, get_queries_for_script
+from src.oem_scraper import OEMScraper
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -602,6 +603,22 @@ class MediaEngine:
                 )
                 all_paths += [p for p in free_clips if p not in all_paths]
                 print(f"[MediaEngine] FreeVideoSources: {len(free_clips)} klip")
+
+        # 5.75. OEM Press Scraper (final fallback)
+        if len(all_paths) < count:
+            print("[MediaEngine] 🏭 OEM press sitelerinden video çekiliyor...")
+            try:
+                oem_scraper = OEMScraper()
+                topic_str = (plan.get("topic", "") or plan.get("title", "") or query) + " " + (plan.get("category_id", "") if plan else "")
+                oem_clips = oem_scraper.get_clips(
+                    topic      = topic_str,
+                    count      = count - len(all_paths),
+                    video_type = os.environ.get("VIDEO_TYPE", "short"),
+                )
+                all_paths += oem_clips
+                print(f"[MediaEngine] OEM Scraper: +{len(oem_clips)} klip")
+            except Exception as e:
+                print(f"[MediaEngine] OEM Scraper hata: {e}")
 
         # 6. Stok biterse: AI video + tekrar kullanım fallback
         if len(all_paths) < count:
