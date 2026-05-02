@@ -164,7 +164,8 @@ class AutoEditor:
         target_duration = random.uniform(min_duration, max_duration)
         
         # Audio süresi hedeften kısaysa loop ile uzat
-        if audio.duration < target_duration:
+        # Only loop if audio is more than 2 seconds shorter than target
+        if audio.duration < target_duration - 2:
             from moviepy.audio.fx.all import audio_loop
             try:
                 audio = audio_loop(audio, duration=target_duration)
@@ -174,9 +175,13 @@ class AutoEditor:
                 import math
                 repeats = math.ceil(target_duration / audio.duration)
                 audio = concatenate_audioclips([audio] * repeats).subclip(0, target_duration)
-        # Audio süresi hedeften uzunsa kırp
-        elif audio.duration > target_duration:
-            audio = audio.subclip(0, target_duration)
+        else:
+            # Audio is long enough — just trim to target if slightly over
+            if audio.duration > target_duration:
+                audio = audio.subclip(0, target_duration)
+        
+        # Log actual vs target so we can debug future repetitions
+        print(f"[Editor] Audio: {audio.duration:.1f}s / Target: {target_duration:.1f}s")
 
         clips = []
         for path in (video_paths or []):
@@ -361,7 +366,8 @@ class AutoEditor:
         if bg_music_path and os.path.exists(bg_music_path):
             from moviepy.editor import CompositeAudioClip
             bg = AudioFileClip(bg_music_path).volumex(0.1)
-            if bg.duration < audio.duration:
+            # Only loop if bg music is more than 2 seconds shorter than audio
+            if bg.duration < audio.duration - 2:
                 from moviepy.audio.fx.all import audio_loop
                 try:
                     bg = audio_loop(bg, duration=audio.duration)
@@ -372,10 +378,15 @@ class AutoEditor:
                     repeats = math.ceil(audio.duration / bg.duration)
                     bg = concatenate_audioclips([bg] * repeats).subclip(0, audio.duration)
             else:
-                bg = bg.subclip(0, audio.duration)
+                # BG music is long enough — just trim if slightly over
+                if bg.duration > audio.duration:
+                    bg = bg.subclip(0, audio.duration)
             final_video = final_video.set_audio(CompositeAudioClip([audio, bg]))
         else:
             final_video = final_video.set_audio(audio)
+        
+        # Log actual vs target so we can debug future repetitions
+        print(f"[Editor] Audio: {audio.duration:.1f}s / Video: {final_video.duration:.1f}s")
 
         output_path = os.path.join(self.output_dir, output_filename)
         os.makedirs(self.output_dir, exist_ok=True)

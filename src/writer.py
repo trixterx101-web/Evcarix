@@ -427,28 +427,44 @@ class CreativeWriter:
             category, "Focus on real data, numbers, measurable facts. No marketing hype.")
 
         if format_type == "short":
+            # Shorts script with explicit word count
+            MIN_WORDS_SHORT = 55   # enough for 25s at 130wpm
+            MAX_WORDS_SHORT = 110  # enough for 50s at 130wpm
+            
             system = (
                 "You are Evcarix's head scriptwriter. Style: data-first, analytical, no hype. "
                 "Motto: 'No hype. Just numbers.' American English only. "
                 "Return format: SES: [male/female]\nSENARYO: [script]"
             )
-            user = (
-                f"Write a YouTube Shorts script for Evcarix.\n"
-                f"Topic: {topic}\nCategory: {category or 'general'}\n"
-                f"Category guide: {cat_extra}\n\n"
-                f"STRUCTURE:\n"
-                f"[0-5s] HOOK: shocking specific number/stat in first sentence\n"
-                f"[5-20s] BODY: 3 data points with real numbers, brands, regions\n"
-                f"[20-35s] INSIGHT: practical takeaway for EV owners\n"
-                f"[35-40s] CTA: 'Subscribe to Evcarix for real EV data.'\n\n"
-                f"RULES:\n"
-                f"- 70-100 words total (35-40 sec at normal speed)\n"
-                f"- First sentence MUST have a specific % or $ or kWh or miles number\n"
-                f"- Real brands: Tesla, BYD, Hyundai, Kia, BMW, Mercedes, VW, Rivian, Lucid\n"
-                f"- Regions: USA, Europe, China ONLY — NEVER Turkey\n"
-                f"- No hype: amazing, incredible, insane, unbelievable\n\n"
-                f"Return:\nSES: [male or female]\nSENARYO: [script]"
-            )
+            user = f"""
+Write a 60-second YouTube Shorts narration script for Evcarix channel.
+Topic: {topic}
+Category: {category or 'general'}
+Category guide: {cat_extra}
+REQUIRED word count: {MIN_WORDS_SHORT} to {MAX_WORDS_SHORT} words (this is mandatory — do not write fewer)
+
+Structure (write ALL sections as continuous spoken text):
+- Hook (0-5s): One shocking data point to stop the scroll
+- Problem (5-20s): What people believe vs real data
+- Data reveal (20-45s): The actual numbers and what they mean
+- Takeaway (45-55s): One clear conclusion
+- CTA (55-60s): Subscribe to Ev-Car-ix for real EV data, no hype
+
+Tone: Data-driven, punchy, no hype.
+Language: English.
+Channel name: always write "Ev-Car-ix" (not Evcarix).
+First sentence MUST have a specific % or $ or kWh or miles number
+Real brands: Tesla, BYD, Hyundai, Kia, BMW, Mercedes, VW, Rivian, Lucid
+Regions: USA, Europe, China ONLY — NEVER Turkey
+No hype: amazing, incredible, insane, unbelievable
+
+Return ONLY the spoken words. No section labels. No formatting.
+Write between {MIN_WORDS_SHORT} and {MAX_WORDS_SHORT} words total — count carefully.
+
+Return:
+SES: [male or female]
+SENARYO: [script]
+"""
         else:
             # Long-form script with explicit word count and structure
             target_duration = 360  # 6 minutes for long-form
@@ -497,9 +513,17 @@ SENARYO: [script]
         raw = self._call_llm(system, user, max_tokens=2000)
         if raw:
             parsed = self._parse_response(raw)
-            # Word count validation for long-form
-            if format_type != "short":
-                actual_words = len(parsed["script"].split())
+            # Word count validation for both short and long-form
+            actual_words = len(parsed["script"].split())
+            if format_type == "short":
+                if actual_words < MIN_WORDS_SHORT:
+                    print(f"[Writer] ⚠️ Shorts script too short ({actual_words} words, need {MIN_WORDS_SHORT}). Retrying...")
+                    # Retry with explicit word count reminder
+                    user += f"\n\nCRITICAL: Write EXACTLY {MIN_WORDS_SHORT}-{MAX_WORDS_SHORT} words. Your previous response had only {actual_words} words which is too short and will cause the audio to loop and repeat. Write a complete, flowing narration that fills the full duration."
+                    raw = self._call_llm(system, user, max_tokens=2000)
+                    if raw:
+                        parsed = self._parse_response(raw)
+            else:
                 if actual_words < min_words:
                     print(f"[Writer] ⚠️ Script too short ({actual_words} words, need {min_words}). Retrying...")
                     # Retry with explicit word count reminder
