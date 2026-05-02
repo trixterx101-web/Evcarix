@@ -384,3 +384,127 @@ class AutoEditor:
             ffmpeg_params=["-ac", "2"],
         )
         return output_path
+
+    # ─── Haftalık Uzun Video Montajı (1920x1080, 16:9) ────────────────────────
+    def assemble_weekly_long_video(self, video_clips, audio_path, title, target_duration, output_path):
+        """
+        Haftalık uzun formatlı video montajı (1920x1080, 16:9, 240-360s).
+        
+        Args:
+            video_clips: Video dosya yolları listesi
+            audio_path: Ses dosyası yolu
+            title: Video başlığı (title card için)
+            target_duration: Hedef süre (saniye, 240-360)
+            output_path: Çıktı dosya adı
+        """
+        import random
+        audio = AudioFileClip(audio_path)
+        
+        # Audio süresini hedeften kısaysa loop ile uzat, uzunsa kırp
+        if audio.duration < target_duration:
+            from moviepy.audio.fx.all import audio_loop
+            try:
+                audio = audio_loop(audio, duration=target_duration)
+            except (AttributeError, ImportError):
+                from moviepy.editor import concatenate_audioclips
+                import math
+                repeats = math.ceil(target_duration / audio.duration)
+                audio = concatenate_audioclips([audio] * repeats).subclip(0, target_duration)
+        elif audio.duration > target_duration:
+            audio = audio.subclip(0, target_duration)
+
+        # Video klipleri 16:9 aspect ratio'ya çevir ve 1920x1080'a resize
+        clips = []
+        for path in (video_clips or []):
+            if not path or not os.path.exists(path):
+                continue
+            try:
+                clip = VideoFileClip(path)
+                w, h = clip.size
+                target_ratio = 16 / 9
+
+                if w / h > target_ratio:
+                    new_w = int(h * target_ratio)
+                    x1 = (w - new_w) // 2
+                    clip = clip.crop(x1=x1, y1=0, x2=x1 + new_w, y2=h)
+                elif w / h < target_ratio:
+                    new_h = int(w / target_ratio)
+                    y1 = (h - new_h) // 2
+                    clip = clip.crop(x1=0, y1=y1, x2=w, y2=y1 + new_h)
+
+                clip = clip.resize((1920, 1080))
+                clips.append(clip)
+            except Exception as e:
+                print(f"[Editor] Klip hatası ({path}): {e}")
+
+        if len(clips) >= 2:
+            base_video = concatenate_videoclips(clips, method="compose")
+            if base_video.duration < target_duration:
+                from moviepy.video.fx.all import loop as video_loop
+                try:
+                    base_video = video_loop(base_video, duration=target_duration)
+                except (AttributeError, ImportError):
+                    import math
+                    repeats = math.ceil(target_duration / base_video.duration)
+                    base_video = concatenate_videoclips([base_video] * repeats).subclip(0, target_duration)
+            else:
+                base_video = base_video.subclip(0, target_duration)
+        else:
+            print("[Editor] Yeterli video klip yok, siyah arka plan kullanılıyor...")
+            base_video = ColorClip(size=(1920, 1080), color=(0, 0, 0)).set_duration(target_duration)
+
+        base_video = base_video.set_audio(audio)
+
+        # Title card (5 saniye) - basit text clip
+        try:
+            from moviepy.video.fx.all import crop
+            title_clip = TextClip(
+                title,
+                fontsize=70,
+                color="white",
+                font="Arial-Bold",
+                align="center",
+                size=(1920, 1080)
+            ).set_position("center").set_duration(5)
+            
+            bg_clip = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
+            title_card = CompositeVideoClip([bg_clip, title_clip])
+        except Exception as e:
+            print(f"[Editor] Title card hatası: {e}, atlanıyor...")
+            title_card = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
+        
+        # Outro card (5 saniye)
+        try:
+            outro_text = "Subscribe for more EV data — Evcarix"
+            outro_clip = TextClip(
+                outro_text,
+                fontsize=60,
+                color="white",
+                font="Arial-Bold",
+                align="center",
+                size=(1920, 1080)
+            ).set_position("center").set_duration(5)
+            
+            outro_bg = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
+            outro_card = CompositeVideoClip([outro_bg, outro_clip])
+        except Exception as e:
+            print(f"[Editor] Outro card hatası: {e}, atlanıyor...")
+            outro_card = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
+        
+        # Video'yu başla (title card'dan sonra)
+        base_video = base_video.set_start(5)
+        
+        # Tüm katmanları birleştir
+        all_layers = [title_card, base_video, outro_card]
+        final_video = CompositeVideoClip(all_layers, size=(1920, 1080))
+
+        # Video export
+        output_full_path = os.path.join(self.output_dir, output_path)
+        os.makedirs(self.output_dir, exist_ok=True)
+        final_video.write_videofile(
+            output_full_path, fps=30, codec="libx264",
+            audio_codec="aac", preset="medium",
+            ffmpeg_params=["-ac", "2"]
+        )
+        print(f"[Editor] Long-form video kaydedildi: {output_full_path}")
+        return output_full_path

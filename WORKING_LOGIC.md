@@ -366,3 +366,121 @@ MoviePy v1.0.3 uyumluluğu için:
 ## 🎯 Sonuç
 
 Evcarix, tamamen otomatik bir EV içerik üretim sistemidir. YouTube trend'inden ilham alarak veya normal konu havuzundan seçerek, çoklu LLM fallback ile içerik üretir, AI veya stok videolarla görselleştirir, seslendirir ve YouTube'a yükler. Sistem, hata yönetimi ve fallback mekanizmaları ile güvenilir çalışır.
+
+---
+
+## 📺 18. Haftalık Uzun Video (Weekly Long-Form)
+
+### 18.1 Schedule
+
+- **Zaman**: Her Pazar 11:00 Türkiye saati (08:00 UTC)
+- **GitHub Actions**: `cron: '0 8 * * 0'`
+- **Upload Slot**: `SUNDAY_LONG`
+
+### 18.2 Video Spesifikasyonları
+
+- **Format**: 1920x1080 Full HD
+- **Aspect Ratio**: 16:9 (horizontal)
+- **FPS**: 30
+- **Süre**: 240-360 saniye (4-6 dakika, random)
+- **Codec**: libx264
+- **Audio Codec**: AAC, stereo
+
+### 18.3 Pipeline Farklılıkları
+
+**Günlük Shorts vs Haftalık Uzun Video:**
+
+| Özellik | Shorts (Günlük) | Long-Form (Haftalık) |
+|---------|----------------|---------------------|
+| Çözünürlük | 1080x1920 (9:16) | 1920x1080 (16:9) |
+| Süre | 25-50 saniye | 240-360 saniye |
+| Video Sayısı | 5-10 klip | 30-45 klip (ceil(duration/8)) |
+| Ses | Kadın/Erkek değişken | Erkek sabit |
+| Title Card | Yok | Var (5 saniye) |
+| Outro Card | Yok | Var (5 saniye) |
+| Playlist | Yok | "Weekly Deep Dives" |
+| Kategori | Varsayılan | 28 (Science & Technology) |
+| made_for_kids | Varsayılan | False |
+
+### 18.4 Title Card (5 saniye)
+
+- **Arka plan**: Koyu mavi (#141428)
+- **Yazı**: Beyaz, Arial-Bold, fontsize 70
+- **İçerik**: Video başlığı
+- **Pozisyon**: Merkez
+
+### 18.5 Outro Card (5 saniye)
+
+- **Arka plan**: Koyu mavi (#141428)
+- **Yazı**: Beyaz, Arial-Bold, fontsize 60
+- **İçerik**: "Subscribe for more EV data — Evcarix"
+- **Pozisyon**: Merkez
+
+### 18.6 Video Montajı
+
+**src/editor.py - `assemble_weekly_long_video()`**:
+
+1. Audio loop (version-safe implementation)
+2. Video klipleri 16:9 crop ve 1920x1080 resize
+3. Video loop (version-safe implementation)
+4. Title card (5s) ekle
+5. Ana video (target_duration) ekle
+6. Outro card (5s) ekle
+7. CompositeVideoClip ile birleştir
+8. FFmpeg export
+
+### 18.7 YouTube Yükleme
+
+- **Playlist**: "Weekly Deep Dives" (yoksa oluştur)
+- **Kategori**: 28 (Science & Technology)
+- **made_for_kids**: False
+- **Tags**: `["ev", "electric car", "Evcarix", "long form", "deep dive"]`
+
+### 18.8 main.py Routing
+
+```python
+upload_slot = os.getenv("UPLOAD_SLOT", "evening")
+
+if upload_slot == "SUNDAY_LONG":
+    asyncio.run(orchestrator.run_weekly_long_video_workflow())
+else:
+    asyncio.run(orchestrator.run_daily_shorts_workflow())
+```
+
+### 18.9 run_weekly_long_video_workflow()
+
+**Adımlar:**
+
+1. **Plan**: 67 konu havuzundan seçim, trend modu support
+2. **AI Video**: clip_count = ceil(target_duration / 8)
+3. **Stock Video**: orientation="landscape", daha fazla klip
+4. **Seslendirme**: Erkek ses, normal hız
+5. **Montaj**: 1920x1080, title + content + outro
+6. **Yükleme**: Weekly Deep Dives playlist
+
+### 18.10 Clip Sayısı Hesaplama
+
+```
+target_duration = random.randint(240, 360)  # 4-6 dakika
+clip_count = math.ceil(target_duration / 8)  # Her klip ~8 saniye
+
+Örnek:
+- 240 saniye → 30 klip
+- 300 saniye → 38 klip
+- 360 saniye → 45 klip
+```
+
+### 18.11 Video Kaynakları
+
+Haftalık uzun video için daha fazla klip gerekir:
+- AI video: Stability AI, Replicate, Kling
+- Stock video: Pexels, Pixabay (landscape orientation)
+- OEM Press Kit: Tesla, Lucid, Waymo
+- NASA/DOE Public Videos
+
+### 18.12 Fallback Mekanizmaları
+
+Günlük Shorts ile aynı:
+- AI video yoksa → Stock video
+- Stok bitse → AI video + tekrar kullanım
+- Version-safe loop implementation

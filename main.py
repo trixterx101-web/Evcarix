@@ -199,7 +199,133 @@ class EvcarixOrchestrator:
         print(f"  Başlık   : {title.encode('ascii', 'ignore').decode('ascii')}")
         print(f"{'='*60}\n")
 
+    async def run_weekly_long_video_workflow(self):
+        """Haftalık uzun formatlı video (1920x1080, 4-6 dakika) pipeline."""
+        import math
+        import random
+        
+        # ── Zaman damgası & slot bilgisi ──────────────────────────
+        now = datetime.datetime.now()
+        slot = "SUNDAY_LONG"
+        ts = now.strftime("%Y%m%d_%H%M%S")
+        
+        # Hedef süre: 240-360 saniye (4-6 dakika)
+        target_duration = random.randint(240, 360)
+        clip_count = math.ceil(target_duration / 8)  # Her klip ~8 saniye
+        
+        print(f"\n{'='*60}")
+        print(f"  Evcarix Weekly Long Video — {now.strftime('%d %b %Y, %H:%M')}")
+        print(f"  Format: 1920x1080 (16:9), {target_duration}s ({target_duration//60}dk)")
+        print(f"  Slot: {slot}")
+        print(f"{'='*60}\n")
+
+        # ── 1. Plan (long-form script) ───────────────────────────
+        print("\n[1/7] Long-form plan oluşturuluyor...")
+        content_mode = os.getenv("CONTENT_MODE", "auto")
+        
+        plan = self.brain.create_daily_plan(slot=slot)
+        script = plan['script']
+        topic = plan['topic']
+        full_topic = plan['full_topic']
+        title = plan.get('title', topic)
+        description = plan.get('description', f"{topic}\n\n#EV #Evcarix #LongForm")
+        tags = plan.get('tags', ["ev", "electric car", "Evcarix", "long form", "deep dive"])
+
+        print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}")
+        print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
+        print(f"      Süre  : {target_duration}s")
+
+        # ── 2. AI Video Klip Üretimi (daha fazla klip) ───────────
+        print(f"\n[2/7] AI video klip üretimi ({clip_count} klip, 6-10s)...")
+        ai_video_clips = self.media_engine.generate_ai_video_clips(
+            topic=topic,
+            count=clip_count,
+            output_dir=f"assets/ai_videos/{ts}",
+            duration=8
+        )
+
+        # ── 3. Stok videolar (AI yetersizse) ─────────────────────
+        video_paths = []
+        if len(ai_video_clips) < clip_count:
+            print(f"\n[3/7] AI videolar yetersiz, stok videolar indiriliyor...")
+            import re
+            search_query = re.sub(r'[^\w\s]', '', topic).strip()
+            video_paths = self.media_engine.download_stock_videos(
+                query=search_query,
+                output_dir=f"assets/temp_videos/{ts}",
+                count=clip_count,
+                orientation="landscape",
+                category=plan.get("category", "general")
+            )
+        
+        # Combine AI clips and stock videos
+        all_video_clips = ai_video_clips + video_paths
+        random.shuffle(all_video_clips)
+        
+        # ── 4. Seslendirme (long-form) ───────────────────────────
+        print("\n[4/7] Long-form seslendirme yapılıyor...")
+        audio_path = os.path.abspath(f"assets/voice_{ts}.mp3")
+        voice_result = await self.media_engine.generate_voiceover(
+            text=script,
+            output_path=audio_path,
+            voice_type='male',  # Long form için erkek ses
+            rate="+0%"
+        )
+        word_timings = voice_result['word_timings']
+
+        # ── 5. Video montajı (long-form, 1920x1080) ───────────────
+        print("\n[5/7] Long-form video montajlanıyor (1920x1080)...")
+        output_filename = f"weekly_long_{ts}.mp4"
+        final_video_path = self.editor.assemble_weekly_long_video(
+            video_clips=all_video_clips,
+            audio_path=audio_path,
+            title=title,
+            target_duration=target_duration,
+            output_path=output_filename
+        )
+
+        # ── Kullanılan klipleri kaydet ───────────────────────────
+        if all_video_clips:
+            self.media_engine.mark_clips_as_used(all_video_clips)
+        print(f"[Main] 🔄 Klip geçmişi güncellendi.")
+
+        # ── 6. YouTube'a yükle (Weekly Deep Dives playlist) ───────
+        if self.uploader and os.path.exists(final_video_path):
+            print("\n[6/7] YouTube'a yükleniyor (Weekly Deep Dives)...")
+            
+            pre_upload_delay = random.randint(5, 25)
+            print(f"      Yükleme öncesi {pre_upload_delay}sn bekleniyor...")
+            await asyncio.sleep(pre_upload_delay)
+
+            try:
+                video_id = self.uploader.upload_video(
+                    final_video_path, title, description, tags,
+                    playlist="Weekly Deep Dives",
+                    category_id=28,  # Science & Technology
+                    made_for_kids=False
+                )
+                print(f"      ✅ Yüklendi! Video ID: {video_id}")
+                print(f"      🔗 https://www.youtube.com/watch?v={video_id}")
+            except Exception as e:
+                print(f"      ❌ YouTube yükleme hatası: {e}")
+                raise e
+        else:
+            print("\n[6/7] YouTube yükleme atlandı.")
+
+        print(f"\n{'='*60}")
+        print(f"  ✅ HAFTALIK UZUN VIDEO TAMAMLANDI!")
+        print(f"  Video    : {final_video_path}")
+        print(f"  Başlık   : {title.encode('ascii', 'ignore').decode('ascii')}")
+        print(f"  Süre     : {target_duration}s")
+        print(f"{'='*60}\n")
+
 
 if __name__ == "__main__":
     orchestrator = EvcarixOrchestrator()
-    asyncio.run(orchestrator.run_daily_shorts_workflow())
+    upload_slot = os.getenv("UPLOAD_SLOT", "evening")
+    
+    # Routing: Haftalık uzun video mu, günlük Short mu?
+    if upload_slot == "SUNDAY_LONG":
+        asyncio.run(orchestrator.run_weekly_long_video_workflow())
+    else:
+        asyncio.run(orchestrator.run_daily_shorts_workflow())
