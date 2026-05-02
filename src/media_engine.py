@@ -606,7 +606,7 @@ class MediaEngine:
             for space_name in spaces:
                 try:
                     print(f"[HuggingFace] {space_name} deneniyor...")
-                    client = Client(space_name, hf_token=self.hf_token)
+                    client = Client(space_name, token=self.hf_token)
 
                     # Call the text-to-image API
                     result = client.predict(
