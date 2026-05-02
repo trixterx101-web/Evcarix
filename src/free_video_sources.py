@@ -11,6 +11,7 @@ import random
 import hashlib
 import requests
 from pathlib import Path
+from src.query_builder import get_queries
 
 ASSETS_DIR = Path("assets")
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; Evcarix/1.0)"}
@@ -38,6 +39,10 @@ class FreeVideoSources:
         Returns list of downloaded file paths.
         """
         clips = []
+        # Use QueryBuilder to get relevant search queries
+        expanded_queries = get_queries(query)
+        primary_query = expanded_queries[0] if expanded_queries else query
+        
         sources = [
             self._coverr,
             self._videvo,
@@ -52,7 +57,7 @@ class FreeVideoSources:
             if len(clips) >= count:
                 break
             try:
-                new = source_fn(query, count - len(clips), video_type)
+                new = source_fn(primary_query, count - len(clips), video_type)
                 clips.extend(new)
                 print(f"[FreeVideo] {source_fn.__name__}: +{len(new)} klip")
             except Exception as e:

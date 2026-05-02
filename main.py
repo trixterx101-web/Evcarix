@@ -135,7 +135,8 @@ class EvcarixOrchestrator:
                 output_dir=f"assets/temp_videos/{ts}",
                 count=5,
                 orientation="portrait",
-                category=plan.get("category", "general")
+                category=plan.get("category", "general"),
+                plan=plan
             )
         
         # Combine AI clips and stock videos
@@ -263,7 +264,8 @@ class EvcarixOrchestrator:
                 output_dir=f"assets/temp_videos/{ts}",
                 count=clip_count,
                 orientation="landscape",
-                category=plan.get("category", "general")
+                category=plan.get("category", "general"),
+                plan=plan
             )
         
         # Combine AI clips and stock videos

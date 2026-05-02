@@ -9,9 +9,29 @@ import requests
 import urllib.parse
 from PIL import Image
 from src.voice_engine import VoiceEngine
+from src.query_builder import get_queries, get_queries_for_script
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# ── Relevance filter for stock videos ────────────────────────────────────────
+IRRELEVANT_PATTERNS = [
+    "wedding", "bride", "fashion", "cooking", "food", "dance",
+    "sport", "football", "basketball", "swimming", "yoga",
+    "beach", "vacation", "travel", "mountain", "ocean",
+    "animal", "dog", "cat", "bird", "nature", "forest",
+    "medical", "hospital", "baby", "child", "school",
+    "music", "concert", "party", "birthday",
+]
+
+def _is_clip_relevant(filename: str, tags: str = "") -> bool:
+    """Reject obviously off-topic clips based on filename and tags."""
+    combined = (filename + " " + tags).lower()
+    for pattern in IRRELEVANT_PATTERNS:
+        if pattern in combined:
+            print(f"[MediaEngine] ⛔ Alakasız klip reddedildi: {filename}")
+            return False
+    return True
 
 # ═══════════════════════════════════════════════════════════════════
 #  NASA / DOE KAMU MALI URL'LERİ  (API gerektirmez, doğrudan CDN)
@@ -511,7 +531,7 @@ class MediaEngine:
 
     # ─── Ana İndirme Metodu — Pexels + Pixabay + Coverr birleşik ──────────────
     def download_stock_videos(self, query, output_dir="assets/temp_videos",
-                              count=6, orientation="portrait", category=None):
+                              count=6, orientation="portrait", category=None, plan=None):
         """
         Tüm kaynaklardan taze video indirir.
         Daha önce kullanılan klipler otomatik olarak hariç tutulur.
@@ -521,16 +541,23 @@ class MediaEngine:
         os.makedirs(output_dir, exist_ok=True)
         all_paths = []
 
+        # Use QueryBuilder to get relevant search queries
+        script_text = plan.get("script", "") or plan.get("narration", "") or "" if plan else ""
+        topic_text = plan.get("topic", "") or plan.get("title", "") or query if plan else query
+        category_id = plan.get("category_id", "") if plan else ""
+        queries = get_queries_for_script(script_text, topic_text, category_id)
+        primary_query = queries[0] if queries else query
+
         # 1. Pexels (kalite öncelikli)
-        pex_q = self._get_professional_query(query, category)
+        pex_q = self._get_professional_query(primary_query, category)
         pex = self._download_from_pexels(pex_q, output_dir, 3, orientation, category=category)
         pex_fresh = self._filter_used_clips(pex)
         all_paths += pex_fresh
         print(f"[MediaEngine] Pexels (kalite): {len(pex_fresh)} taze klip")
 
         # 2. Pexels (topic bazlı — farklı sorgu)
-        if len(all_paths) < count:
-            topic_query = f"Tesla {query} exterior 4k" if "tesla" not in query.lower() else query
+        if len(all_paths) < count and len(queries) > 1:
+            topic_query = queries[1]  # Use second query from QueryBuilder
             pex2 = self._download_from_pexels(topic_query, output_dir, count, orientation, category=category)
             pex2_fresh = self._filter_used_clips(pex2)
             all_paths += [p for p in pex2_fresh if p not in all_paths]
@@ -538,7 +565,7 @@ class MediaEngine:
 
         # 3. Pixabay
         if len(all_paths) < count:
-            pix = self._download_from_pixabay(query, output_dir,
+            pix = self._download_from_pixabay(primary_query, output_dir,
                                                count - len(all_paths), orientation, category=category)
             pix_fresh = self._filter_used_clips(pix)
             all_paths += [p for p in pix_fresh if p not in all_paths]

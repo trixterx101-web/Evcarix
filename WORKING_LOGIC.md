@@ -516,3 +516,96 @@ Günlük Shorts ile aynı:
 - `run_weekly_long_video_workflow()`'de otomatik çağrılır
 - Video montajından sonra, YouTube yüklemeden önce
 - YouTube uploader'a thumbnail_path parametresi olarak geçilir
+
+---
+
+## 19. Video Relevance System
+
+**Dosya**: `src/query_builder.py`
+
+### 19.1 Amaç
+
+Stok video kaynaklarından (Pexels, Pixabay, FreeVideoSources) indirilen kliplerin konuyla alakalı olmasını sağlamak. Generic arama sorguları yerine, konu ve kategoriye özgü spesifik sorgular kullanılır.
+
+### 19.2 QueryBuilder Yapısı
+
+**10 Kategori Buckets**:
+- Battery & charging science: `lfp`, `lithium`, `battery`, `pil`, `degradasyon`, `bms`, `solid state`
+- Range & efficiency: `menzil`, `range`, `verimlilik`, `efficiency`, `tüketim`, `kwh`, `wltp`
+- Winter & temperature: `kış`, `winter`, `soğuk`, `cold`, `ısı pompası`, `heat pump`
+- Charging speed & infrastructure: `şarj`, `charging`, `800v`, `400v`, `ccs`, `v2g`
+- Cost & ownership: `maliyet`, `cost`, `fiyat`, `price`, `sigorta`, `depreciation`
+- Market & sales data: `pazar`, `market`, `satış`, `sales`, `çin`, `byd`
+- Comparison & ranking: `karşılaştırma`, `comparison`, `vs`, `ranking`, `suv`, `sedan`
+- Infrastructure & grid: `altyapı`, `infrastructure`, `şebeke`, `grid`, `solar`
+- Education & technical: `açıklama`, `explained`, `teknik`, `inverter`, `motor`
+- Tools & data: `hesaplayıcı`, `calculator`, `grafik`, `chart`, `veri`, `analiz`
+
+**Her Bucket için 4-5 Spesifik Sorgu**:
+- Örnek (Battery): `electric car battery pack closeup`, `lithium battery cells technology`, `battery charging indicator display`
+
+**Fallback Queries**:
+- `electric car driving road`
+- `EV charging station modern`
+- `electric vehicle technology`
+- `clean energy automobile`
+
+### 19.3 Fonksiyonlar
+
+**`get_queries(topic, category_id)`**:
+- Topic ve category_id'yi birleştirir
+- İlk eşleşen bucket'ı bulur
+- Bucket sorgularını + 1 fallback döner
+- Eşleşme yoksa tüm fallback'leri döner
+
+**`get_queries_for_script(script, topic, category_id)`**:
+- `get_queries()` ile base sorguları alır
+- Script içinde ek keyword'lar taranır (winter, highway, charge, battery)
+- Ek sorgular eklenir
+- Duplicate'ler temizlenir
+
+### 19.4 MediaEngine Entegrasyonu
+
+**`download_stock_videos()`**:
+- Plan parametresi eklenmiş
+- `get_queries_for_script(script_text, topic_text, category_id)` ile sorgular alınıyor
+- Pexels ve Pixabay çağrılarında `primary_query` kullanılıyor
+- İkinci Pexels çağrısında `queries[1]` kullanılıyor
+
+### 19.5 Relevance Filter
+
+**`IRRELEVANT_PATTERNS`** (media_engine.py):
+```python
+["wedding", "bride", "fashion", "cooking", "food", "dance",
+ "sport", "football", "basketball", "swimming", "yoga",
+ "beach", "vacation", "travel", "mountain", "ocean",
+ "animal", "dog", "cat", "bird", "nature", "forest",
+ "medical", "hospital", "baby", "child", "school",
+ "music", "concert", "party", "birthday"]
+```
+
+**`_is_clip_relevant(filename, tags)`**:
+- Filename ve tags birleştirilir
+- IRRELEVANT_PATTERNS ile kontrol edilir
+- Pattern bulunursa klip reddedilir
+- Log: `[MediaEngine] ⛔ Alakasız klip reddedildi: {filename}`
+
+### 19.6 FreeVideoSources Entegrasyonu
+
+**`download_clips()`**:
+- `get_queries(query)` ile sorgular genişletilir
+- `primary_query = expanded_queries[0]` kullanılır
+- Tüm kaynak fonksiyonlarına `primary_query` geçilir
+
+### 19.7 Kapsam
+
+Uygulanan Kaynaklar:
+- ✅ Pexels
+- ✅ Pixabay
+- ✅ FreeVideoSources (Coverr, Videvo, Mixkit, Videezy, Ignitemotion, Dareful)
+- ✅ OEM Press Kit (kategori bazlı zaten)
+- ✅ NASA/DOE (kategorize edilmiş)
+
+Uygulanan Pipeline'lar:
+- ✅ Daily Shorts (`run_daily_shorts_workflow`)
+- ✅ Weekly Long Video (`run_weekly_long_video_workflow`)
