@@ -35,6 +35,7 @@ class YouTubeUploader:
             else:
                 # CI/CD ortamında bu aşamaya gelmemeli, token.json önceden hazırlanmalı
                 if os.getenv("CI"):
+                    print("[Uploader] ⚠️ GitHub Actions ortamında geçerli token.json bulunamadı!")
                     raise Exception("GitHub Actions ortamında geçerli token.json bulunamadı!")
                 
                 flow = InstalledAppFlow.from_client_secrets_file(self.client_secrets_file, self.scopes)
