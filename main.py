@@ -55,7 +55,7 @@ class EvcarixOrchestrator:
         content_mode = os.getenv("CONTENT_MODE", "auto")
         slot = os.getenv("UPLOAD_SLOT", "evening")
         
-        plan = self.brain.create_daily_plan(slot=slot, content_mode=content_mode)
+        plan = self.brain.create_daily_plan(slot=slot)
         script      = plan['script']
         topic       = plan['topic']
         full_topic  = plan['full_topic']
