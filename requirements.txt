@@ -16,3 +16,4 @@ numpy
 opencv-python
 yt-dlp
 gradio_client
+fal-client>=0.5.0

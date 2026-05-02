@@ -100,13 +100,13 @@ Evcarix, YouTube Shorts formatında otomatik EV (Electric Vehicle) içerik üret
 ### 4.1 AI Video Üretimi (ÖNCELİKLI)
 
 **AI Video Generation Chain**:
-- Provider 1 — Kling AI (KLING_API_KEY) — best quality
-- Provider 2 — Runway ML (RUNWAY_API_KEY) — cinematic
-- Provider 3 — Luma Dream (LUMA_API_KEY) — realistic
-- Provider 4 — Stability AI (STABILITY_API_KEY) — fast
-- Provider 5 — HuggingFace (no key, FREE) — always available
-- Provider 6 — Upsampler.com (no key, FREE) — Wan 2.2 model, no signup, no watermark
-- Provider 7 — HuggingFace Spaces Wan 2.2 (no key, FREE) — unlimited, queue-based
+- Provider 1 — fal.ai LTX-Video (FAL_KEY) — best quality, open source, fast
+- Provider 2 — Kling AI (KLING_API_KEY) — cinematic
+- Provider 3 — Runway ML (RUNWAY_API_KEY) — cinematic
+- Provider 4 — Luma Dream (LUMA_API_KEY) — realistic
+- Provider 5 — Stability AI (STABILITY_API_KEY) — fast
+- Provider 6 — HuggingFace Gradio (no key, FREE) — zeroscope Spaces, queue-based
+- Provider 7 — HuggingFace Router (HF_TOKEN, FREE) — Wan2.1-T2V-14B via nebius provider
 
 **Prompt Selection**:
 9 category-specific prompts in `get_prompt()`:

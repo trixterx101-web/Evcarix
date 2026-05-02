@@ -114,6 +114,7 @@ class AIVideoGenerator:
         self.runway_key    = os.environ.get("RUNWAY_API_KEY", "")
         self.luma_key      = os.environ.get("LUMA_API_KEY", "")
         self.stability_key = os.environ.get("STABILITY_API_KEY", "")
+        self.fal_key       = os.environ.get("FAL_KEY", "")
 
     # ── Public API ─────────────────────────────────────────────────────────────
     def generate(self, topic: str, category_id: str = "",
@@ -156,19 +157,67 @@ class AIVideoGenerator:
     # ── Provider chain ─────────────────────────────────────────────────────────
     def _get_provider_chain(self) -> list:
         chain = []
+        if self.fal_key:
+            chain.append(("fal.ai LTX-Video",   self._fal_ltx))
         if self.kling_key:
-            chain.append(("Kling AI",      self._kling))
+            chain.append(("Kling AI",            self._kling))
         if self.runway_key:
-            chain.append(("Runway ML",     self._runway))
+            chain.append(("Runway ML",           self._runway))
         if self.luma_key:
-            chain.append(("Luma Dream",    self._luma))
+            chain.append(("Luma Dream",          self._luma))
         if self.stability_key:
-            chain.append(("Stability AI",  self._stability))
-        # Free providers (no API key needed) - always available
-        chain.append(("HuggingFace",   self._huggingface))
-        chain.append(("Upsampler",      self._upsampler))
-        chain.append(("Wan 2.2 Spaces", self._wan22_spaces))
+            chain.append(("Stability AI",        self._stability))
+        # Always available fallbacks
+        chain.append(("HuggingFace Gradio",  self._huggingface_gradio))
+        chain.append(("HuggingFace Router",  self._huggingface_router))
         return chain
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ── Provider: fal.ai LTX-Video (PRIMARY — best free option) ───────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    def _fal_ltx(self, prompt: str, count: int,
+                 duration: int, aspect: str) -> list[str]:
+        """
+        fal.ai LTX-Video — open source, fast, high quality.
+        Free credits on signup. ~$0.04/sec after that.
+        Sign up: https://fal.ai  then copy API key to GitHub Secret FAL_KEY
+        """
+        import fal_client
+        os.environ["FAL_KEY"] = self.fal_key
+        clips = []
+
+        video_size = "portrait_9_16" if aspect == "9:16" else "landscape_16_9"
+
+        for i in range(count):
+            try:
+                print(f"[fal.ai] Generating video {i+1}/{count}...")
+                result = fal_client.run(
+                    "fal-ai/ltx-video-v095",
+                    arguments={
+                        "prompt": prompt,
+                        "negative_prompt": (
+                            "watermark, logo, text, people faces, hands, "
+                            "blurry, low quality, distorted"
+                        ),
+                        "num_inference_steps": 30,
+                        "guidance_scale": 3.0,
+                        "num_frames": 97,
+                        "fps": 24,
+                        "video_size": video_size,
+                        "seed": int(time.time()) + i,
+                    }
+                )
+                video_url = result.get("video", {}).get("url", "")
+                if video_url:
+                    path = self._download_video(video_url, f"fal_{i}")
+                    if path:
+                        clips.append(path)
+                        print(f"[fal.ai] ✅ Video {i+1} hazır: {path}")
+                time.sleep(2)
+            except Exception as e:
+                print(f"[fal.ai] Hata: {e}")
+                break
+        return clips
 
     # ══════════════════════════════════════════════════════════════════════════
     # ── Provider: Kling AI ────────────────────────────────────────────────────
@@ -467,155 +516,127 @@ class AIVideoGenerator:
         return None
 
     # ══════════════════════════════════════════════════════════════════════════
-    # ── Provider: HuggingFace (FREE — no API key) ─────────────────────────────
+    # ── Provider: HuggingFace Gradio API (FREE — always available) ───────────
     # ══════════════════════════════════════════════════════════════════════════
-    def _huggingface(self, prompt: str, count: int,
-                     duration: int, aspect: str) -> list[str]:
+    def _huggingface_gradio(self, prompt: str, count: int,
+                             duration: int, aspect: str) -> list[str]:
         """
-        HuggingFace free Inference API — zeroscope_v2_576w model.
-        No API key required. Rate limited but always available.
+        HuggingFace Spaces Gradio API — zeroscope Space (always free).
+        Uses the Gradio queue API, not the broken Inference API.
         """
         clips = []
-        hf_token = os.environ.get("HF_TOKEN", "")  # optional, increases rate limit
-        headers  = {"Content-Type": "application/json"}
+        # Working Spaces with Gradio API
+        spaces = [
+            "https://fffiloni-zeroscope.hf.space",
+            "https://hysts-zeroscope-v2.hf.space",
+        ]
+        hf_token = os.environ.get("HF_TOKEN", "")
+        headers = {}
         if hf_token:
             headers["Authorization"] = f"Bearer {hf_token}"
 
-        models = [
-            "cerspense/zeroscope_v2_576w",
-            "damo-vilab/text-to-video-ms-1.7b",
-        ]
+        for i in range(count):
+            space_url = spaces[i % len(spaces)]
+            try:
+                # Step 1: queue join
+                r = requests.post(
+                    f"{space_url}/queue/join",
+                    headers={**headers, "Content-Type": "application/json"},
+                    json={
+                        "data": [prompt, 24, 576, 320, 7.5, 50],
+                        "fn_index": 0,
+                        "session_hash": hashlib.md5(
+                            f"{prompt}{i}".encode()
+                        ).hexdigest()[:8],
+                    },
+                    timeout=30,
+                )
+                if r.status_code != 200:
+                    print(f"[HF Gradio] {space_url} join hata: {r.status_code}")
+                    continue
+
+                event_id = r.json().get("event_id", "")
+                if not event_id:
+                    continue
+
+                # Step 2: poll status
+                deadline = time.time() + MAX_WAIT
+                while time.time() < deadline:
+                    status_r = requests.get(
+                        f"{space_url}/queue/status",
+                        timeout=20,
+                    )
+                    if status_r.status_code == 200:
+                        data = status_r.json()
+                        if data.get("status") == "complete":
+                            output = data.get("output", {})
+                            video_path_remote = (
+                                output.get("data", [{}])[0]
+                                if output.get("data") else None
+                            )
+                            if video_path_remote:
+                                full_url = f"{space_url}/file={video_path_remote}"
+                                path = self._download_video(full_url, f"hf_gradio_{i}")
+                                if path:
+                                    clips.append(path)
+                            break
+                    time.sleep(POLL_EVERY)
+
+            except Exception as e:
+                print(f"[HF Gradio] {e}")
+            time.sleep(3)
+        return clips
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ── Provider: HuggingFace Router (FREE — requires HF_TOKEN) ──────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    def _huggingface_router(self, prompt: str, count: int,
+                             duration: int, aspect: str) -> list[str]:
+        """
+        HuggingFace Inference Providers router — uses serverless providers.
+        Requires HF_TOKEN with at least free tier.
+        Working models as of 2025: wan-ai/Wan2.1-T2V-14B via nebius provider
+        """
+        hf_token = os.environ.get("HF_TOKEN", "")
+        if not hf_token:
+            print("[HF Router] HF_TOKEN yok, atlanıyor.")
+            return []
+
+        clips = []
+        # Use the providers endpoint (replaces broken free inference API)
+        endpoint = "https://router.huggingface.co/nebius/v1/video/generate"
+        headers  = {
+            "Authorization": f"Bearer {hf_token}",
+            "Content-Type":  "application/json",
+        }
 
         for i in range(count):
-            model = models[i % len(models)]
             try:
-                print(f"[HuggingFace] Model: {model}")
                 r = requests.post(
-                    f"https://api-inference.huggingface.co/models/{model}",
+                    endpoint,
                     headers=headers,
                     json={
-                        "inputs": prompt,
-                        "parameters": {
-                            "num_frames":          16,
-                            "num_inference_steps": 25,
-                            "guidance_scale":      7.5,
-                        }
+                        "model":  "Wan-AI/Wan2.1-T2V-14B",
+                        "prompt": prompt,
+                        "num_frames": 81,
+                        "fps": 16,
                     },
                     timeout=120,
                 )
                 if r.status_code == 200:
                     ct = r.headers.get("content-type", "")
                     if "video" in ct or "octet-stream" in ct:
-                        path = ASSETS_DIR / f"hf_{i}_{int(time.time())}.mp4"
+                        path = ASSETS_DIR / f"hf_router_{i}_{int(time.time())}.mp4"
                         with open(path, "wb") as f:
                             f.write(r.content)
                         if path.stat().st_size > 50_000:
-                            print(f"[HuggingFace] ✅ {path.name}")
+                            print(f"[HF Router] ✅ {path.name}")
                             clips.append(str(path))
-                elif r.status_code == 503:
-                    print(f"[HuggingFace] Model yükleniyor, bekleniyor...")
-                    time.sleep(20)
                 else:
-                    print(f"[HuggingFace] {r.status_code}: {r.text[:80]}")
+                    print(f"[HF Router] {r.status_code}: {r.text[:100]}")
             except Exception as e:
-                print(f"[HuggingFace] {e}")
-            time.sleep(3)
-        return clips
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # ── Provider: Upsampler.com (FREE — Wan 2.2, no signup) ─────────────────────
-    # ══════════════════════════════════════════════════════════════════════════
-    def _upsampler(self, prompt: str, count: int,
-                   duration: int, aspect: str) -> list[str]:
-        """
-        Upsampler.com free video generator - Wan 2.2 model.
-        No signup, no watermark, unlimited.
-        URL: https://upsampler.com/free-video-generator-no-signup
-        """
-        clips = []
-        for i in range(count):
-            try:
-                print(f"[Upsampler] Generating video {i+1}/{count}...")
-                # Upsampler uses a simple POST to their free endpoint
-                r = requests.post(
-                    "https://api.upsampler.com/v1/generate",
-                    headers={"Content-Type": "application/json"},
-                    json={
-                        "prompt": prompt,
-                        "model": "wan2.2",
-                        "duration": min(duration, 10),
-                        "aspect_ratio": aspect,
-                    },
-                    timeout=120,
-                )
-                if r.status_code == 200:
-                    data = r.json()
-                    url = data.get("video_url") or data.get("url", "")
-                    if url:
-                        path = self._download_video(url, f"upsampler_{i}")
-                        if path:
-                            clips.append(path)
-                elif r.status_code == 429:
-                    print(f"[Upsampler] Rate limited, bekleniyor...")
-                    time.sleep(10)
-                else:
-                    print(f"[Upsampler] {r.status_code}: {r.text[:80]}")
-            except Exception as e:
-                print(f"[Upsampler] {e}")
-            time.sleep(2)
-        return clips
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # ── Provider: HuggingFace Spaces Wan 2.2 (FREE — unlimited) ───────────────
-    # ══════════════════════════════════════════════════════════════════════════
-    def _wan22_spaces(self, prompt: str, count: int,
-                      duration: int, aspect: str) -> list[str]:
-        """
-        HuggingFace Spaces Wan 2.2 - completely free, no API key, unlimited.
-        URL: https://huggingface.co/spaces/Wan-AI/Wan2.2
-        Queue-based, may require waiting but always available.
-        """
-        clips = []
-        for i in range(count):
-            try:
-                print(f"[Wan2.2] Generating video {i+1}/{count} (queue-based)...")
-                r = requests.post(
-                    "https://wan-ai-wan2-2.hf.space/run/predict",
-                    headers={"Content-Type": "application/json"},
-                    json={
-                        "data": [
-                            prompt,  # prompt
-                            25,      # num_inference_steps
-                            7.5,     # guidance_scale
-                            16,      # num_frames
-                            512,     # height
-                            512,     # width
-                        ]
-                    },
-                    timeout=300,  # 5 min timeout for queue
-                )
-                if r.status_code == 200:
-                    data = r.json()
-                    # HuggingFace Spaces returns data in different format
-                    if isinstance(data, dict):
-                        url = data.get("data", [{}])[0].get("url", "") if data.get("data") else ""
-                    elif isinstance(data, list) and len(data) > 0:
-                        url = data[0].get("url", "") if isinstance(data[0], dict) else ""
-                    else:
-                        url = ""
-                    
-                    if url:
-                        path = self._download_video(url, f"wan22_{i}")
-                        if path:
-                            clips.append(path)
-                elif r.status_code == 503:
-                    print(f"[Wan2.2] Queue dolu, bekleniyor...")
-                    time.sleep(15)
-                else:
-                    print(f"[Wan2.2] {r.status_code}: {r.text[:80]}")
-            except Exception as e:
-                print(f"[Wan2.2] {e}")
-            time.sleep(3)
+                print(f"[HF Router] {e}")
+            time.sleep(5)
         return clips
 
     # ── Download helper ────────────────────────────────────────────────────────
