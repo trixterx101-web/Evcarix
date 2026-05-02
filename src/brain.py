@@ -200,28 +200,49 @@ class EvcarixBrain:
         text = text.strip(' :;|')
         return text
 
-    def create_daily_plan(self, slot="evening", content_mode="auto"):
+    def create_daily_plan(self, slot="evening"):
         print("Evcarix Brain: Plan oluşturuluyor...")
 
-        # ── YENİ: Content mode kontrolü ────────────────────────────────
-        # trend modunda: YouTube trend'ten ilham al
-        # auto modunda: Normal sistem konusu
-        if content_mode == "trend":
-            print("[Brain] TREND MODU: YouTube trend'ten ilham alınıyor...")
-            try:
-                triggered_plan = self.trend_engine.trigger_from_youtube_trend(hours_back=6)
-                if triggered_plan:
-                    print(f"\n🚀 TREND TETİKLEYİCİ AKTIF!")
-                    print(f"   Başlık : {triggered_plan['title']}")
-                    print(f"   Konu   : {triggered_plan['topic']}")
-                    print(f"   Kaynak : {triggered_plan.get('inspired_by', 'N/A')}")
-                    print(f"   NOT    : Görüntü/ses kopyalanmadı — tamamen orijinal içerik")
-                    # Geçmişe kaydet
-                    self._save_history(triggered_plan)
-                    return triggered_plan
-            except Exception as e:
-                print(f"[Brain] Trend tetikleyici hatası (auto moda geçiliyor): {e}")
-        # ── Auto veya trend başarısızsa normal pipeline devam eder ──────
+        # ── YouTube Trend Tetikleyici (öncelikli) ────────────────────
+        try:
+            triggered_plan = self.trend_engine.trigger_from_youtube_trend(hours_back=6)
+            if triggered_plan:
+                print(f"\n🚀 TREND MOD AKTİF!")
+                print(f"   Başlık : {triggered_plan['title']}")
+                print(f"   Konu   : {triggered_plan['topic']}")
+                print(f"   Kaynak : {triggered_plan.get('inspired_by', 'N/A')}")
+                print(f"   ✅ NOT : Görüntü/ses kopyalanmadı — tamamen orijinal içerik")
+                self._save_history(triggered_plan)
+
+                # SEO metadata ekle
+                import datetime as _dt
+                best_hours = [6, 7, 8, 14, 15, 16, 19, 20]
+                now_h = _dt.datetime.utcnow().hour
+                next_best = min(best_hours, key=lambda h: (h - now_h) % 24)
+                triggered_plan["seo_metadata"] = {
+                    "suggested_upload_time_utc": f"{next_best:02d}:00",
+                    "first_24h_actions": [
+                        "Pin a question comment immediately after upload",
+                        "Reply to ALL comments within first 2 hours",
+                        "Share to r/electricvehicles and r/teslamotors",
+                        "Post on Twitter/X with top 3 hashtags",
+                        "Add to EV Data playlist within 10 min of upload",
+                    ],
+                    "a_b_test_titles": triggered_plan.get("all_titles", []),
+                    "target_ctr": "12-18%",
+                    "target_retention": "70%+",
+                    "shorts_optimization": {
+                        "hook_in_first_3s": True,
+                        "loop_friendly_ending": True,
+                        "vertical_9_16": True,
+                        "recommended_length_sec": 38,
+                    }
+                }
+                print(f"[Brain] 📊 Upload önerisi: {next_best:02d}:00 UTC | Hedef CTR: %12-18")
+                return triggered_plan
+        except Exception as e:
+            print(f"[Brain] Trend tetikleyici hatası (normal moda geçiliyor): {e}")
+        # ── Trend bulunamazsa normal pipeline devam eder ─────────────
 
         config = {"type": "short", "duration": 55}  # Shorts formatı
 
@@ -281,6 +302,26 @@ class EvcarixBrain:
             "tags":       tags_list,
             "variation":  variation,
         }
+
+        # ── SEO Metadata (normal mod) ─────────────────────────────────
+        import datetime as _dt
+        best_hours = [6, 7, 8, 14, 15, 16, 19, 20]
+        now_h = _dt.datetime.utcnow().hour
+        next_best = min(best_hours, key=lambda h: (h - now_h) % 24)
+        plan["seo_metadata"] = {
+            "suggested_upload_time_utc": f"{next_best:02d}:00",
+            "first_24h_actions": [
+                "Pin a question comment immediately after upload",
+                "Reply to ALL comments within first 2 hours",
+                "Share to r/electricvehicles and r/teslamotors",
+                "Post on Twitter/X with top 3 hashtags",
+                "Add to EV Data playlist within 10 min of upload",
+            ],
+            "a_b_test_titles": titles,
+            "target_ctr": "12-18%",
+            "target_retention": "70%+",
+        }
+        print(f"[Brain] 📊 Upload önerisi: {next_best:02d}:00 UTC | Hedef CTR: %12-18")
 
         # Geçmişe kaydet
         self._save_history(plan)

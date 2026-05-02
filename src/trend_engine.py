@@ -2,7 +2,7 @@ import os
 import json
 import random
 import re
-import datetime
+import datetime as dt
 import feedparser
 import requests
 import pandas as pd
@@ -828,6 +828,417 @@ Return ONLY this JSON (no markdown, no backticks):
         print(f"[TrendEngine] Core fallback: {selected_core}")
         self._save_topic_history(selected_core)
         return selected_core
+
+
+# ── JSON Temizleyici ────────────────────────────────────────────
+    def _clean_json(self, text: str) -> str:
+        import re
+        text = re.sub(r'```json\s*', '', text)
+        text = re.sub(r'```\s*', '', text)
+        text = text.strip()
+        text = re.sub(r'(?<!\\)[\x00-\x1f\x7f]', ' ', text)
+        text = re.sub(r'  +', ' ', text)
+        return text
+
+    # ── Son X saatteki EV Short'ları ───────────────────────────────
+    def get_recent_ev_shorts(self, hours_back=6, max_results=15):
+        """
+        YouTube Data API ile son X saatte yayınlanan EV Short'larını bulur.
+        SADECE başlık + açıklama alır — görüntü/ses ALMAZ — telif riski SIFIR.
+        """
+        from datetime import timezone, timedelta
+        api_key = os.getenv("YOUTUBE_API_KEY")
+        if not api_key:
+            print("[TrendEngine] YOUTUBE_API_KEY yok.")
+            return []
+
+        published_after = (dt.datetime.now(timezone.utc) - timedelta(hours=hours_back))
+        published_after_str = published_after.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        queries = [
+            "electric car review shorts 2025",
+            "EV new model 2025 2026 shorts",
+            "electric vehicle launch shorts",
+            "tesla new model shorts",
+            "BYD electric car review shorts",
+            "EV battery range test shorts",
+            "electric car comparison shorts",
+            "Hyundai Kia EV shorts",
+            "rivian lucid electric car shorts",
+            "EV charging speed test shorts",
+        ]
+        query = random.choice(queries)
+
+        params = {
+            "part": "snippet",
+            "q": query,
+            "type": "video",
+            "videoDuration": "short",
+            "order": "date",
+            "publishedAfter": published_after_str,
+            "relevanceLanguage": "en",
+            "maxResults": max_results,
+            "key": api_key,
+        }
+        try:
+            r = requests.get("https://www.googleapis.com/youtube/v3/search",
+                             params=params, timeout=15)
+            r.raise_for_status()
+            items = r.json().get("items", [])
+
+            ev_kw = ["electric", "ev", "battery", "tesla", "range", "charging",
+                     "byd", "ioniq", "rivian", "lucid", "volt", "kwh", "hybrid",
+                     "motor", "watt", "mercedes eq", "bmw i", "kia ev", "hyundai",
+                     "polestar", "nio", "xpeng"]
+            results = []
+            for item in items:
+                snip = item.get("snippet", {})
+                video_id = item.get("id", {}).get("videoId", "")
+                title = snip.get("title", "")
+                description = snip.get("description", "")
+                combined = (title + " " + description).lower()
+                if not any(kw in combined for kw in ev_kw):
+                    continue
+                results.append({
+                    "video_id": video_id,
+                    "title": title,
+                    "description": description[:500],
+                    "channel": snip.get("channelTitle", ""),
+                    "published": snip.get("publishedAt", ""),
+                    "url": f"https://www.youtube.com/watch?v={video_id}",
+                })
+            print(f"[TrendEngine] Son {hours_back}s: {len(results)} EV Short (sorgu: '{query}')")
+            return results
+        except Exception as e:
+            print(f"[TrendEngine] get_recent_ev_shorts hatası: {e}")
+            return []
+
+    # ── Çoklu LLM ile orijinal script üret ─────────────────────────
+    def generate_inspired_script(self, video_data: dict) -> dict | None:
+        """
+        YouTube videosunun SADECE başlık+açıklamasından ilham alarak
+        tamamen orijinal Evcarix script üretir.
+        LLM Öncelik: Gemini → Groq 70B → Groq 8B → OpenRouter → Mistral →
+                     Cohere → Together → Perplexity → DeepSeek → HuggingFace
+        """
+        title = video_data.get("title", "")
+        description = video_data.get("description", "")
+        channel = video_data.get("channel", "")
+
+        system = (
+            "You are the head writer for Evcarix, a data-driven EV YouTube Shorts channel. "
+            "Style: analytical, fact-first, no hype. Motto: 'No hype. Just numbers.' "
+            "Always return valid JSON only — no markdown, no extra text."
+        )
+        user = (
+            f"A competitor published a Short about: \"{title}\"\n"
+            f"Channel: {channel}\n"
+            f"Their description: \"{description[:300]}\"\n\n"
+            f"Write a COMPLETELY ORIGINAL Evcarix script inspired by this TOPIC only.\n"
+            f"Rules:\n"
+            f"- Do NOT copy their words or sentence structure\n"
+            f"- Data-driven: real stats, %, kWh, miles numbers\n"
+            f"- 35-45 seconds spoken (80-100 words)\n"
+            f"- Start with a shocking specific stat\n"
+            f"- End with: 'Subscribe to Evcarix for real EV data.'\n"
+            f"- English only, USA/Europe/China examples ONLY\n"
+            f"- Never mention Turkey\n\n"
+            f"Return ONLY this JSON (no backticks):\n"
+            f'{{"topic":"one line topic","title":"YouTube title under 70 chars with number",'
+            f'"script":"full script","tags":["tag1","tag2","tag3","tag4","tag5","tag6","tag7"],'
+            f'"hook":"first sentence","category":"battery_science|range_tests|charging|comparisons|market_data|education"}}'
+        )
+
+        # LLM pipeline (CreativeWriter ile aynı sıra)
+        llm_calls = [
+            ("Gemini",      lambda: self._call_llm_gemini(system, user)),
+            ("Groq 70B",    lambda: self._call_llm_groq(system, user, "llama-3.3-70b-versatile")),
+            ("Groq 8B",     lambda: self._call_llm_groq(system, user, "llama-3.1-8b-instant")),
+            ("OpenRouter",  lambda: self._call_llm_openrouter(system, user)),
+            ("Mistral",     lambda: self._call_llm_mistral(system, user)),
+            ("Cohere",      lambda: self._call_llm_cohere(system, user)),
+            ("Together",    lambda: self._call_llm_together(system, user)),
+            ("Perplexity",  lambda: self._call_llm_perplexity(system, user)),
+            ("DeepSeek",    lambda: self._call_llm_deepseek(system, user)),
+            ("HuggingFace", lambda: self._call_llm_huggingface(system, user)),
+        ]
+
+        for name, fn in llm_calls:
+            try:
+                print(f"[LLM] {name} deneniyor...")
+                raw = fn()
+                if not raw:
+                    continue
+                cleaned = self._clean_json(raw)
+                import re as _re
+                match = _re.search(r'\{.*\}', cleaned, _re.DOTALL)
+                if match:
+                    result = json.loads(match.group())
+                    if all(k in result for k in ["topic", "title", "script"]):
+                        result["source_video_id"] = video_data.get("video_id", "")
+                        result["source_title"]    = title
+                        result["inspired_by"]     = video_data.get("url", "")
+                        print(f"[LLM] ✅ {name}: {result['title'][:50]}")
+                        return result
+            except Exception as e:
+                print(f"[LLM] {name} hata: {e}")
+
+        print("[LLM] ❌ Tüm LLM'ler başarısız.")
+        return None
+
+    def _call_llm_gemini(self, system, user):
+        if not GEMINI_AVAILABLE or not self.gemini_client:
+            return None
+        try:
+            resp = self.gemini_client.models.generate_content(
+                model='gemini-2.0-flash', contents=f"{system}\n\n{user}")
+            return resp.text
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                print("[LLM] Gemini kota →")
+            else:
+                print(f"[LLM] Gemini: {e}")
+            return None
+
+    def _call_llm_groq(self, system, user, model):
+        groq_keys = [k for k in [
+            os.getenv("GROQ_API_KEY"),
+            os.getenv("GROQ_API_KEY_2"),
+            os.getenv("GROQ_API_KEY_3"),
+        ] if k]
+        if not groq_keys:
+            return None
+        try:
+            from groq import Groq
+            for key in groq_keys:
+                try:
+                    client = Groq(api_key=key)
+                    resp = client.chat.completions.create(
+                        model=model,
+                        messages=[{"role": "system", "content": system},
+                                  {"role": "user", "content": user}],
+                        max_tokens=600, temperature=0.7,
+                    )
+                    return resp.choices[0].message.content.strip()
+                except Exception as e:
+                    if "429" in str(e) or "rate_limit" in str(e).lower():
+                        continue
+                    raise
+        except Exception as e:
+            print(f"[LLM] Groq ({model}): {e}")
+        return None
+
+    def _call_llm_openrouter(self, system, user):
+        key = os.getenv("OPENROUTER_API_KEY")
+        if not key:
+            return None
+        try:
+            r = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}",
+                         "Content-Type": "application/json",
+                         "HTTP-Referer": "https://evcarix.com"},
+                json={"model": "mistralai/mistral-7b-instruct:free",
+                      "messages": [{"role": "system", "content": system},
+                                   {"role": "user", "content": user}],
+                      "max_tokens": 600},
+                timeout=30,
+            )
+            return r.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            print(f"[LLM] OpenRouter: {e}")
+            return None
+
+    def _call_llm_mistral(self, system, user):
+        key = os.getenv("MISTRAL_API_KEY")
+        if not key:
+            return None
+        try:
+            r = requests.post(
+                "https://api.mistral.ai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json={"model": "mistral-small-latest",
+                      "messages": [{"role": "system", "content": system},
+                                   {"role": "user", "content": user}],
+                      "max_tokens": 600},
+                timeout=30,
+            )
+            return r.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            print(f"[LLM] Mistral: {e}")
+            return None
+
+    def _call_llm_cohere(self, system, user):
+        key = os.getenv("COHERE_API_KEY")
+        if not key:
+            return None
+        try:
+            r = requests.post(
+                "https://api.cohere.com/v1/chat",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json={"model": "command-r", "message": user, "preamble": system, "max_tokens": 600},
+                timeout=30,
+            )
+            return r.json().get("text", "").strip()
+        except Exception as e:
+            print(f"[LLM] Cohere: {e}")
+            return None
+
+    def _call_llm_together(self, system, user):
+        key = os.getenv("TOGETHER_API_KEY")
+        if not key:
+            return None
+        try:
+            r = requests.post(
+                "https://api.together.xyz/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json={"model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                      "messages": [{"role": "system", "content": system},
+                                   {"role": "user", "content": user}],
+                      "max_tokens": 600},
+                timeout=30,
+            )
+            return r.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            print(f"[LLM] Together: {e}")
+            return None
+
+    def _call_llm_perplexity(self, system, user):
+        key = os.getenv("PERPLEXITY_API_KEY")
+        if not key:
+            return None
+        try:
+            r = requests.post(
+                "https://api.perplexity.ai/chat/completions",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json={"model": "llama-3.1-sonar-small-128k-online",
+                      "messages": [{"role": "system", "content": system},
+                                   {"role": "user", "content": user}],
+                      "max_tokens": 600},
+                timeout=30,
+            )
+            return r.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            print(f"[LLM] Perplexity: {e}")
+            return None
+
+    def _call_llm_deepseek(self, system, user):
+        key = os.getenv("DEEPSEEK_API_KEY")
+        if not key:
+            return None
+        try:
+            r = requests.post(
+                "https://api.deepseek.com/chat/completions",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json={"model": "deepseek-chat",
+                      "messages": [{"role": "system", "content": system},
+                                   {"role": "user", "content": user}],
+                      "max_tokens": 600},
+                timeout=30,
+            )
+            return r.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            print(f"[LLM] DeepSeek: {e}")
+            return None
+
+    def _call_llm_huggingface(self, system, user):
+        key = os.getenv("HUGGINGFACE_API_KEY")
+        if not key:
+            return None
+        try:
+            model = "mistralai/Mistral-7B-Instruct-v0.3"
+            prompt_text = f"<s>[INST] {system}\n\n{user} [/INST]"
+            r = requests.post(
+                f"https://api-inference.huggingface.co/models/{model}",
+                headers={"Authorization": f"Bearer {key}"},
+                json={"inputs": prompt_text,
+                      "parameters": {"max_new_tokens": 600,
+                                     "temperature": 0.7,
+                                     "return_full_text": False}},
+                timeout=60,
+            )
+            result = r.json()
+            if isinstance(result, list) and result:
+                return result[0].get("generated_text", "").strip()
+        except Exception as e:
+            print(f"[LLM] HuggingFace: {e}")
+        return None
+
+    # ── Ana Trend Tetikleyici ───────────────────────────────────────
+    def trigger_from_youtube_trend(self, hours_back=6) -> dict | None:
+        """
+        1. Son X saatteki EV Short'larını bul
+        2. Kullanılmamış birini seç
+        3. Tamamen orijinal script üret (çoklu LLM)
+        4. daily_plan.json formatında döndür
+        """
+        print(f"\n[TrendEngine] 🔍 Son {hours_back}s EV Short'ları taranıyor...")
+        recent = self.get_recent_ev_shorts(hours_back=hours_back)
+        if not recent:
+            print("[TrendEngine] Yeni EV Short bulunamadı.")
+            return None
+
+        selected = None
+        for video in recent:
+            if not self._is_used_recently(video["title"]):
+                selected = video
+                break
+
+        if not selected:
+            print("[TrendEngine] Tüm bulunan videolar daha önce kullanılmış.")
+            return None
+
+        print(f"[TrendEngine] 🎯 Seçilen  : {selected['title'][:60]}")
+        print(f"[TrendEngine] 📺 Kanal    : {selected['channel']}")
+        print(f"[TrendEngine] 🔗 İlham URL: {selected['url']}")
+        print(f"[TrendEngine] ⚠️  NOT      : Görüntü/ses kopyalanmıyor — sadece konu ilhamı")
+
+        script_data = self.generate_inspired_script(selected)
+        if not script_data:
+            return None
+
+        self._save_topic_history(selected["title"])
+
+        now = dt.datetime.now()
+        tags = script_data.get("tags", [])
+        for must in ["ev", "electriccar", "evcarix", "Shorts", "ElectricVehicle"]:
+            if must not in tags:
+                tags.append(must)
+
+        plan = {
+            "timestamp":       now.strftime("%Y%m%d_%H%M%S"),
+            "slot":            os.getenv("UPLOAD_SLOT", "evening"),
+            "config":          {"type": "short", "duration": 55},
+            "topic":           script_data["topic"],
+            "full_topic":      script_data["topic"],
+            "category":        script_data.get("category", "trend"),
+            "title":           script_data["title"],
+            "all_titles":      [script_data["title"]],
+            "script":          script_data["script"],
+            "voice":           random.choice(["male", "female"]),
+            "description":     (
+                f"{script_data['title']}\n\n"
+                f"Real EV data. No hype. Just numbers. — Evcarix\n\n"
+                f"What you'll learn:\n"
+                f"— {script_data.get('hook', script_data['topic'])}\n\n"
+                f"{chr(10).join('#' + t.replace(' ', '') for t in tags[:15])}"
+            ),
+            "tags":            tags,
+            "variation": {
+                "cta_style":  "Subscribe to Evcarix for real EV data.",
+                "hook_style": "trend",
+                "emoji_set":  ["⚡", "🔋", "📊"],
+            },
+            "inspired_by":     script_data.get("inspired_by", ""),
+            "source_video_id": script_data.get("source_video_id", ""),
+        }
+
+        with open("daily_plan.json", "w", encoding="utf-8") as f:
+            json.dump(plan, f, ensure_ascii=False, indent=4)
+
+        print(f"[TrendEngine] ✅ Trend plan kaydedildi → daily_plan.json")
+        print(f"[TrendEngine] 📝 Başlık: {plan['title']}")
+        return plan
 
 
 if __name__ == "__main__":

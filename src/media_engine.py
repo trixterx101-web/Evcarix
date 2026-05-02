@@ -74,6 +74,10 @@ class MediaEngine:
         self.hf_token = os.getenv("HF_TOKEN")
         self.coverr_api_key = os.getenv("COVERR_API_KEY")
         self.voice_engine = VoiceEngine()
+        
+        # Kullanılan klip takip sistemi
+        self.used_clips_file = "used_clips.json"
+        self._load_used_clips()
 
         # yt-dlp kurulu mu kontrol et
         try:
@@ -466,87 +470,77 @@ class MediaEngine:
         return paths
 
     # ─── Ana İndirme Metodu — Pexels + Pixabay + Coverr birleşik ──────────────
-    def download_stock_videos(self, query, output_dir="assets/temp_videos", count=4, orientation="portrait", category=None):
+    def download_stock_videos(self, query, output_dir="assets/temp_videos",
+                              count=6, orientation="portrait", category=None):
         """
-        Video kaynaklarını kalite sırasına göre indirir:
-        1. OEM Press Kit (Tesla/Hyundai/BMW) - En kaliteli 4K/1080p profesyonel
-        2. NASA/DOE - Kamu malı, yüksek kalite
-        3. Pexels - Ücretsiz ama kaliteli
-        4. Pixabay - Ücretsiz, orta kalite
-        5. Coverr - Ücretsiz
-        6. YouTube CC - Değişken kalite
+        Tüm kaynaklardan taze video indirir.
+        Daha önce kullanılan klipler otomatik olarak hariç tutulur.
+        Öncelik: Pexels → Pixabay → OEM PressKit → NASA/DOE → Pexels (ek)
         """
+        import json as _json
         os.makedirs(output_dir, exist_ok=True)
-
-        # Öncelik: En kaliteli kaynaklar daha fazla alır
-        oem_count = min(count, 2)
-        nasa_count = min(max(count - oem_count, 0), 2)
-        pexels_count = min(max(count - oem_count - nasa_count, 0), 2)
-        pixabay_count = min(max(count - oem_count - nasa_count - pexels_count, 0), 1)
-        coverr_count = min(max(count - oem_count - nasa_count - pexels_count - pixabay_count, 0), 1)
-        yt_count = max(count - oem_count - nasa_count - pexels_count - pixabay_count - coverr_count, 0)
-
-        # Sıralı indir (kalite sırası)
         all_paths = []
 
-        # 1. OEM Press Kit (En kaliteli)
-        if oem_count > 0:
-            oem_paths = self._download_from_oem_presskit(output_dir, oem_count, category)
-            all_paths += oem_paths
-            print(f"[MediaEngine] OEM PressKit (4K/Pro): {len(oem_paths)} klip")
+        # 1. Pexels (kalite öncelikli)
+        pex_q = self._get_professional_query(query, category)
+        pex = self._download_from_pexels(pex_q, output_dir, 3, orientation, category=category)
+        pex_fresh = self._filter_used_clips(pex)
+        all_paths += pex_fresh
+        print(f"[MediaEngine] Pexels (kalite): {len(pex_fresh)} taze klip")
 
-        # 2. NASA/DOE (Yüksek kalite)
-        if nasa_count > 0 and len(all_paths) < count:
-            try:
-                pub_paths = self._download_public_domain(output_dir, nasa_count)
-                all_paths += pub_paths
-                print(f"[MediaEngine] NASA/DOE (High Quality): {len(pub_paths)} klip")
-            except Exception as e:
-                print(f"[MediaEngine] NASA/DOE: ağ erişimi yok, atlandı ({str(e)[:50]})")
-
-        # 3. Pexels (Kaliteli)
-        if pexels_count > 0 and len(all_paths) < count:
-            remaining_pex = min(pexels_count, count - len(all_paths))
-            pex_paths = self._download_from_pexels(query, output_dir, remaining_pex, orientation, category=category)
-            all_paths += pex_paths
-            print(f"[MediaEngine] Pexels (Quality): {len(pex_paths)} klip")
-
-        # 4. Pixabay (Orta kalite)
-        if pixabay_count > 0 and len(all_paths) < count:
-            remaining_pix = min(pixabay_count, count - len(all_paths))
-            pix_paths = self._download_from_pixabay(query, output_dir, remaining_pix, orientation, category=category)
-            all_paths += pix_paths
-            print(f"[MediaEngine] Pixabay (Medium): {len(pix_paths)} klip")
-
-        # 5. Coverr (Değişken)
-        if coverr_count > 0 and len(all_paths) < count:
-            remaining_cov = min(coverr_count, count - len(all_paths))
-            cov_paths = self._download_from_coverr(query, output_dir, remaining_cov, orientation, category=category)
-            all_paths += cov_paths
-            print(f"[MediaEngine] Coverr (Variable): {len(cov_paths)} klip")
-
-        # 6. YouTube CC (Son çare)
-        if yt_count > 0 and len(all_paths) < count and self.ytdlp_available:
-            remaining_yt = min(yt_count, count - len(all_paths))
-            yt_paths = self._download_from_youtube_cc(query, output_dir, remaining_yt)
-            all_paths += yt_paths
-            print(f"[MediaEngine] YouTube CC (Fallback): {len(yt_paths)} klip")
-
-        # Eksik varsa Pexels ile tamamla
+        # 2. Pexels (topic bazlı — farklı sorgu)
         if len(all_paths) < count:
-            extra_needed = count - len(all_paths)
-            extra = self._download_from_pexels(query, output_dir, extra_needed, orientation, category=category)
-            all_paths += extra
-            print(f"[MediaEngine] Pexels ile tamamlandı: {len(extra)} klip")
+            topic_query = f"Tesla {query} exterior 4k" if "tesla" not in query.lower() else query
+            pex2 = self._download_from_pexels(topic_query, output_dir, count, orientation, category=category)
+            pex2_fresh = self._filter_used_clips(pex2)
+            all_paths += [p for p in pex2_fresh if p not in all_paths]
+            print(f"[MediaEngine] Pexels (topic): {len(pex2_fresh)} taze klip")
+
+        # 3. Pixabay
+        if len(all_paths) < count:
+            pix = self._download_from_pixabay(query, output_dir,
+                                               count - len(all_paths), orientation, category=category)
+            pix_fresh = self._filter_used_clips(pix)
+            all_paths += [p for p in pix_fresh if p not in all_paths]
+            print(f"[MediaEngine] Pixabay: {len(pix_fresh)} taze klip")
+
+        # 4. OEM Press Kit
+        if len(all_paths) < count:
+            oem = self._download_from_oem_presskit(output_dir, 3, category)
+            oem_fresh = self._filter_used_clips(oem)
+            all_paths += [p for p in oem_fresh if p not in all_paths]
+            print(f"[MediaEngine] OEM PressKit: {len(oem_fresh)} taze klip")
+
+        # 5. NASA/DOE
+        if len(all_paths) < count:
+            pub = self._download_public_domain(output_dir, 2)
+            pub_fresh = self._filter_used_clips(pub)
+            all_paths += [p for p in pub_fresh if p not in all_paths]
+            print(f"[MediaEngine] NASA/DOE: {len(pub_fresh)} taze klip")
+
+        # 6. Tüm hash'ler sıfırla ve tekrar dene — eğer hepsi kullanılmışsa
+        if len(all_paths) < 2:
+            print("[MediaEngine] ⚠️  Tüm klipler kullanılmış. Hash geçmişi temizleniyor...")
+            self._used_clips.clear()
+            self._save_used_clips()
+            # Temizledikten sonra tekrar Pexels'ten indir
+            retry = self._download_from_pexels(
+                self._get_professional_query(query, category),
+                output_dir + "_retry",
+                count, orientation, category=category
+            )
+            all_paths += retry
+            print(f"[MediaEngine] Yeniden indirme: {len(retry)} klip")
 
         random.shuffle(all_paths)
 
         if not all_paths:
-            print("[MediaEngine] Tüm kaynaklardan video alınamadı!")
+            print("[MediaEngine] ⚠️  Hiçbir kaynaktan taze video alınamadı!")
             return []
 
-        print(f"[MediaEngine] ✅ Toplam {len(all_paths)} klip hazır (Kalite sırasıyla)")
-        return all_paths[:count]
+        final = all_paths[:count]
+        print(f"[MediaEngine] ✅ {len(final)} taze klip hazır (daha önce kullanılanlar hariç)")
+        return final
 
     # ─── NASA / DOE Kamu Malı Videolar ───────────────────────────────────────
     def _download_public_domain(self, output_dir, count):
@@ -1231,3 +1225,55 @@ class MediaEngine:
         except Exception as e:
             print(f"[MediaEngine] Thumbnail hatası: {e}")
             return None
+
+    # ── Kullanılan Klip Takip Sistemi ─────────────────────────────
+    def _load_used_clips(self):
+        """Daha önce kullanılan video klip hash'lerini yükler."""
+        if os.path.exists(self.used_clips_file):
+            try:
+                with open(self.used_clips_file, "r") as f:
+                    self._used_clips = set(json.load(f))
+            except Exception:
+                self._used_clips = set()
+        else:
+            self._used_clips = set()
+        print(f"[MediaEngine] 📋 Daha önce kullanılan klip sayısı: {len(self._used_clips)}")
+
+    def _save_used_clips(self):
+        """Kullanılan klip listesini diske kaydeder (max 500 kayıt)."""
+        clip_list = list(self._used_clips)[-500:]
+        with open(self.used_clips_file, "w") as f:
+            json.dump(clip_list, f)
+
+    def _get_clip_hash(self, file_path: str) -> str:
+        """Dosya adı + boyut = benzersiz tanımlayıcı (MD5 gerektirmez)."""
+        try:
+            size = os.path.getsize(file_path)
+            return f"{os.path.basename(file_path)}_{size}"
+        except Exception:
+            return os.path.basename(file_path)
+
+    def _filter_used_clips(self, paths: list) -> list:
+        """Daha önce kullanılan klipleri listeden çıkarır."""
+        fresh, skipped = [], 0
+        for p in paths:
+            if not p or not os.path.exists(p):
+                continue
+            clip_hash = self._get_clip_hash(p)
+            if clip_hash not in self._used_clips:
+                fresh.append(p)
+            else:
+                skipped += 1
+        if skipped > 0:
+            print(f"[MediaEngine] 🔄 {skipped} daha önce kullanılan klip atlandı → taze klip kullanılıyor.")
+        return fresh
+
+    def mark_clips_as_used(self, paths: list):
+        """Video başarıyla üretilince klipleri kullanıldı olarak işaretle."""
+        count = 0
+        for p in paths:
+            if p and os.path.exists(p):
+                self._used_clips.add(self._get_clip_hash(p))
+                count += 1
+        self._save_used_clips()
+        print(f"[MediaEngine] ✅ {count} klip 'kullanıldı' olarak kaydedildi → bir daha seçilmeyecek.")

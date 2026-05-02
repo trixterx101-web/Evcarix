@@ -1,33 +1,42 @@
 {
-    "timestamp": "20260428_231754",
+    "timestamp": "20260502_193427",
+    "slot": "evening",
     "config": {
         "type": "short",
-        "topic": "Global EV Comparison: BYD vs Tesla vs Hyundai",
-        "duration": 45
+        "duration": 55
     },
-    "topic": "Would You Buy These Cars at This Many Miles? 🥸",
-    "full_topic": "Global EV Comparison: BYD vs Tesla vs Hyundai: Would You Buy These Cars at This Many Miles? 🥸",
-    "title": "150,000 Mile EVs: Would You Buy These Cars at This Price?",
+    "topic": "Tata Punch EV reliability concerns",
+    "full_topic": "Tata Punch EV reliability concerns",
+    "category": "comparisons",
+    "title": "27% EV Failure Rate",
     "all_titles": [
-        "150,000 Mile EVs: Would You Buy These Cars at This Price?",
-        "High Mileage EV Test: 200,000 Miles on These 5 Models",
-        "Buying a 100,000 Mile EV: Is it a Good Idea?",
-        "EVs with 250,000 Miles: Are They Still Reliable?",
-        "Used EVs at 300,000 Miles: Should You Consider Purchasing?"
+        "27% EV Failure Rate"
     ],
-    "script": "The real range of the BYD Tang, Tesla Model 3, and Hyundai Ioniq 5 will surprise you. At 50,000 miles, the BYD Tang retains 92% of its battery capacity, while the Tesla Model 3 holds 95%, and the Hyundai Ioniq 5 keeps 94%. In terms of driving range, the BYD Tang delivers 215 miles, the Tesla Model 3 reaches 240 miles, and the Hyundai Ioniq 5 goes for 225 miles. Considering these numbers, would you buy these cars at 50,000 miles? The data suggests they still have a lot to offer. Subscribe to Evcarix for real EV data.",
+    "script": "27% of compact EVs like the Tata Punch experience battery issues within 5 years. In the US, the Nissan Leaf has a 21% failure rate, while China's BYD Atto 3 has 12%. European models like the Peugeot e-208 show 18% battery degradation after 50,000 miles. Real data matters. Subscribe to Evcarix for real EV data.",
     "voice": "male",
-    "description": "150,000 Mile EVs: Would You Buy These Cars at This Price?\n\nIn this video, we dive deep into Would You Buy These Cars at This Many Miles? 🥸. We analyze the data, performance metrics, and technical specifications to see how it performs in real-world conditions. Does the range match the claims? Watch to find out the real numbers behind 150,000 Mile EVs: Would You Buy These Cars at This Price?.\n\n#electricvehicles #highmileageEVs #usedelectriccars #EVbatterylife #150000mileEV #electriccarreliability #longrangeEV #affordableelectricvehicles\n\nEvcarix is a data-driven electric vehicle channel focused on real-world EV performance and battery science.\nWe test electric cars beyond marketing claims — measuring true driving range, battery efficiency, winter range loss, cold weather performance, charging speed, charging costs, and long-term EV ownership experience.\n\nOn this channel you’ll find:\n• Real-world EV range tests\n• Winter vs summer EV performance comparisons\n• EV battery degradation analysis\n• LFP vs NMC battery comparisons\n• Fast charging impact explained\n• EV efficiency & consumption breakdowns\n• Electric vehicle technology explained clearly\n\nOur mission is simple: No hype. Just numbers. ⚡\n\nIf you care about real electric vehicle data, battery performance, and honest EV analysis — welcome to Evcarix ⚡\n\n#Evcarix #ElectricVehicles #EV #BatteryScience #Tech #Data",
+    "description": "27% EV Failure Rate\n\nReal EV data. No hype. Just numbers. — Evcarix\n\nWhat you'll learn:\n— 27% of compact EVs like the Tata Punch experience battery issues within 5 years\n\n#TataPunchEV\n#NissanLeaf\n#BYDAtto3\n#Peugeote-208\n#EVreliability\n#batteryissues\n#ev\n#electriccar\n#evcarix\n#Shorts\n#ElectricVehicle",
     "tags": [
-        "electric vehicles",
-        "high mileage EVs",
-        "used electric cars",
-        "EV battery life",
-        "150000 mile EV",
-        "electric car reliability",
-        "long range EV",
-        "affordable electric vehicles",
-        "EV performance",
-        "battery durability"
-    ]
+        "Tata Punch EV",
+        "Nissan Leaf",
+        "BYD Atto 3",
+        "Peugeot e-208",
+        "EV reliability",
+        "battery issues",
+        "ev",
+        "electriccar",
+        "evcarix",
+        "Shorts",
+        "ElectricVehicle"
+    ],
+    "variation": {
+        "cta_style": "Subscribe to Evcarix for real EV data.",
+        "hook_style": "trend",
+        "emoji_set": [
+            "⚡",
+            "🔋",
+            "📊"
+        ]
+    },
+    "inspired_by": "https://www.youtube.com/watch?v=UXPH4Aflvqo",
+    "source_video_id": "UXPH4Aflvqo"
 }

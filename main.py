@@ -166,6 +166,11 @@ class EvcarixOrchestrator:
             category=plan.get("category", "general")
         )
 
+        # ── Kullanılan klipleri kaydet — bir daha seçilmesin ──────────
+        if all_video_clips:
+            self.media_engine.mark_clips_as_used(all_video_clips)
+        print(f"[Main] 🔄 Klip geçmişi güncellendi — bir sonraki video farklı görüntüler kullanacak.")
+
         # ── 7. YouTube'a yükle ────────────────────────────────────
         if self.uploader and os.path.exists(final_video_path):
             print("\n[7/7] YouTube'a yükleniyor...")
