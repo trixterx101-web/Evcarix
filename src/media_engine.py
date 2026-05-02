@@ -20,6 +20,7 @@ class MediaEngine:
         self.kling_access_key = os.getenv("KLING_ACCESS_KEY")
         self.kling_secret_key = os.getenv("KLING_SECRET_KEY")
         self.dashscope_api_key = os.getenv("DASHSCOPE_API_KEY")
+        self.hf_token = os.getenv("HF_TOKEN")
         self.voice_engine = VoiceEngine()
 
     async def generate_voiceover(self, text, output_path, voice_type="female", rate="+10%"):
@@ -582,6 +583,52 @@ class MediaEngine:
             print(f"[Qwen] Hata: {e}")
             return None
 
+    # ─── HuggingFace Video Generation ────────────────────────────────────────
+    def generate_huggingface_video(self, prompt, output_path, duration=5):
+        """HuggingFace Inference API ile video üretir."""
+        if not self.hf_token:
+            print("[HuggingFace] API key bulunamadı, atlanıyor.")
+            return None
+
+        try:
+            print(f"[HuggingFace] Video üretimi için prompt: {prompt[:50]}...")
+
+            # HuggingFace Inference API
+            # Using text-to-video model: damo-vilab/text-to-video-ms-1.7b
+            model_id = "damo-vilab/text-to-video-ms-1.7b"
+            api_url = f"https://api-inference.huggingface.co/models/{model_id}"
+            headers = {
+                "Authorization": f"Bearer {self.hf_token}",
+                "Content-Type": "application/json"
+            }
+
+            response = requests.post(api_url, headers=headers, json={"inputs": prompt}, timeout=120)
+
+            if response.status_code == 200:
+                # Response is video bytes
+                with open(output_path, 'wb') as f:
+                    f.write(response.content)
+                print(f"[HuggingFace] ✅ Video indirildi: {output_path}")
+                return output_path
+            elif response.status_code == 503:
+                print("[HuggingFace] Model yükleniyor, tekrar deneniyor...")
+                # Model is loading, wait and retry
+                import time
+                time.sleep(20)
+                response = requests.post(api_url, headers=headers, json={"inputs": prompt}, timeout=120)
+                if response.status_code == 200:
+                    with open(output_path, 'wb') as f:
+                        f.write(response.content)
+                    print(f"[HuggingFace] ✅ Video indirildi: {output_path}")
+                    return output_path
+            else:
+                print(f"[HuggingFace] Hata: {response.status_code} - {response.text}")
+
+            return None
+        except Exception as e:
+            print(f"[HuggingFace] Hata: {e}")
+            return None
+
     # ─── Helper: Animate Image to Video (Pan/Zoom Effect) ─────────────────
     def _animate_image_to_video(self, image_path, output_path, duration=5):
         """Statik görüntüyü pan/zoom efektiyle videoya çevirir."""
@@ -631,7 +678,7 @@ class MediaEngine:
 
     # ─── Generate Multiple Video Clips from AI Services ───────────────────
     def generate_ai_video_clips(self, topic, count=6, output_dir="assets/ai_videos", duration=5):
-        """Birden fazla AI video klip üretir (Stability, Replicate, Kling, Qwen)."""
+        """Birden fazla AI video klip üretir (Stability, Replicate, Kling, Qwen, HuggingFace)."""
         os.makedirs(output_dir, exist_ok=True)
         clips = []
 
@@ -650,6 +697,7 @@ class MediaEngine:
             ("Replicate", self.generate_replicate_video),
             ("Kling", self.generate_kling_video),
             ("Qwen", self.generate_qwen_video),
+            ("HuggingFace", self.generate_huggingface_video),
         ]
         
         for i in range(min(count, len(prompts))):
