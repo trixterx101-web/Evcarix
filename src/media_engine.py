@@ -29,40 +29,21 @@ DOE_PUBLIC_VIDEOS = [
 OEM_PRESS_SEARCH = {
     "tesla": {
         "direct_videos": [
-            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-3-Desktop-NA.mp4",
             "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-Y-Desktop-NA.mp4",
-            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Cybertruck-Homepage-Desktop.mp4",
-            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Model-S-Homepage-Desktop-LHD-01.mp4",
-            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Model-X-Homepage-Desktop.mp4",
+            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-S-Desktop.mp4",
+            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Model-3-Hero-Desktop.mp4",
+            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Megapack-Homepage-Desktop.mp4",
         ]
     },
-    "hyundai": {
+    "lucid": {
         "direct_videos": [
-            "https://www.hyundainews.com/assets/blt1e15b5a1ee2e7a35/IONIQ5_Exterior_01.mp4",
-            "https://www.hyundainews.com/assets/blt9b73ef77742c5c54/IONIQ6_Exterior_Reveal.mp4",
+            "https://www.lucidmotors.com/media/video/lucid-air-exterior-driving.mp4",
+            "https://www.lucidmotors.com/media/video/lucid-air-interior-overview.mp4",
         ]
     },
-    "bmw": {
+    "waymo": {
         "direct_videos": [
-            "https://media.bmwgroup.com/content/dam/bmwgroup_master/bba/Videos/i4/BMW_i4_Driving_1920x1080.mp4",
-            "https://media.bmwgroup.com/content/dam/bmwgroup_master/bba/Videos/iX/BMW_iX_Driving_1920x1080.mp4",
-        ]
-    },
-    "kia": {
-        "direct_videos": [
-            "https://www.kiamedia.com/us/en/media/asset/EV6_Exterior_Driving_01.mp4",
-            "https://www.kiamedia.com/us/en/media/asset/EV9_Exterior_Reveal.mp4",
-        ]
-    },
-    "rivian": {
-        "direct_videos": [
-            "https://media.rivian.com/r1t-driving-offroad.mp4",
-            "https://media.rivian.com/r1s-highway-driving.mp4",
-        ]
-    },
-    "ford": {
-        "direct_videos": [
-            "https://media.ford.com/content/fordmedia/fna/us/en/news/2022/05/19/f-150-lightning/_jcr_content/image.video.mp4",
+            "https://storage.googleapis.com/waymo-uploads/files/research/open-dataset/waymo-open-dataset.mp4",
         ]
     },
 }
@@ -516,9 +497,12 @@ class MediaEngine:
 
         # 2. NASA/DOE (Yüksek kalite)
         if nasa_count > 0 and len(all_paths) < count:
-            pub_paths = self._download_public_domain(output_dir, nasa_count)
-            all_paths += pub_paths
-            print(f"[MediaEngine] NASA/DOE (High Quality): {len(pub_paths)} klip")
+            try:
+                pub_paths = self._download_public_domain(output_dir, nasa_count)
+                all_paths += pub_paths
+                print(f"[MediaEngine] NASA/DOE (High Quality): {len(pub_paths)} klip")
+            except Exception as e:
+                print(f"[MediaEngine] NASA/DOE: ağ erişimi yok, atlandı ({str(e)[:50]})")
 
         # 3. Pexels (Kaliteli)
         if pexels_count > 0 and len(all_paths) < count:
@@ -1096,6 +1080,18 @@ class MediaEngine:
     # ─── Generate Multiple Video Clips from AI Services ───────────────────
     def generate_ai_video_clips(self, topic, count=6, output_dir="assets/ai_videos", duration=5):
         """Birden fazla AI video klip üretir (Stability, Replicate, Kling, Qwen, HuggingFace)."""
+        # Hiç AI video API key'i yoksa hızlıca çık
+        has_any_key = any([
+            self.stability_api_key,
+            self.replicate_api_key,
+            self.kling_access_key,
+            self.dashscope_api_key,
+            self.hf_token,
+        ])
+        if not has_any_key:
+            print("[AI Videos] Hiç AI video API key'i yok, stok videoya geçiliyor.")
+            return []
+
         os.makedirs(output_dir, exist_ok=True)
         clips = []
 

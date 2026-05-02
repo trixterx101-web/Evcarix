@@ -1,5 +1,6 @@
 import os
 import json
+import re
 
 try:
     from google import genai
@@ -39,6 +40,18 @@ class CreativeWriter:
                 self.groq_client = Groq(api_key=self.groq_api_keys[0])
             except ImportError:
                 print("Groq kütüphanesi yüklü değil.")
+
+    def _clean_json_string(self, text: str) -> str:
+        """Groq/LLM yanıtındaki JSON parse hatalarını önlemek için temizle."""
+        # Markdown code block işaretlerini kaldır
+        text = re.sub(r'```json\s*', '', text)
+        text = re.sub(r'```\s*', '', text)
+        text = text.strip()
+        # String içindeki literal kontrol karakterlerini kaldır
+        text = re.sub(r'(?<!\\)[\x00-\x1f\x7f]', ' ', text)
+        # Çift boşlukları temizle
+        text = re.sub(r'  +', ' ', text)
+        return text
 
     # ─────────────────────────────────────────────────────────────────
     # BAŞLIK — Viral CTR Optimizasyonu
@@ -80,12 +93,16 @@ class CreativeWriter:
                 resp = self.gemini_client.models.generate_content(
                     model='gemini-2.0-flash', contents=prompt
                 )
-                text = resp.text.strip().replace("```json", "").replace("```", "").strip()
+                text = self._clean_json_string(resp.text)
                 titles = json.loads(text)
                 if isinstance(titles, list) and titles:
                     return titles
             except Exception as e:
-                print(f"[Writer] generate_title hatası (Gemini): {e}")
+                err_str = str(e)
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    print(f"[Writer] Gemini kota aşıldı, Groq'a geçiliyor...")
+                else:
+                    print(f"[Writer] generate_title hatası (Gemini): {e}")
 
         def _is_duplicate(title, history_set):
             t = title.lower().strip()
@@ -111,7 +128,7 @@ class CreativeWriter:
                             ],
                             temperature=0.65, max_tokens=400,
                         )
-                        text = completion.choices[0].message.content.strip().replace("```json", "").replace("```", "").strip()
+                        text = self._clean_json_string(completion.choices[0].message.content)
                         titles = json.loads(text)
                         if isinstance(titles, list) and titles:
                             history_set = set(h.lower() for h in (history_titles or []))
@@ -306,7 +323,7 @@ SENARYO: [script text]
                     temperature=0.6,
                     max_tokens=2048,
                 )
-                return self._parse_response(completion.choices[0].message.content)
+                return self._parse_response(self._clean_json_string(completion.choices[0].message.content))
             except Exception as e:
                 error_str = str(e)
                 if "rate_limit" in error_str.lower() or "429" in error_str or "quota" in error_str.lower():
@@ -328,16 +345,13 @@ SENARYO: [script text]
                 )
                 return self._parse_response(response.text)
             except Exception as e:
-                error_str = str(e)
-                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower():
-                    print(f"[Writer] Gemini key {key_idx + 1}/{len(self.gemini_api_keys)} quota exhausted, trying next...")
-                    if key_idx < len(self.gemini_api_keys) - 1:
-                        continue  # Try next key
-                    else:
-                        raise Exception(f"All Gemini API keys quota exhausted")
+                err_str = str(e)
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+                    print(f"[Writer] Gemini kota aşıldı, Groq'a geçiliyor...")
+                    return None  # Hemen Groq fallback'e düş
                 else:
-                    raise  # Re-raise other errors
-        raise Exception("No valid Gemini API keys available")
+                    print(f"[Writer] Gemini hatası: {e}")
+        return None
 
     def _parse_response(self, text):
         voice = "female"
@@ -420,7 +434,7 @@ SENARYO: [script text]
                                 messages=[{"role": "user", "content": prompt}],
                                 max_tokens=500
                             )
-                            seo_body = completion.choices[0].message.content.strip()
+                            seo_body = self._clean_json_string(completion.choices[0].message.content).strip()
                             break
                         except Exception as e:
                             error_str = str(e)
@@ -531,7 +545,7 @@ SENARYO: [script text]
                                 messages=[{"role": "user", "content": prompt}],
                                 max_tokens=250
                             )
-                            raw_tags = completion.choices[0].message.content.strip()
+                            raw_tags = self._clean_json_string(completion.choices[0].message.content).strip()
                             break
                         except Exception as e:
                             error_str = str(e)

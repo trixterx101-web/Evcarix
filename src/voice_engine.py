@@ -14,30 +14,37 @@ class VoiceEngine:
     async def generate_voice(self, text, output_path, voice_type="female", rate="+0%"):
         """
         Metni ses dosyasına dönüştürür ve kelime zamanlamalarını döner.
+        edge-tts >= 6.1.9 ile uyumlu.
         """
         voice = self.voices.get(voice_type, self.default_voice)
-        print(f"[VoiceEngine] Premium ses kullanılıyor: {voice}")
-        
+        print(f"[VoiceEngine] Ses kullanılıyor: {voice}")
+
         communicate = edge_tts.Communicate(text, voice, rate=rate)
         subs = []
-        
-        # Sesi kaydet ve kelime zamanlamalarını topla
-        with open(output_path, "wb") as f:
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    f.write(chunk["data"])
-                elif chunk["type"] == "WordBoundary":
-                    subs.append({
-                        "text": chunk["text"],
-                        "start": chunk["offset"] / 10**7, # Saniyeye çevir
-                        "duration": chunk["duration"] / 10**7
-                    })
-        
-        if os.path.exists(output_path):
-            print(f"[VoiceEngine] Premium ses dosyası ve {len(subs)} kelime zamanlaması hazır.")
-            return {"audio_path": output_path, "word_timings": subs}
-        else:
-            raise Exception("Ses dosyası oluşturulamadı!")
+
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+
+        # Önce audio dosyasını kaydet
+        await communicate.save(output_path)
+
+        # Sonra ayrı bir communicate instance ile word boundary al
+        communicate2 = edge_tts.Communicate(text, voice, rate=rate)
+        async for chunk in communicate2.stream():
+            if chunk["type"] == "WordBoundary":
+                # FIX: offset/duration artık int (100-nanosecond ticks)
+                start_sec = chunk["offset"] / 10_000_000
+                dur_sec = chunk["duration"] / 10_000_000
+                subs.append({
+                    "text": chunk["text"],
+                    "start": start_sec,
+                    "duration": dur_sec,
+                })
+
+        if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+            raise RuntimeError(f"[VoiceEngine] Ses dosyası oluşturulamadı: {output_path}")
+
+        print(f"[VoiceEngine] ✅ Ses hazır: {output_path} | {len(subs)} kelime zamanlaması")
+        return {"audio_path": output_path, "word_timings": subs}
 
     async def list_available_voices(self):
         """Kullanılabilir tüm sesleri listeler (Opsiyonel)."""
