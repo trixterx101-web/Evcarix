@@ -16,9 +16,10 @@ class MediaEngine:
         self.pexels_api_key = os.getenv("PEXELS_API_KEY")
         self.pixabay_api_key = os.getenv("PIXABAY_API_KEY")
         self.stability_api_key = os.getenv("STABILITY_API_KEY")
-        self.replicate_api_key = os.getenv("REPLICATE_API_KEY")
+        self.replicate_api_key = os.getenv("REPLICATE_API_TOKEN")
         self.kling_access_key = os.getenv("KLING_ACCESS_KEY")
         self.kling_secret_key = os.getenv("KLING_SECRET_KEY")
+        self.dashscope_api_key = os.getenv("DASHSCOPE_API_KEY")
         self.voice_engine = VoiceEngine()
 
     async def generate_voiceover(self, text, output_path, voice_type="female", rate="+10%"):
@@ -515,6 +516,72 @@ class MediaEngine:
             print(f"[Kling] Hata: {e}")
             return None
 
+    # ─── Qwen AI Video Generation ───────────────────────────────────────────
+    def generate_qwen_video(self, prompt, output_path, duration=5):
+        """Qwen AI (DashScope) ile video üretir."""
+        if not self.dashscope_api_key:
+            print("[Qwen] API key bulunamadı, atlanıyor.")
+            return None
+
+        try:
+            print(f"[Qwen] Video üretimi için prompt: {prompt[:50]}...")
+
+            # Qwen DashScope API for video generation
+            # Note: Using Alibaba Cloud DashScope API
+            url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/generation"
+            headers = {
+                "Authorization": f"Bearer {self.dashscope_api_key}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "model": "qwen-vl-max",  # or appropriate video model
+                "input": {
+                    "prompt": prompt,
+                    "duration": duration
+                },
+                "parameters": {
+                    "size": "1080*1920",  # 9:16 aspect ratio
+                    "fps": 24
+                }
+            }
+
+            response = requests.post(url, headers=headers, json=data, timeout=60)
+            if response.status_code == 200:
+                result = response.json()
+                task_id = result.get("output", {}).get("task_id")
+                if task_id:
+                    # Poll for result
+                    import time
+                    max_wait = 300  # 5 minutes
+                    waited = 0
+                    while waited < max_wait:
+                        time.sleep(10)
+                        waited += 10
+                        status_url = f"https://dashscope.aliyuncs.com/api/v1/tasks/{task_id}"
+                        status_resp = requests.get(status_url, headers=headers, timeout=30)
+                        if status_resp.status_code == 200:
+                            status_data = status_resp.json()
+                            task_status = status_data.get("output", {}).get("task_status")
+                            if task_status == "SUCCEEDED":
+                                video_url = status_data.get("output", {}).get("results", [{}])[0].get("url")
+                                if video_url:
+                                    r = requests.get(video_url, stream=True, timeout=120)
+                                    if r.status_code == 200:
+                                        with open(output_path, 'wb') as f:
+                                            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                                                if chunk:
+                                                    f.write(chunk)
+                                        print(f"[Qwen] ✅ Video indirildi: {output_path}")
+                                        return output_path
+                            elif task_status == "FAILED":
+                                print(f"[Qwen] ❌ Video üretimi başarısız")
+                                break
+
+            return None
+        except Exception as e:
+            print(f"[Qwen] Hata: {e}")
+            return None
+
     # ─── Helper: Animate Image to Video (Pan/Zoom Effect) ─────────────────
     def _animate_image_to_video(self, image_path, output_path, duration=5):
         """Statik görüntüyü pan/zoom efektiyle videoya çevirir."""
@@ -564,10 +631,10 @@ class MediaEngine:
 
     # ─── Generate Multiple Video Clips from AI Services ───────────────────
     def generate_ai_video_clips(self, topic, count=6, output_dir="assets/ai_videos", duration=5):
-        """Birden fazla AI video klip üretir (Stability, Replicate, Kling)."""
+        """Birden fazla AI video klip üretir (Stability, Replicate, Kling, Qwen)."""
         os.makedirs(output_dir, exist_ok=True)
         clips = []
-        
+
         prompts = [
             f"futuristic electric car driving on highway at sunset, cinematic 4k, dramatic lighting, {topic}",
             f"EV battery technology close up, laboratory, lithium cells, futuristic blue glow, {topic}",
@@ -576,12 +643,13 @@ class MediaEngine:
             f"aerial view of electric car on winding road, mountains, golden hour, cinematic, {topic}",
             f"electric motor engine technology close up, heat visualization, futuristic, {topic}",
         ]
-        
+
         # Try each service for each clip
         services = [
             ("Stability", self.generate_stability_video),
             ("Replicate", self.generate_replicate_video),
             ("Kling", self.generate_kling_video),
+            ("Qwen", self.generate_qwen_video),
         ]
         
         for i in range(min(count, len(prompts))):
