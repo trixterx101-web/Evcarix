@@ -163,22 +163,13 @@ class AutoEditor:
         max_duration = 50
         target_duration = random.uniform(min_duration, max_duration)
         
-        # Audio süresi hedeften kısaysa loop ile uzat
-        # Only loop if audio is more than 2 seconds shorter than target
-        if audio.duration < target_duration - 2:
-            from moviepy.audio.fx.all import audio_loop
-            try:
-                audio = audio_loop(audio, duration=target_duration)
-            except (AttributeError, ImportError):
-                # fallback: manual loop via concatenation
-                from moviepy.editor import concatenate_audioclips
-                import math
-                repeats = math.ceil(target_duration / audio.duration)
-                audio = concatenate_audioclips([audio] * repeats).subclip(0, target_duration)
-        else:
-            # Audio is long enough — just trim to target if slightly over
-            if audio.duration > target_duration:
-                audio = audio.subclip(0, target_duration)
+        # Audio süresini kullan, loop yapma (metin tekrarını önlemek için)
+        # Video süresini audio süresine eşitle
+        target_duration = min(target_duration, audio.duration)
+        
+        # Audio çok uzunsa kırp
+        if audio.duration > target_duration:
+            audio = audio.subclip(0, target_duration)
         
         # Log actual vs target so we can debug future repetitions
         print(f"[Editor] Audio: {audio.duration:.1f}s / Target: {target_duration:.1f}s")
@@ -351,15 +342,9 @@ class AutoEditor:
             clips = [ColorClip(size=(1920, 1080), color=(0, 0, 0)).set_duration(audio.duration)]
 
         final_video = concatenate_videoclips(clips, method="compose")
+        # Video loop kaldırıldı - metin tekrarını önlemek için
         if final_video.duration < audio.duration:
-            from moviepy.video.fx.all import loop as video_loop
-            try:
-                final_video = video_loop(final_video, duration=audio.duration)
-            except (AttributeError, ImportError):
-                # fallback: manual loop via concatenation
-                import math
-                repeats = math.ceil(audio.duration / final_video.duration)
-                final_video = concatenate_videoclips([final_video] * repeats).subclip(0, audio.duration)
+            final_video = final_video.subclip(0, final_video.duration)
         else:
             final_video = final_video.subclip(0, audio.duration)
 
@@ -412,16 +397,10 @@ class AutoEditor:
         import random
         audio = AudioFileClip(audio_path)
         
-        # Audio süresini hedeften kısaysa loop ile uzat, uzunsa kırp
+        # Audio süresini kullan, loop yapma (metin tekrarını önlemek için)
+        # Video süresini audio süresine eşitle
         if audio.duration < target_duration:
-            from moviepy.audio.fx.all import audio_loop
-            try:
-                audio = audio_loop(audio, duration=target_duration)
-            except (AttributeError, ImportError):
-                from moviepy.editor import concatenate_audioclips
-                import math
-                repeats = math.ceil(target_duration / audio.duration)
-                audio = concatenate_audioclips([audio] * repeats).subclip(0, target_duration)
+            target_duration = audio.duration
         elif audio.duration > target_duration:
             audio = audio.subclip(0, target_duration)
 

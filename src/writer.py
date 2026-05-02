@@ -428,8 +428,8 @@ class CreativeWriter:
 
         if format_type == "short":
             # Shorts script with explicit word count
-            MIN_WORDS_SHORT = 55   # enough for 25s at 130wpm
-            MAX_WORDS_SHORT = 110  # enough for 50s at 130wpm
+            MIN_WORDS_SHORT = 90   # enough for 40s at 130wpm
+            MAX_WORDS_SHORT = 130  # enough for 60s at 130wpm
             
             system = (
                 "You are Evcarix's head scriptwriter. Style: data-first, analytical, no hype. "
@@ -468,8 +468,8 @@ SENARYO: [script]
         else:
             # Long-form script with explicit word count and structure
             target_duration = 360  # 6 minutes for long-form
-            min_words = int(target_duration * 1.8)
-            max_words = int(target_duration * 2.5)
+            min_words = int(target_duration * 2.0)  # 720 words minimum
+            max_words = int(target_duration * 2.8)  # 1008 words maximum
             
             system = (
                 "You are Evcarix's senior analyst. Write data-rich EV scripts. "
