@@ -333,10 +333,10 @@ class EvcarixOrchestrator:
 
 if __name__ == "__main__":
     orchestrator = EvcarixOrchestrator()
-    upload_slot = os.getenv("UPLOAD_SLOT", "evening")
+    video_type = os.environ.get("VIDEO_TYPE", "short").strip().lower()
     
-    # Routing: Haftalık uzun video mu, günlük Short mu?
-    if upload_slot == "SUNDAY_LONG":
+    # Routing: Video type'a göre workflow seç
+    if video_type == "long":
         asyncio.run(orchestrator.run_weekly_long_video_workflow())
     else:
         asyncio.run(orchestrator.run_daily_shorts_workflow())

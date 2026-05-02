@@ -8,18 +8,30 @@ on:
     - cron: '0 8 * * 0'   # Pazar TR 11:00 — Haftalık uzun video (UTC 08:00)
   workflow_dispatch:
     inputs:
-      slot:
+      video_type:
+        description: 'Video type (short / long)'
+        required: true
+        default: 'short'
+        type: choice
+        options:
+          - short
+          - long
+      upload_slot:
         description: 'Upload slot (evening / night)'
         required: false
         default: 'evening'
-      mode:
+        type: choice
+        options:
+          - evening
+          - night
+      content_mode:
         description: 'Content mode (trend / auto)'
         required: false
         default: 'auto'
         type: choice
         options:
-          - 'auto'
-          - 'trend'
+          - trend
+          - auto
 
 jobs:
   build-and-upload:
@@ -73,15 +85,13 @@ jobs:
           # Mode: trend (YouTube'tan ilham) veya auto (sistem konusu)
           # cron 07:00 UTC -> trend, cron 13:00 UTC -> auto, cron 08:00 UTC Sunday -> long video
           CONTENT_MODE: >-
-            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode ||
-                github.event.schedule == '0 7 * * *' && 'trend' ||
-                github.event.schedule == '0 13 * * *' && 'auto' ||
-                'auto' }}
+            ${{ github.event.inputs.content_mode || 'auto' }}
           # Slot bilgisi
           UPLOAD_SLOT: >-
-            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.slot ||
-                github.event.schedule == '0 8 * * 0' && 'SUNDAY_LONG' ||
-                'evening' }}
+            ${{ github.event.inputs.upload_slot || 'evening' }}
+          # Video type: short (günlük) veya long (haftalık)
+          VIDEO_TYPE: >-
+            ${{ github.event.inputs.video_type || 'short' }}
         run: |
           # Kimlik dosyalarını secrets'den oluştur
           python src/setup_secrets.py
