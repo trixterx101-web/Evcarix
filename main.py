@@ -289,6 +289,16 @@ class EvcarixOrchestrator:
             self.media_engine.mark_clips_as_used(all_video_clips)
         print(f"[Main] 🔄 Klip geçmişi güncellendi.")
 
+        # ── 5.5 Thumbnail oluştur ───────────────────────────────
+        print("\n[5.5/7] Thumbnail oluşturuluyor...")
+        from src.thumbnail_generator import ThumbnailGenerator
+        thumb_gen = ThumbnailGenerator()
+        thumb_path = thumb_gen.create(
+            title=title,
+            stat=plan.get("stat", ""),
+            category=plan.get("category_id", "default")
+        )
+
         # ── 6. YouTube'a yükle (Weekly Deep Dives playlist) ───────
         if self.uploader and os.path.exists(final_video_path):
             print("\n[6/7] YouTube'a yükleniyor (Weekly Deep Dives)...")
@@ -302,7 +312,8 @@ class EvcarixOrchestrator:
                     final_video_path, title, description, tags,
                     playlist="Weekly Deep Dives",
                     category_id=28,  # Science & Technology
-                    made_for_kids=False
+                    made_for_kids=False,
+                    thumbnail_path=thumb_path
                 )
                 print(f"      ✅ Yüklendi! Video ID: {video_id}")
                 print(f"      🔗 https://www.youtube.com/watch?v={video_id}")

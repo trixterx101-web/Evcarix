@@ -484,3 +484,35 @@ Günlük Shorts ile aynı:
 - AI video yoksa → Stock video
 - Stok bitse → AI video + tekrar kullanım
 - Version-safe loop implementation
+
+### 18.13 Thumbnail Generation
+
+**src/thumbnail_generator.py**:
+
+- **Çıkış**: 1280x720 JPEG, quality 97
+- **Design katmanları (alttan üste)**:
+  1. Kategori gradient arka plan (koyu → daha koyu, 9 palet)
+  2. Hafif grid overlay
+  3. Yumuşak glow accent elipsler (kategori accent rengi)
+  4. Sol accent bar (8px solid)
+  5. Stat bloğu — büyük numara sağ taraf (örn: -50%, 800V, 1M KM)
+  6. Başlık metni — büyük harf, max 3 satır, stroke shadow
+  7. Data progress bar — alt dekoratif element
+  8. Brand bar — EVCARIX + motto sol alt
+  9. Kategori badge — sağ üst köşe pill
+- **Font**: DejaVu Sans Bold (sistem) with fallback to default
+- **Kategori paletleri**:
+  - battery: #0D1B2A → #1A3A5C, accent #00D4FF
+  - range: #0A1628 → #1C3D6E, accent #00FF88
+  - charging: #1A0A00 → #4A1800, accent #FF6B00
+  - ownership: #0D1A0D → #1A3D1A, accent #7FFF00
+  - comparison: #1A0A2E → #3D1A6E, accent #BF00FF
+  - market: #1A1200 → #4A3600, accent #FFD700
+  - infrastructure: #001A1A → #004D4D, accent #00FFFF
+  - education: #0D0D1A → #1A1A4D, accent #4488FF
+  - tools: #1A000D → #4D0026, accent #FF0066
+
+**Integration**:
+- `run_weekly_long_video_workflow()`'de otomatik çağrılır
+- Video montajından sonra, YouTube yüklemeden önce
+- YouTube uploader'a thumbnail_path parametresi olarak geçilir
