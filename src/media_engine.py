@@ -128,10 +128,20 @@ class MediaEngine:
         return True
 
     def _get_professional_query(self, topic, category=None):
-        """Her çalışmada farklı bir arama sorgusu üretir — kategoriye gore EV odakli."""
+        """Her çalışmada farklı bir arama sorgusu üretir — kategoriye gore EV odakli + konu anahtar kelimeleri."""
         clean_topic = topic.split(':')[0].split('?')[0].strip() if ':' in topic or '?' in topic else topic
-        clean_topic = clean_topic.replace("electric", "").replace("car", "").strip()
-
+        
+        # Konu başlığından anahtar kelimeler çıkar
+        topic_keywords = []
+        important_words = ["battery", "charging", "range", "tesla", "hyundai", "byd", "kia", "bmw", 
+                          "mercedes", "audi", "volkswagen", "ford", "gm", "nissan", "toyota", 
+                          "lucid", "rivian", "polestar", "nio", "xpeng", "cost", "price", 
+                          "depreciation", "market", "sales", "infrastructure", "grid", 
+                          "solar", "motor", "heat", "pump", "aerodynamics", "drag", "efficiency"]
+        for word in important_words:
+            if word.lower() in clean_topic.lower():
+                topic_keywords.append(word)
+        
         # Kategoriye gore spesifik EV arama stratejileri
         category_strategies = {
             "battery_science": [
@@ -200,9 +210,13 @@ class MediaEngine:
         }
 
         if category and category in category_strategies:
-            return random.choice(category_strategies[category])
+            base_query = random.choice(category_strategies[category])
+            # Konu anahtar kelimelerini sorguya ekle
+            if topic_keywords:
+                base_query = f"{base_query} {' '.join(topic_keywords[:2])}"
+            return base_query
 
-        # Varsayilan genel EV sorgulari
+        # Varsayilan genel EV sorgulari - konu anahtar kelimeleriyle
         strategies = [
             f"{clean_topic} EV driving 4k",
             f"Tesla {clean_topic} exterior 4k",
@@ -215,7 +229,11 @@ class MediaEngine:
             f"lithium battery cell technology",
             f"BYD electric car driving",
         ]
-        return random.choice(strategies)
+        base_query = random.choice(strategies)
+        # Konu anahtar kelimelerini sorguya ekle
+        if topic_keywords:
+            base_query = f"{base_query} {' '.join(topic_keywords[:2])}"
+        return base_query
 
     # ─── Pexels Video İndirme ──────────────────────────────────────────────────
     def _download_from_pexels(self, query, output_dir, count, orientation, category=None):
