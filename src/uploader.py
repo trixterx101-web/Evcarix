@@ -46,7 +46,8 @@ class YouTubeUploader:
         
         return build("youtube", "v3", credentials=creds)
 
-    def upload_video(self, file_path, title, description, tags, category_id="2", max_retries=3):
+    def upload_video(self, file_path, title, description, tags, category_id="2", max_retries=3,
+                  playlist_name: str = None, thumbnail_path: str = None):
         """Videoyu YouTube'a yükler.
         Category 2 = Autos & Vehicles (EV içeriği için en uygun)
         503/500 transient sunucu hatalarında exponential backoff ile retry yapar.
@@ -114,7 +115,42 @@ class YouTubeUploader:
                     if status:
                         print(f"Yükleniyor: %{int(status.progress() * 100)}")
                 print(f"Yükleme Tamamlandı! Video ID: {response['id']}")
-                return response['id']
+                video_id = response['id']
+                
+                # Add to playlist if specified
+                if playlist_name and video_id:
+                    try:
+                        playlist_id = self._get_or_create_playlist(playlist_name)
+                        if playlist_id:
+                            self.youtube.playlistItems().insert(
+                                part="snippet",
+                                body={
+                                    "snippet": {
+                                        "playlistId": playlist_id,
+                                        "resourceId": {
+                                            "kind": "youtube#video",
+                                            "videoId": video_id,
+                                        }
+                                    }
+                                }
+                            ).execute()
+                            print(f"[Uploader] ✅ Playlist'e eklendi: {playlist_name}")
+                    except Exception as e:
+                        print(f"[Uploader] ⚠️ Playlist hatası (devam ediliyor): {e}")
+                
+                # Upload thumbnail if specified
+                if thumbnail_path and video_id and os.path.exists(thumbnail_path):
+                    try:
+                        from googleapiclient.http import MediaFileUpload
+                        self.youtube.thumbnails().set(
+                            videoId=video_id,
+                            media_body=MediaFileUpload(thumbnail_path)
+                        ).execute()
+                        print(f"[Uploader] ✅ Thumbnail yüklendi: {thumbnail_path}")
+                    except Exception as e:
+                        print(f"[Uploader] ⚠️ Thumbnail hatası (devam ediliyor): {e}")
+                
+                return video_id
             except (HttpError, ResumableUploadError) as e:
                 err_str = str(e)
                 if "503" in err_str or "500" in err_str or "Service Unavailable" in err_str:
@@ -126,6 +162,36 @@ class YouTubeUploader:
                         raise
                 else:
                     raise
+
+    def _get_or_create_playlist(self, playlist_name: str) -> str | None:
+        """Return playlist_id for given name, creating it if it doesn't exist."""
+        try:
+            # Search existing playlists
+            response = self.youtube.playlists().list(
+                part="snippet",
+                mine=True,
+                maxResults=50
+            ).execute()
+            for item in response.get("items", []):
+                if item["snippet"]["title"] == playlist_name:
+                    return item["id"]
+            # Not found — create it
+            created = self.youtube.playlists().insert(
+                part="snippet,status",
+                body={
+                    "snippet": {
+                        "title": playlist_name,
+                        "description": f"Evcarix — {playlist_name}",
+                    },
+                    "status": {"privacyStatus": "public"}
+                }
+            ).execute()
+            pid = created["id"]
+            print(f"[Uploader] ✅ Yeni playlist oluşturuldu: {playlist_name} ({pid})")
+            return pid
+        except Exception as e:
+            print(f"[Uploader] ⚠️ Playlist bulunamadı/oluşturulamadı: {e}")
+            return None
 
     def set_thumbnail(self, video_id, thumbnail_path, max_retries=4):
         """Video için kapak görselini yükler — YouTube processing süresi için exponential backoff retry."""

@@ -95,7 +95,11 @@ class EvcarixOrchestrator:
                     print("\n[6/6] YouTube'a yükleniyor...")
                     try:
                         video_id = self.uploader.upload_video(
-                            final_video_path, title, description, tags
+                            file_path=final_video_path,
+                            title=title,
+                            description=description,
+                            tags=tags,
+                            playlist_name="Short Video"
                         )
                         print(f"      ✅ Yüklendi! Video ID: {video_id}")
                         print(f"      🔗 https://www.youtube.com/watch?v={video_id}")
@@ -182,7 +186,11 @@ class EvcarixOrchestrator:
 
             try:
                 video_id = self.uploader.upload_video(
-                    final_video_path, title, description, tags
+                    file_path=final_video_path,
+                    title=title,
+                    description=description,
+                    tags=tags,
+                    playlist_name="Short Video"
                 )
                 print(f"      ✅ Yüklendi! Video ID: {video_id}")
                 print(f"      🔗 https://www.youtube.com/watch?v={video_id}")
@@ -309,10 +317,12 @@ class EvcarixOrchestrator:
 
             try:
                 video_id = self.uploader.upload_video(
-                    final_video_path, title, description, tags,
-                    playlist="Weekly Deep Dives",
-                    category_id=28,  # Science & Technology
-                    made_for_kids=False,
+                    file_path=final_video_path,
+                    title=title,
+                    description=description,
+                    tags=tags,
+                    category_id="28",
+                    playlist_name="Weekly Deep Dives",
                     thumbnail_path=thumb_path
                 )
                 print(f"      ✅ Yüklendi! Video ID: {video_id}")
