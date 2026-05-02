@@ -585,44 +585,42 @@ class MediaEngine:
 
     # ─── HuggingFace Video Generation ────────────────────────────────────────
     def generate_huggingface_video(self, prompt, output_path, duration=5):
-        """HuggingFace Inference API ile video üretir."""
+        """HuggingFace Inference API ile görüntü üretir, pan/zoom ile videoya çevirir."""
         if not self.hf_token:
             print("[HuggingFace] API key bulunamadı, atlanıyor.")
             return None
 
         try:
-            print(f"[HuggingFace] Video üretimi için prompt: {prompt[:50]}...")
+            print(f"[HuggingFace] Görüntü üretimi için prompt: {prompt[:50]}...")
 
-            # HuggingFace Inference API
-            # Using text-to-video model: damo-vilab/text-to-video-ms-1.7b
-            model_id = "damo-vilab/text-to-video-ms-1.7b"
+            # HuggingFace Inference API - text-to-image
+            # Use a model that's available on the free Inference API
+            model_id = "stabilityai/stable-diffusion-xl-base-1.0"
             api_url = f"https://api-inference.huggingface.co/models/{model_id}"
             headers = {
                 "Authorization": f"Bearer {self.hf_token}",
-                "Content-Type": "application/json"
             }
 
             response = requests.post(api_url, headers=headers, json={"inputs": prompt}, timeout=120)
 
-            if response.status_code == 200:
-                # Response is video bytes
-                with open(output_path, 'wb') as f:
-                    f.write(response.content)
-                print(f"[HuggingFace] ✅ Video indirildi: {output_path}")
-                return output_path
-            elif response.status_code == 503:
-                print("[HuggingFace] Model yükleniyor, tekrar deneniyor...")
-                # Model is loading, wait and retry
+            if response.status_code == 503:
+                # Model loading, retry after wait
+                print("[HuggingFace] Model yükleniyor, 20sn bekleniyor...")
                 import time
                 time.sleep(20)
                 response = requests.post(api_url, headers=headers, json={"inputs": prompt}, timeout=120)
-                if response.status_code == 200:
-                    with open(output_path, 'wb') as f:
-                        f.write(response.content)
-                    print(f"[HuggingFace] ✅ Video indirildi: {output_path}")
-                    return output_path
+
+            if response.status_code == 200:
+                # Save image first
+                img_path = output_path.replace('.mp4', '_temp.png')
+                with open(img_path, 'wb') as f:
+                    f.write(response.content)
+                print(f"[HuggingFace] Görüntü oluşturuldu, animasyon yapılıyor...")
+
+                # Animate image to video (pan/zoom)
+                return self._animate_image_to_video(img_path, output_path, duration)
             else:
-                print(f"[HuggingFace] Hata: {response.status_code} - {response.text}")
+                print(f"[HuggingFace] Hata: {response.status_code} - {response.text[:200]}")
 
             return None
         except Exception as e:
