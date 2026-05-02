@@ -585,43 +585,93 @@ class MediaEngine:
 
     # ─── HuggingFace Video Generation ────────────────────────────────────────
     def generate_huggingface_video(self, prompt, output_path, duration=5):
-        """HuggingFace Inference API ile görüntü üretir, pan/zoom ile videoya çevirir."""
+        """HuggingFace Spaces (Gradio API) ile görüntü üretir, pan/zoom ile videoya çevirir."""
         if not self.hf_token:
             print("[HuggingFace] API key bulunamadı, atlanıyor.")
             return None
 
         try:
-            print(f"[HuggingFace] Görüntü üretimi için prompt: {prompt[:50]}...")
+            from gradio_client import Client
 
-            # HuggingFace Inference API - text-to-image
-            # Use a model that's available on the free Inference API
+            print(f"[HuggingFace] Spaces üzerinden görüntü üretimi: {prompt[:50]}...")
+
+            # Use free HuggingFace Space for image generation
+            # Try multiple Spaces in order
+            spaces = [
+                "stabilityai/stable-diffusion-3-medium",
+                "black-forest-labs/FLUX.1-schnell",
+                "stabilityai/stable-diffusion-xl-base-1.0",
+            ]
+
+            for space_name in spaces:
+                try:
+                    print(f"[HuggingFace] {space_name} deneniyor...")
+                    client = Client(space_name, hf_token=self.hf_token)
+
+                    # Call the text-to-image API
+                    result = client.predict(
+                        prompt=prompt,
+                        api_name="/call"
+                    )
+
+                    if result:
+                        # result might be a file path or URL
+                        img_path = output_path.replace('.mp4', '_temp.png')
+
+                        if isinstance(result, str) and os.path.exists(result):
+                            # Local file path from Gradio
+                            import shutil
+                            shutil.copy2(result, img_path)
+                        elif isinstance(result, str) and result.startswith('http'):
+                            # URL - download it
+                            r = requests.get(result, timeout=60)
+                            if r.status_code == 200:
+                                with open(img_path, 'wb') as f:
+                                    f.write(r.content)
+                            else:
+                                continue
+                        elif isinstance(result, (list, tuple)):
+                            # Some spaces return [filepath, seed] etc.
+                            file_path = result[0] if result else None
+                            if file_path and os.path.exists(str(file_path)):
+                                import shutil
+                                shutil.copy2(str(file_path), img_path)
+                            else:
+                                continue
+                        else:
+                            continue
+
+                        if os.path.exists(img_path):
+                            print(f"[HuggingFace] ✅ Görüntü oluşturuldu, animasyon yapılıyor...")
+                            return self._animate_image_to_video(img_path, output_path, duration)
+                except Exception as e:
+                    print(f"[HuggingFace] {space_name} hatası: {str(e)[:100]}")
+                    continue
+
+            # Fallback: Try Inference API directly
+            print("[HuggingFace] Spaces başarısız, Inference API deneniyor...")
             model_id = "stabilityai/stable-diffusion-xl-base-1.0"
             api_url = f"https://api-inference.huggingface.co/models/{model_id}"
-            headers = {
-                "Authorization": f"Bearer {self.hf_token}",
-            }
+            headers = {"Authorization": f"Bearer {self.hf_token}"}
 
             response = requests.post(api_url, headers=headers, json={"inputs": prompt}, timeout=120)
-
             if response.status_code == 503:
-                # Model loading, retry after wait
-                print("[HuggingFace] Model yükleniyor, 20sn bekleniyor...")
                 import time
                 time.sleep(20)
                 response = requests.post(api_url, headers=headers, json={"inputs": prompt}, timeout=120)
 
             if response.status_code == 200:
-                # Save image first
                 img_path = output_path.replace('.mp4', '_temp.png')
                 with open(img_path, 'wb') as f:
                     f.write(response.content)
-                print(f"[HuggingFace] Görüntü oluşturuldu, animasyon yapılıyor...")
-
-                # Animate image to video (pan/zoom)
+                print(f"[HuggingFace] ✅ Görüntü oluşturuldu, animasyon yapılıyor...")
                 return self._animate_image_to_video(img_path, output_path, duration)
             else:
-                print(f"[HuggingFace] Hata: {response.status_code} - {response.text[:200]}")
+                print(f"[HuggingFace] Inference API hatası: {response.status_code}")
 
+            return None
+        except ImportError:
+            print("[HuggingFace] gradio_client yüklü değil, pip install gradio_client")
             return None
         except Exception as e:
             print(f"[HuggingFace] Hata: {e}")
