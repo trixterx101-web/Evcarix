@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import google.auth
 from googleapiclient.discovery import build
@@ -57,15 +58,30 @@ class YouTubeUploader:
         else:
             shorts_title = title[:97]
         
-        # Tags listesine Shorts ekle
+        # Tags listesine Shorts ekle ve temizle
         final_tags = list(tags) if tags else []
         for must_have in ["Shorts", "EVShorts", "ElectricCarShorts"]:
             if must_have not in final_tags:
                 final_tags.append(must_have)
-        # YouTube tag limiti: 500 karakter
-        tag_str = ",".join(final_tags)
-        if len(tag_str) > 500:
-            final_tags = final_tags[:15]  # sadece ilk 15 etiketi al
+
+        # YouTube tag gereksinimleri:
+        # - Her tag en az 2 karakter, max 30 karakter
+        # - Toplam max 500 karakter
+        # - Boşluk veya özel karakter olmamalı
+        cleaned_tags = []
+        for tag in final_tags:
+            # Boşluk ve özel karakterleri kaldır
+            clean = re.sub(r'[^a-zA-Z0-9]', '', str(tag))
+            if len(clean) >= 2 and len(clean) <= 30:
+                cleaned_tags.append(clean)
+
+        # Toplam karakter limiti kontrol
+        total_chars = sum(len(t) + 1 for t in cleaned_tags)  # +1 for comma
+        while total_chars > 500 and cleaned_tags:
+            cleaned_tags.pop()
+            total_chars = sum(len(t) + 1 for t in cleaned_tags)
+
+        final_tags = cleaned_tags[:30]  # Max 30 tag
 
         body = {
             "snippet": {
