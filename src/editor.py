@@ -164,8 +164,8 @@ class AutoEditor:
         
         # Audio süresi hedeften kısaysa loop ile uzat
         if audio.duration < target_duration:
-            loop_count = int(target_duration / audio.duration) + 1
-            audio = audio.loop(duration=target_duration)
+            from moviepy import audio as afx
+            audio = afx.audio_loop(audio, duration=target_duration)
         # Audio süresi hedeften uzunsa kırp
         elif audio.duration > target_duration:
             audio = audio.subclip(0, target_duration)
