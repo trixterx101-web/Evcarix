@@ -154,8 +154,21 @@ class AutoEditor:
         FIX 3: write_videofile'da ffmpeg_params ile ses kanalı zorlaması eklendi.
         FIX 4: Boş video_paths durumu güvenli şekilde ele alınıyor.
         """
+        import random
         audio = AudioFileClip(audio_path)
-        target_duration = audio.duration
+        
+        # Video süresi 25-50 saniye random aralığında
+        min_duration = 25
+        max_duration = 50
+        target_duration = random.uniform(min_duration, max_duration)
+        
+        # Audio süresi hedeften kısaysa loop ile uzat
+        if audio.duration < target_duration:
+            loop_count = int(target_duration / audio.duration) + 1
+            audio = audio.loop(duration=target_duration)
+        # Audio süresi hedeften uzunsa kırp
+        elif audio.duration > target_duration:
+            audio = audio.subclip(0, target_duration)
 
         clips = []
         for path in (video_paths or []):

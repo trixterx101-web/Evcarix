@@ -518,19 +518,29 @@ class MediaEngine:
             all_paths += [p for p in pub_fresh if p not in all_paths]
             print(f"[MediaEngine] NASA/DOE: {len(pub_fresh)} taze klip")
 
-        # 6. Tüm hash'ler sıfırla ve tekrar dene — eğer hepsi kullanılmışsa
-        if len(all_paths) < 2:
-            print("[MediaEngine] ⚠️  Tüm klipler kullanılmış. Hash geçmişi temizleniyor...")
-            self._used_clips.clear()
-            self._save_used_clips()
-            # Temizledikten sonra tekrar Pexels'ten indir
-            retry = self._download_from_pexels(
-                self._get_professional_query(query, category),
-                output_dir + "_retry",
-                count, orientation, category=category
-            )
-            all_paths += retry
-            print(f"[MediaEngine] Yeniden indirme: {len(retry)} klip")
+        # 6. Stok biterse: AI video + tekrar kullanım fallback
+        if len(all_paths) < count:
+            print("[MediaEngine] ⚠️  Stok videolar tükendi. AI video + tekrar kullanım devreye giriyor...")
+            
+            # 6a. AI video üret (varsa)
+            ai_clips = self.generate_ai_video_clips(query, count=count - len(all_paths))
+            if ai_clips:
+                all_paths += [p for p in ai_clips if p not in all_paths]
+                print(f"[MediaEngine] 🤖 AI video: {len(ai_clips)} klip eklendi")
+            
+            # 6b. Yine yetersizse hash temizle ve tekrar dene (başşa dön)
+            if len(all_paths) < count:
+                print("[MediaEngine] 🔄 Hash geçmişi temizleniyor, klipler tekrar kullanılacak...")
+                self._used_clips.clear()
+                self._save_used_clips()
+                # Tekrar Pexels'ten indir (bu sefer filtresiz)
+                retry = self._download_from_pexels(
+                    self._get_professional_query(query, category),
+                    output_dir + "_retry",
+                    count, orientation, category=category
+                )
+                all_paths += [p for p in retry if p not in all_paths]
+                print(f"[MediaEngine] Yeniden indirme: {len(retry)} klip")
 
         random.shuffle(all_paths)
 
