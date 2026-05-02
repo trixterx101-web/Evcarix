@@ -3,7 +3,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import (
     VideoFileClip, AudioFileClip,
-    CompositeVideoClip, ColorClip, concatenate_videoclips, ImageClip
+    CompositeVideoClip, ColorClip, concatenate_videoclips, ImageClip,
+    TextClip
 )
 import PIL.Image
 from io import BytesIO

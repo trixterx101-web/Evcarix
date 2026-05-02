@@ -276,14 +276,20 @@ class MediaEngine:
                     if not video_files:
                         continue
                     sorted_files = sorted(video_files, key=lambda x: x.get('width', 0), reverse=True)
-                    # Sadece portrait (dikey) videoları seç - 9:16 formatı için zorunlu
-                    # Aspect ratio < 0.6 (yaklaşık 9:16'dan daha dikey)
-                    portrait_files = [f for f in sorted_files if f.get('width', 0) > 0 and (f.get('height', 0) / f.get('width', 1)) >= 1.6]
+                    # VIDEO_TYPE'a göre orientation kontrolü
+                    video_type = os.environ.get("VIDEO_TYPE", "short").strip().lower()
+                    if video_type == "long":
+                        # Landscape (16:9) videoları seç - width >= height
+                        portrait_files = [f for f in sorted_files if f.get('width', 0) >= f.get('height', 0)]
+                    else:
+                        # Portrait (9:16) videoları seç - 9:16 formatı için zorunlu
+                        # Aspect ratio >= 1.6 (yaklaşık 9:16'dan daha dikey)
+                        portrait_files = [f for f in sorted_files if f.get('width', 0) > 0 and (f.get('height', 0) / f.get('width', 1)) >= 1.6]
                     if portrait_files:
                         chosen = random.choice(portrait_files[:3]) if len(portrait_files) >= 3 else portrait_files[0]
                     else:
                         # Portrait yoksa atla
-                        print(f"[Pexels] ⚠️ Portrait (9:16) video bulunamadı, atlanıyor")
+                        print(f"[Pexels] ⚠️ {video_type.upper()} video bulunamadı, atlanıyor")
                         continue
                     video_url = chosen['link']
                     clean_q = re.sub(r'[^\w\s-]', '', query).strip().replace(' ', '_')[:30]
@@ -361,17 +367,25 @@ class MediaEngine:
                 for i, hit in enumerate(hits[:count]):
                     videos_dict = hit.get('videos', {})
                     chosen_video = None
-                    # Portrait (dikey) video kontrolü - 9:16 için aspect ratio >= 1.6
+                    # VIDEO_TYPE'a göre orientation kontrolü
+                    video_type = os.environ.get("VIDEO_TYPE", "short").strip().lower()
                     for quality in ['large', 'medium', 'small', 'tiny']:
                         if quality in videos_dict and videos_dict[quality].get('url'):
                             vid = videos_dict[quality]
-                            # Portrait kontrol: height/width >= 1.6 (yaklaşık 9:16)
                             w, h = vid.get('width', 0), vid.get('height', 0)
-                            if w > 0 and h / w >= 1.6:
-                                chosen_video = vid
-                                break
+                            if w > 0:
+                                if video_type == "long":
+                                    # Landscape (16:9) videoları seç - width >= height
+                                    if w >= h:
+                                        chosen_video = vid
+                                        break
+                                else:
+                                    # Portrait (9:16) için aspect ratio >= 1.6
+                                    if h / w >= 1.6:
+                                        chosen_video = vid
+                                        break
                     if not chosen_video:
-                        print(f"[Pixabay] ⚠️ Portrait video bulunamadı, atlanıyor")
+                        print(f"[Pixabay] ⚠️ {video_type.upper()} video bulunamadı, atlanıyor")
                         continue
                     video_url = chosen_video['url']
                     clean_q = re.sub(r'[^\w\s-]', '', optimized_query).strip().replace(' ', '_')[:30]
@@ -432,14 +446,19 @@ class MediaEngine:
                 if downloaded >= count:
                     break
 
-                # Filter for portrait/vertical videos
+                # Filter for portrait/vertical videos based on VIDEO_TYPE
+                video_type = os.environ.get("VIDEO_TYPE", "short").strip().lower()
                 is_vertical = video.get('is_vertical', False)
                 aspect_ratio = video.get('aspect_ratio', '')
                 max_height = video.get('max_height', 0)
                 max_width = video.get('max_width', 0)
 
-                if orientation == "portrait":
-                    # Accept vertical or tall videos
+                if video_type == "long":
+                    # Accept landscape videos: width >= height
+                    if max_width > 0 and max_height > max_width:
+                        continue
+                else:
+                    # Accept portrait videos: height >= 1.6 * width
                     if not is_vertical and max_height / max(max_width, 1) < 1.6:
                         continue
 
@@ -538,6 +557,24 @@ class MediaEngine:
             pub_fresh = self._filter_used_clips(pub)
             all_paths += [p for p in pub_fresh if p not in all_paths]
             print(f"[MediaEngine] NASA/DOE: {len(pub_fresh)} taze klip")
+
+        # 5.5. Free video sources fallback (no API key needed)
+        if len(all_paths) < count:
+            print("[MediaEngine] 🆓 Ücretsiz video kaynakları deneniyor...")
+            from src.free_video_sources import FreeVideoSources, EV_SEARCH_TERMS
+            free_src = FreeVideoSources()
+            ev_terms = random.sample(EV_SEARCH_TERMS, min(3, len(EV_SEARCH_TERMS)))
+            needed_count = count - len(all_paths)
+            for term in ev_terms:
+                if len(all_paths) >= count:
+                    break
+                free_clips = free_src.download_clips(
+                    query=term,
+                    count=needed_count,
+                    video_type=os.environ.get("VIDEO_TYPE", "short")
+                )
+                all_paths += [p for p in free_clips if p not in all_paths]
+                print(f"[MediaEngine] FreeVideoSources: {len(free_clips)} klip")
 
         # 6. Stok biterse: AI video + tekrar kullanım fallback
         if len(all_paths) < count:
