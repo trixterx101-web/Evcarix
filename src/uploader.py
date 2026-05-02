@@ -142,7 +142,6 @@ class YouTubeUploader:
                 # Upload thumbnail if specified
                 if thumbnail_path and video_id and os.path.exists(thumbnail_path):
                     try:
-                        from googleapiclient.http import MediaFileUpload
                         self.youtube.thumbnails().set(
                             videoId=video_id,
                             media_body=MediaFileUpload(thumbnail_path)
