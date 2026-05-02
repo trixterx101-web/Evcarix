@@ -21,6 +21,7 @@ class MediaEngine:
         self.kling_secret_key = os.getenv("KLING_SECRET_KEY")
         self.dashscope_api_key = os.getenv("DASHSCOPE_API_KEY")
         self.hf_token = os.getenv("HF_TOKEN")
+        self.coverr_api_key = os.getenv("COVERR_API_KEY")
         self.voice_engine = VoiceEngine()
 
     async def generate_voiceover(self, text, output_path, voice_type="female", rate="+10%"):
@@ -305,22 +306,123 @@ class MediaEngine:
             print(f"[Pixabay] İndirme hatası: {e}")
         return paths
 
-    # ─── Ana İndirme Metodu — Pexels + Pixabay birleşik ──────────────────────
+    # ─── Coverr Video İndirme ──────────────────────────────────────────────────
+    def _download_from_coverr(self, query, output_dir, count, orientation="portrait", category=None):
+        """Coverr.co API'den ücretsiz stok video indirir."""
+        if not self.coverr_api_key:
+            print("[Coverr] API key bulunamadı, atlanıyor.")
+            return []
+
+        optimized_query = self._get_professional_query(query, category=category)
+        paths = []
+        try:
+            # Coverr API search
+            url = (
+                f"https://api.coverr.co/videos"
+                f"?query={urllib.parse.quote(optimized_query)}"
+                f"&page_size={count + 4}"
+                f"&urls=true"
+            )
+            headers = {
+                "Authorization": f"Bearer {self.coverr_api_key}",
+                "Accept": "application/json"
+            }
+
+            print(f"[Coverr] '{optimized_query}' aranıyor...")
+            response = requests.get(url, headers=headers, timeout=15)
+
+            if response.status_code != 200:
+                print(f"[Coverr] API hatası: {response.status_code}")
+                return []
+
+            data = response.json()
+            hits = data.get('hits', [])
+
+            if not hits:
+                print(f"[Coverr] Video bulunamadı: {optimized_query}")
+                return []
+
+            downloaded = 0
+            for video in hits:
+                if downloaded >= count:
+                    break
+
+                # Filter for portrait/vertical videos
+                is_vertical = video.get('is_vertical', False)
+                aspect_ratio = video.get('aspect_ratio', '')
+                max_height = video.get('max_height', 0)
+                max_width = video.get('max_width', 0)
+
+                if orientation == "portrait":
+                    # Accept vertical or tall videos
+                    if not is_vertical and max_height / max(max_width, 1) < 1.6:
+                        continue
+
+                urls = video.get('urls', {})
+                mp4_url = urls.get('mp4', '')
+                mp4_download = urls.get('mp4_download', '')
+
+                video_url = mp4_download or mp4_url
+                if not video_url:
+                    continue
+
+                title = video.get('title', 'coverr_video').replace(' ', '_')[:40]
+                safe_title = re.sub(r'[^\w\-]', '', title)
+                filename = f"coverr_{safe_title}.mp4"
+                out_path = os.path.join(output_dir, filename)
+
+                if os.path.exists(out_path):
+                    paths.append(out_path)
+                    downloaded += 1
+                    continue
+
+                print(f"[Coverr] İndiriliyor: {title[:40]}...")
+                r = requests.get(video_url, stream=True, timeout=60)
+                if r.status_code == 200:
+                    with open(out_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=1024 * 1024):
+                            if chunk:
+                                f.write(chunk)
+                    paths.append(out_path)
+                    downloaded += 1
+                    print(f"[Coverr] ✅ İndirildi: {filename}")
+
+                    # Register download stats (required by Coverr API)
+                    video_id = video.get('id', '')
+                    if video_id:
+                        try:
+                            requests.patch(
+                                f"https://api.coverr.co/videos/{video_id}/stats/downloads",
+                                headers=headers,
+                                timeout=5
+                            )
+                        except Exception:
+                            pass
+
+            if not paths:
+                print(f"[Coverr] Portrait video bulunamadı, atlanıyor")
+        except Exception as e:
+            print(f"[Coverr] İndirme hatası: {e}")
+        return paths
+
+    # ─── Ana İndirme Metodu — Pexels + Pixabay + Coverr birleşik ──────────────
     def download_stock_videos(self, query, output_dir="assets/temp_videos", count=4, orientation="portrait", category=None):
-        """Pexels ve Pixabay'dan video indirir, birleştirir ve karıştırır."""
+        """Pexels, Pixabay ve Coverr'dan video indirir, birleştirir ve karıştırır."""
         os.makedirs(output_dir, exist_ok=True)
 
-        pexels_count = (count + 1) // 2
-        pixabay_count = count - pexels_count
+        pexels_count = (count + 1) // 3
+        pixabay_count = (count + 1) // 3
+        coverr_count = count - pexels_count - pixabay_count
 
         pexels_paths = self._download_from_pexels(query, output_dir, pexels_count, orientation, category=category)
         pixabay_paths = self._download_from_pixabay(query, output_dir, pixabay_count, orientation, category=category)
+        coverr_paths = self._download_from_coverr(query, output_dir, coverr_count, orientation, category=category)
 
-        all_paths = pexels_paths + pixabay_paths
+        all_paths = pexels_paths + pixabay_paths + coverr_paths
         random.shuffle(all_paths)
 
         if not all_paths:
-            print("[MediaEngine] Her iki kaynaktan da video alınamadı!")
+            print("[MediaEngine] Her üç kaynaktan da video alınamadı!")
             return []
 
         if len(all_paths) < count:
@@ -328,7 +430,7 @@ class MediaEngine:
             extra = self._download_from_pexels(query, output_dir, extra_needed, orientation, category=category)
             all_paths += extra
 
-        print(f"[MediaEngine] Toplam {len(all_paths)} klip hazır ({len(pexels_paths)} Pexels + {len(pixabay_paths)} Pixabay)")
+        print(f"[MediaEngine] Toplam {len(all_paths)} klip hazır ({len(pexels_paths)} Pexels + {len(pixabay_paths)} Pixabay + {len(coverr_paths)} Coverr)")
         return all_paths[:count]
 
     def generate_ai_fallback_images(self, topic, count=3, output_dir="assets/ai_fallback"):
