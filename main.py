@@ -60,6 +60,12 @@ class EvcarixOrchestrator:
         tags        = plan.get('tags', ["ev", "electric car", "Evcarix", "Shorts"])
 
         print(f"\n[1/6] Plan Hazır")
+        if plan.get("inspired_by"):
+            print(f"      🔥 MOD    : TREND (YouTube trend'inden ilham alındı)")
+            print(f"      🔗 İlham  : {plan.get('inspired_by')}")
+            print(f"      ⚠️  NOT   : Görüntü/ses kopyalanmadı — orijinal içerik")
+        else:
+            print(f"      📋 MOD   : NORMAL (havuz konusu)")
         print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}")
         print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
 

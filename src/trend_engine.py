@@ -1,10 +1,12 @@
 import os
 import json
 import random
+import re
+import datetime
 import feedparser
 import requests
 import pandas as pd
-from datetime import datetime
+from datetime import timezone, timedelta
 
 try:
     from google import genai
@@ -13,7 +15,7 @@ except Exception:
     GEMINI_AVAILABLE = False
 
 TOPIC_HISTORY_FILE = "used_topics.json"
-TOPIC_HISTORY_LIMIT = 14  # Son 14 konu tekrar edilmez
+TOPIC_HISTORY_LIMIT = 14
 
 
 class TrendEngine:
@@ -26,14 +28,13 @@ class TrendEngine:
             "https://www.greencarreports.com/rss/news",
             "https://cleantechnica.com/feed/",
         ]
-        # EV konularında YouTube arama terimleri — her çalışmada farklısı seçilir
         self.ev_search_queries = [
             "electric car range test",
-            "EV battery technology 2024",
+            "EV battery technology 2025",
             "Tesla vs competition real world",
             "electric vehicle charging speed comparison",
             "EV battery degradation data",
-            "best electric cars 2024 real test",
+            "best electric cars 2025 real test",
             "solid state battery breakthrough",
             "electric car ownership cost analysis",
             "BYD electric car range test",
@@ -44,6 +45,8 @@ class TrendEngine:
             "electric vehicle battery life test",
             "fast charging impact battery health",
         ]
+
+        # Gemini
         self.gemini_api_key = os.getenv("GEMINI_API_KEY") if GEMINI_AVAILABLE else None
         self.gemini_client = None
         if GEMINI_AVAILABLE and self.gemini_api_key:
@@ -51,11 +54,41 @@ class TrendEngine:
                 self.gemini_client = genai.Client(api_key=self.gemini_api_key)
             except Exception as e:
                 print(f"[TrendEngine] Gemini init hatası: {e}")
-                self.gemini_client = None
 
-    # ─── Konu Geçmişi ─────────────────────────────────────────────────────────
+        # Tüm LLM API key'leri
+        self.groq_keys = [k for k in [
+            os.getenv("GROQ_API_KEY"),
+            os.getenv("GROQ_API_KEY_2"),
+            os.getenv("GROQ_API_KEY_3"),
+        ] if k]
+        self.openrouter_key    = os.getenv("OPENROUTER_API_KEY")
+        self.mistral_key       = os.getenv("MISTRAL_API_KEY")
+        self.cohere_key        = os.getenv("COHERE_API_KEY")
+        self.together_key      = os.getenv("TOGETHER_API_KEY")
+        self.perplexity_key    = os.getenv("PERPLEXITY_API_KEY")
+        self.deepseek_key      = os.getenv("DEEPSEEK_API_KEY")
+        self.huggingface_key   = os.getenv("HUGGINGFACE_API_KEY")
+        self.ollama_url        = os.getenv("OLLAMA_URL", "http://localhost:11434")
+
+    # ─── JSON Temizleyici ──────────────────────────────────────────
+    def _clean_json(self, text: str) -> str:
+        text = re.sub(r'```json\s*', '', text)
+        text = re.sub(r'```\s*', '', text)
+        text = text.strip()
+        text = re.sub(r'(?<!\\)[\x00-\x1f\x7f]', ' ', text)
+        text = re.sub(r'  +', ' ', text)
+        return text
+
+    def _parse_json_safe(self, text: str) -> dict | None:
+        try:
+            cleaned = self._clean_json(text)
+            return json.loads(cleaned)
+        except Exception as e:
+            print(f"[TrendEngine] JSON parse hatası: {e}")
+            return None
+
+    # ─── Konu Geçmişi ─────────────────────────────────────────────
     def _load_topic_history(self):
-        """Daha önce kullanılan konuları yükler."""
         if os.path.exists(TOPIC_HISTORY_FILE):
             try:
                 with open(TOPIC_HISTORY_FILE, "r", encoding="utf-8") as f:
@@ -65,7 +98,6 @@ class TrendEngine:
         return []
 
     def _save_topic_history(self, topic):
-        """Kullanılan konuyu geçmişe ekler, limitin üstündekini siler."""
         history = self._load_topic_history()
         if topic in history:
             history.remove(topic)
@@ -75,7 +107,6 @@ class TrendEngine:
             json.dump(history, f, ensure_ascii=False, indent=2)
 
     def _is_used_recently(self, topic):
-        """Bu konu son TOPIC_HISTORY_LIMIT içinde kullanıldı mı?"""
         history = self._load_topic_history()
         topic_lower = topic.lower()
         for h in history:
@@ -83,9 +114,8 @@ class TrendEngine:
                 return True
         return False
 
-    # ─── RSS Haberleri ─────────────────────────────────────────────────────────
+    # ─── RSS Haberleri ─────────────────────────────────────────────
     def get_latest_news(self):
-        """Haber kaynaklarından en son haberleri çeker."""
         news_items = []
         for url in self.feeds:
             try:
@@ -95,26 +125,24 @@ class TrendEngine:
                         "title": entry.title,
                         "link": entry.link,
                         "summary": entry.summary if 'summary' in entry else "",
-                        "published": entry.published if 'published' in entry else datetime.now().isoformat(),
+                        "published": entry.published if 'published' in entry else datetime.datetime.now().isoformat(),
                         "source": url.split("//")[1].split("/")[0]
                     })
             except Exception as e:
                 print(f"Feed hatası ({url}): {e}")
         return pd.DataFrame(news_items)
 
-    # ─── YouTube Trending (Autos Kategorisi) ───────────────────────────────────
+    # ─── YouTube Trending ──────────────────────────────────────────
     def get_youtube_trending(self, region_code="US", max_results=20):
-        """YouTube Data API'den en popüler Autos & Vehicles videolarını çeker."""
         api_key = os.getenv("YOUTUBE_API_KEY")
         if not api_key:
-            print("[TrendEngine] YOUTUBE_API_KEY bulunamadı, trending atlanıyor.")
             return []
         url = "https://www.googleapis.com/youtube/v3/videos"
         params = {
             'part': 'snippet,statistics',
             'chart': 'mostPopular',
             'regionCode': region_code,
-            'videoCategoryId': '2',  # Autos & Vehicles
+            'videoCategoryId': '2',
             'maxResults': max_results,
             'key': api_key
         }
@@ -136,13 +164,10 @@ class TrendEngine:
             print(f"[TrendEngine] YouTube trending hatası: {e}")
             return []
 
-    # ─── YouTube EV Keyword Araması ────────────────────────────────────────────
     def get_youtube_ev_search(self, max_results=20):
-        """EV anahtar kelimeleriyle en çok izlenen YouTube videolarını arar."""
         api_key = os.getenv("YOUTUBE_API_KEY")
         if not api_key:
             return []
-        # Her seferinde farklı bir arama terimi seç
         query = random.choice(self.ev_search_queries)
         url = "https://www.googleapis.com/youtube/v3/search"
         params = {
@@ -172,33 +197,583 @@ class TrendEngine:
             print(f"[TrendEngine] YouTube EV arama hatası: {e}")
             return []
 
-    # ─── Ana Konu Seçici ───────────────────────────────────────────────────────
-    def select_trending_topic(self, news_df):
-        """Her seferinde farklı, geçmişte kullanılmamış EV konusu seçer.
-        Öncelik: YouTube EV Arama > YouTube Trending > Gemini RSS > Core Fallback
+    # ─── YENİ: Son X saatteki EV Short'ları ──────────────────────
+    def get_recent_ev_shorts(self, hours_back=6, max_results=15):
         """
+        YouTube Data API ile son X saatte yayınlanan EV Short videolarını bulur.
+        SADECE başlık + açıklama alır — görüntü/ses ALMAZ — telif riski SIFIR.
+        """
+        api_key = os.getenv("YOUTUBE_API_KEY")
+        if not api_key:
+            print("[TrendEngine] YOUTUBE_API_KEY yok, recent EV shorts atlanıyor.")
+            return []
+
+        published_after = (datetime.datetime.now(timezone.utc) - timedelta(hours=hours_back))
+        published_after_str = published_after.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        ev_short_queries = [
+            "electric car review shorts 2025",
+            "EV new model 2025 2026 shorts",
+            "electric vehicle launch shorts",
+            "tesla new model shorts",
+            "BYD electric car review shorts",
+            "EV battery range test shorts",
+            "electric car comparison shorts",
+            "new EV release shorts",
+            "EV charging speed test shorts",
+            "hyundai kia ioniq ev shorts",
+            "rivian lucid electric car shorts",
+            "electric car real world test shorts",
+        ]
+        query = random.choice(ev_short_queries)
+
+        url = "https://www.googleapis.com/youtube/v3/search"
+        params = {
+            "part": "snippet",
+            "q": query,
+            "type": "video",
+            "videoDuration": "short",
+            "order": "date",
+            "publishedAfter": published_after_str,
+            "relevanceLanguage": "en",
+            "maxResults": max_results,
+            "key": api_key,
+        }
+        try:
+            r = requests.get(url, params=params, timeout=15)
+            r.raise_for_status()
+            items = r.json().get("items", [])
+
+            results = []
+            ev_keywords = [
+                "electric", "ev", "battery", "tesla", "range", "charging",
+                "byd", "ioniq", "rivian", "lucid", "volt", "kwh", "hybrid",
+                "motor", "watt", "model", "mercedes eq", "bmw i", "kia ev",
+                "hyundai", "polestar", "nio", "xpeng", "li auto",
+            ]
+            for item in items:
+                snip = item.get("snippet", {})
+                video_id = item.get("id", {}).get("videoId", "")
+                title = snip.get("title", "")
+                description = snip.get("description", "")
+                channel = snip.get("channelTitle", "")
+                published = snip.get("publishedAt", "")
+
+                combined = (title + " " + description).lower()
+                if not any(kw in combined for kw in ev_keywords):
+                    continue
+
+                results.append({
+                    "video_id": video_id,
+                    "title": title,
+                    "description": description[:500],
+                    "channel": channel,
+                    "published": published,
+                    "url": f"https://www.youtube.com/watch?v={video_id}",
+                })
+
+            print(f"[TrendEngine] Son {hours_back}s: {len(results)} EV Short bulundu (sorgu: '{query}')")
+            return results
+
+        except Exception as e:
+            print(f"[TrendEngine] get_recent_ev_shorts hatası: {e}")
+            return []
+
+    # ─── YENİ: Çoklu LLM ile Script Üretimi ──────────────────────
+    def _build_script_prompt(self, video_data: dict) -> tuple[str, str]:
+        """System prompt ve user prompt döndürür."""
+        title = video_data.get("title", "")
+        description = video_data.get("description", "")
+        channel = video_data.get("channel", "")
+
+        system = (
+            "You are the head writer for Evcarix, a data-driven EV YouTube Shorts channel. "
+            "Style: analytical, fact-first, no hype. Motto: 'No hype. Just numbers.' "
+            "Always return valid JSON only — no markdown, no extra text, no code blocks."
+        )
+
+        user = f"""A competitor channel just published a Short about: "{title}"
+Channel: {channel}
+Their description: "{description[:300]}"
+
+Write a COMPLETELY ORIGINAL Evcarix Short script inspired by this TOPIC only.
+Rules:
+- Do NOT copy their words or structure
+- Data-driven angle: real stats, percentages, kWh numbers
+- Length: 35-45 seconds spoken (80-100 words)
+- Start with a shocking stat or surprising fact
+- End with: "Subscribe to Evcarix for real EV data."
+- English only, USA/Europe/China examples only
+- Never mention Turkey or Turkish brands
+
+Return ONLY this JSON (no markdown, no backticks):
+{{"topic":"one line topic","title":"YouTube title under 70 chars with specific number","script":"full script text","tags":["tag1","tag2","tag3","tag4","tag5","tag6","tag7"],"hook":"first sentence only","category":"battery_science|range_tests|charging|comparisons|market_data|education"}}"""
+
+        return system, user
+
+    def _llm_gemini(self, system: str, user: str) -> dict | None:
+        """Gemini 2.0 Flash ile üret."""
+        if not GEMINI_AVAILABLE or not self.gemini_client:
+            return None
+        try:
+            prompt = f"{system}\n\n{user}"
+            resp = self.gemini_client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=prompt
+            )
+            return self._parse_json_safe(resp.text)
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                print(f"[LLM] Gemini kota aşıldı, sonraki LLM'e geçiliyor.")
+            else:
+                print(f"[LLM] Gemini hatası: {e}")
+            return None
+
+    def _llm_groq(self, system: str, user: str, model: str = "llama-3.3-70b-versatile") -> dict | None:
+        """Groq ile üret — birden fazla key desteği."""
+        if not self.groq_keys:
+            return None
+        try:
+            from groq import Groq
+        except ImportError:
+            print("[LLM] groq paketi yok: pip install groq")
+            return None
+
+        for key in self.groq_keys:
+            try:
+                client = Groq(api_key=key)
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user",   "content": user},
+                    ],
+                    max_tokens=600,
+                    temperature=0.7,
+                )
+                raw = resp.choices[0].message.content.strip()
+                result = self._parse_json_safe(raw)
+                if result:
+                    return result
+            except Exception as e:
+                print(f"[LLM] Groq ({model}) hatası: {e}")
+                continue
+        return None
+
+    def _llm_openrouter(self, system: str, user: str) -> dict | None:
+        """
+        OpenRouter — 200+ model, ücretsiz tier mevcut.
+        Ücretsiz modeller: mistralai/mistral-7b-instruct, nousresearch/nous-capybara-7b vb.
+        https://openrouter.ai/keys adresinden ücretsiz key alın.
+        """
+        if not self.openrouter_key:
+            return None
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.openrouter_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://evcarix.com",
+                "X-Title": "Evcarix Auto-Studio",
+            }
+            # Ücretsiz ve güçlü model
+            data = {
+                "model": "mistralai/mistral-7b-instruct:free",
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user",   "content": user},
+                ],
+                "max_tokens": 600,
+                "temperature": 0.7,
+            }
+            r = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=data, timeout=30
+            )
+            r.raise_for_status()
+            raw = r.json()["choices"][0]["message"]["content"].strip()
+            return self._parse_json_safe(raw)
+        except Exception as e:
+            print(f"[LLM] OpenRouter hatası: {e}")
+            return None
+
+    def _llm_mistral(self, system: str, user: str) -> dict | None:
+        """
+        Mistral AI — mistral-small ücretsiz tier var.
+        https://console.mistral.ai/ adresinden ücretsiz key alın.
+        """
+        if not self.mistral_key:
+            return None
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.mistral_key}",
+                "Content-Type": "application/json",
+            }
+            data = {
+                "model": "mistral-small-latest",
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user",   "content": user},
+                ],
+                "max_tokens": 600,
+                "temperature": 0.7,
+            }
+            r = requests.post(
+                "https://api.mistral.ai/v1/chat/completions",
+                headers=headers, json=data, timeout=30
+            )
+            r.raise_for_status()
+            raw = r.json()["choices"][0]["message"]["content"].strip()
+            return self._parse_json_safe(raw)
+        except Exception as e:
+            print(f"[LLM] Mistral hatası: {e}")
+            return None
+
+    def _llm_cohere(self, system: str, user: str) -> dict | None:
+        """
+        Cohere — command-r ücretsiz tier var (günde 20 istek).
+        https://dashboard.cohere.com/api-keys adresinden ücretsiz key alın.
+        """
+        if not self.cohere_key:
+            return None
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.cohere_key}",
+                "Content-Type": "application/json",
+            }
+            data = {
+                "model": "command-r",
+                "message": user,
+                "preamble": system,
+                "max_tokens": 600,
+                "temperature": 0.7,
+            }
+            r = requests.post(
+                "https://api.cohere.com/v1/chat",
+                headers=headers, json=data, timeout=30
+            )
+            r.raise_for_status()
+            raw = r.json().get("text", "").strip()
+            return self._parse_json_safe(raw)
+        except Exception as e:
+            print(f"[LLM] Cohere hatası: {e}")
+            return None
+
+    def _llm_together(self, system: str, user: str) -> dict | None:
+        """
+        Together AI — Llama 3.3 70B, Qwen 2.5 72B ücretsiz $5 kredi.
+        https://api.together.xyz adresinden key alın.
+        """
+        if not self.together_key:
+            return None
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.together_key}",
+                "Content-Type": "application/json",
+            }
+            data = {
+                "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user",   "content": user},
+                ],
+                "max_tokens": 600,
+                "temperature": 0.7,
+            }
+            r = requests.post(
+                "https://api.together.xyz/v1/chat/completions",
+                headers=headers, json=data, timeout=30
+            )
+            r.raise_for_status()
+            raw = r.json()["choices"][0]["message"]["content"].strip()
+            return self._parse_json_safe(raw)
+        except Exception as e:
+            print(f"[LLM] Together AI hatası: {e}")
+            return None
+
+    def _llm_perplexity(self, system: str, user: str) -> dict | None:
+        """
+        Perplexity AI — sonar-small-chat ücretsiz $5 kredi.
+        https://www.perplexity.ai/settings/api adresinden key alın.
+        """
+        if not self.perplexity_key:
+            return None
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.perplexity_key}",
+                "Content-Type": "application/json",
+            }
+            data = {
+                "model": "llama-3.1-sonar-small-128k-online",
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user",   "content": user},
+                ],
+                "max_tokens": 600,
+                "temperature": 0.7,
+            }
+            r = requests.post(
+                "https://api.perplexity.ai/chat/completions",
+                headers=headers, json=data, timeout=30
+            )
+            r.raise_for_status()
+            raw = r.json()["choices"][0]["message"]["content"].strip()
+            return self._parse_json_safe(raw)
+        except Exception as e:
+            print(f"[LLM] Perplexity hatası: {e}")
+            return None
+
+    def _llm_deepseek(self, system: str, user: str) -> dict | None:
+        """
+        DeepSeek — deepseek-chat çok ucuz ($0.14/1M token).
+        https://platform.deepseek.com/api_keys adresinden key alın.
+        """
+        if not self.deepseek_key:
+            return None
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.deepseek_key}",
+                "Content-Type": "application/json",
+            }
+            data = {
+                "model": "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user",   "content": user},
+                ],
+                "max_tokens": 600,
+                "temperature": 0.7,
+            }
+            r = requests.post(
+                "https://api.deepseek.com/chat/completions",
+                headers=headers, json=data, timeout=30
+            )
+            r.raise_for_status()
+            raw = r.json()["choices"][0]["message"]["content"].strip()
+            return self._parse_json_safe(raw)
+        except Exception as e:
+            print(f"[LLM] DeepSeek hatası: {e}")
+            return None
+
+    def _llm_huggingface(self, system: str, user: str) -> dict | None:
+        """
+        HuggingFace Inference API — ücretsiz tier (Mistral 7B, Zephyr vb.).
+        https://huggingface.co/settings/tokens adresinden ücretsiz key alın.
+        """
+        if not self.huggingface_key:
+            return None
+        try:
+            model = "mistralai/Mistral-7B-Instruct-v0.3"
+            headers = {
+                "Authorization": f"Bearer {self.huggingface_key}",
+                "Content-Type": "application/json",
+            }
+            prompt = f"<s>[INST] {system}\n\n{user} [/INST]"
+            data = {
+                "inputs": prompt,
+                "parameters": {
+                    "max_new_tokens": 600,
+                    "temperature": 0.7,
+                    "return_full_text": False,
+                },
+            }
+            r = requests.post(
+                f"https://api-inference.huggingface.co/models/{model}",
+                headers=headers, json=data, timeout=60
+            )
+            r.raise_for_status()
+            result = r.json()
+            if isinstance(result, list) and result:
+                raw = result[0].get("generated_text", "").strip()
+                return self._parse_json_safe(raw)
+        except Exception as e:
+            print(f"[LLM] HuggingFace hatası: {e}")
+        return None
+
+    def _llm_ollama(self, system: str, user: str) -> dict | None:
+        """
+        Ollama — yerel LLM (ücretsiz, internet gerekmez).
+        Kurulum: https://ollama.ai → ollama run llama3
+        GitHub Actions'da çalışmaz, local geliştirme için.
+        """
+        try:
+            r = requests.get(f"{self.ollama_url}/api/tags", timeout=3)
+            if r.status_code != 200:
+                return None
+        except Exception:
+            return None
+
+        models_to_try = ["llama3.3", "llama3.1", "llama3", "mistral", "qwen2.5"]
+        available = [m["name"].split(":")[0] for m in r.json().get("models", [])]
+
+        chosen = next((m for m in models_to_try if m in available), None)
+        if not chosen:
+            return None
+
+        try:
+            data = {
+                "model": chosen,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user",   "content": user},
+                ],
+                "stream": False,
+                "options": {"temperature": 0.7, "num_predict": 600},
+            }
+            resp = requests.post(
+                f"{self.ollama_url}/api/chat",
+                json=data, timeout=120
+            )
+            resp.raise_for_status()
+            raw = resp.json()["message"]["content"].strip()
+            result = self._parse_json_safe(raw)
+            if result:
+                print(f"[LLM] Ollama ({chosen}) başarılı.")
+            return result
+        except Exception as e:
+            print(f"[LLM] Ollama hatası: {e}")
+            return None
+
+    def generate_inspired_script(self, video_data: dict) -> dict | None:
+        """
+        Bulunan YouTube videosunun SADECE başlık+açıklamasından ilham alarak
+        tamamen orijinal Evcarix script üretir.
+        LLM öncelik: Gemini → Groq 70B → Groq 8B → OpenRouter → Mistral →
+                     Cohere → Together → Perplexity → DeepSeek → HuggingFace → Ollama
+        """
+        system, user = self._build_script_prompt(video_data)
+
+        llm_pipeline = [
+            ("Gemini 2.0 Flash",        lambda: self._llm_gemini(system, user)),
+            ("Groq Llama3.3-70B",       lambda: self._llm_groq(system, user, "llama-3.3-70b-versatile")),
+            ("Groq Llama3.1-8B",        lambda: self._llm_groq(system, user, "llama-3.1-8b-instant")),
+            ("OpenRouter Mistral-7B",   lambda: self._llm_openrouter(system, user)),
+            ("Mistral Small",           lambda: self._llm_mistral(system, user)),
+            ("Cohere Command-R",        lambda: self._llm_cohere(system, user)),
+            ("Together Llama3.3-70B",   lambda: self._llm_together(system, user)),
+            ("Perplexity Sonar",        lambda: self._llm_perplexity(system, user)),
+            ("DeepSeek Chat",           lambda: self._llm_deepseek(system, user)),
+            ("HuggingFace Mistral-7B",  lambda: self._llm_huggingface(system, user)),
+            ("Ollama (local)",          lambda: self._llm_ollama(system, user)),
+        ]
+
+        for name, fn in llm_pipeline:
+            try:
+                print(f"[LLM] {name} deneniyor...")
+                result = fn()
+                if result and all(k in result for k in ["topic", "title", "script"]):
+                    result["source_video_id"] = video_data.get("video_id", "")
+                    result["source_title"]    = video_data.get("title", "")
+                    result["inspired_by"]     = video_data.get("url", "")
+                    print(f"[LLM] ✅ {name} başarılı: {result['title'][:50]}")
+                    return result
+                else:
+                    print(f"[LLM] {name} geçersiz yanıt döndü, sonraki deneniyor.")
+            except Exception as e:
+                print(f"[LLM] {name} exception: {e}")
+                continue
+
+        print("[LLM] ❌ Tüm LLM'ler başarısız. Script üretilemedi.")
+        return None
+
+    def trigger_from_youtube_trend(self, hours_back=6) -> dict | None:
+        """
+        Ana tetikleyici:
+        1. Son X saatteki EV Short'larını bul
+        2. Daha önce kullanılmamış birini seç
+        3. Orijinal script üret (çoklu LLM)
+        4. daily_plan.json formatında kaydet ve döndür
+        """
+        print(f"\n[TrendEngine] 🔍 Son {hours_back}s EV Short'ları taranıyor...")
+
+        recent_videos = self.get_recent_ev_shorts(hours_back=hours_back)
+        if not recent_videos:
+            print("[TrendEngine] Yeni EV Short bulunamadı, normal moda geçiliyor.")
+            return None
+
+        # Kullanılmamış video seç
+        selected_video = None
+        for video in recent_videos:
+            if not self._is_used_recently(video["title"]):
+                selected_video = video
+                break
+
+        if not selected_video:
+            print("[TrendEngine] Tüm bulunan videolar daha önce kullanılmış.")
+            return None
+
+        print(f"[TrendEngine] 🎯 Seçilen trend : {selected_video['title'][:60]}")
+        print(f"[TrendEngine] 📺 Kaynak kanal  : {selected_video['channel']}")
+        print(f"[TrendEngine] 🔗 İlham URL      : {selected_video['url']}")
+        print(f"[TrendEngine] ⚠️  NOT: Görüntü/ses kopyalanmıyor — sadece konu ilhamı")
+
+        script_data = self.generate_inspired_script(selected_video)
+        if not script_data:
+            return None
+
+        self._save_topic_history(selected_video["title"])
+
+        now = datetime.datetime.now()
+        tags = script_data.get("tags", [])
+        for must in ["ev", "electriccar", "evcarix", "Shorts", "ElectricVehicle"]:
+            if must not in tags:
+                tags.append(must)
+
+        plan = {
+            "timestamp":   now.strftime("%Y%m%d_%H%M%S"),
+            "slot":        os.getenv("UPLOAD_SLOT", "evening"),
+            "config":      {"type": "short", "duration": 55},
+            "topic":       script_data["topic"],
+            "full_topic":  script_data["topic"],
+            "category":    script_data.get("category", "trend"),
+            "title":       script_data["title"],
+            "all_titles":  [script_data["title"]],
+            "script":      script_data["script"],
+            "voice":       random.choice(["male", "female"]),
+            "description": (
+                f"{script_data['title']}\n\n"
+                f"Real EV data. No hype. Just numbers. — Evcarix\n\n"
+                f"What you'll learn:\n"
+                f"— {script_data.get('hook', script_data['topic'])}\n\n"
+                f"{chr(10).join('#' + t.replace(' ', '') for t in tags[:15])}"
+            ),
+            "tags":        tags,
+            "variation": {
+                "cta_style":  "Subscribe to Evcarix for real EV data.",
+                "hook_style": "trend",
+                "emoji_set":  ["⚡", "🔋", "📊"],
+            },
+            "inspired_by":     script_data.get("inspired_by", ""),
+            "source_video_id": script_data.get("source_video_id", ""),
+        }
+
+        with open("daily_plan.json", "w", encoding="utf-8") as f:
+            json.dump(plan, f, ensure_ascii=False, indent=4)
+
+        print(f"[TrendEngine] ✅ Trend plan kaydedildi → daily_plan.json")
+        print(f"[TrendEngine] 📝 Başlık: {plan['title']}")
+        return plan
+
+    # ─── Mevcut Ana Konu Seçici (değişmedi) ───────────────────────
+    def select_trending_topic(self, news_df):
         ev_keywords = [
             'ev', 'electric', 'battery', 'tesla', 'range', 'charging',
             'volt', 'watt', 'efficiency', 'byd', 'ioniq', 'rivian', 'lucid',
             'solid state', 'lithium', 'kwh', 'kilowatt', 'hybrid', 'motor'
         ]
-
         def is_ev_related(title):
             t = title.lower()
             return any(word in t for word in ev_keywords)
 
-        # 1) YouTube EV Keyword Araması — En Yüksek Öncelik
         yt_ev = self.get_youtube_ev_search(max_results=20)
-        random.shuffle(yt_ev)  # Her seferinde farklı sıra
+        random.shuffle(yt_ev)
         for item in yt_ev:
             title = item['title']
             if is_ev_related(title) and not self._is_used_recently(title):
                 clean = title.encode('ascii', 'ignore').decode('ascii')
-                print(f"[TrendEngine] YouTube EV search selected: {clean}")
+                print(f"[TrendEngine] YouTube EV search: {clean}")
                 self._save_topic_history(title)
                 return title
 
-        # 2) YouTube Trending (Autos Kategorisi)
         yt = self.get_youtube_trending(region_code=os.getenv('YOUTUBE_REGION', 'US'))
         candidates = [i for i in yt if is_ev_related(i['title'])]
         random.shuffle(candidates)
@@ -206,11 +781,10 @@ class TrendEngine:
             title = item['title']
             if not self._is_used_recently(title):
                 clean = title.encode('ascii', 'ignore').decode('ascii')
-                print(f"[TrendEngine] YouTube trending selected: {clean}")
+                print(f"[TrendEngine] YouTube trending: {clean}")
                 self._save_topic_history(title)
                 return title
 
-        # 3) Gemini — RSS Haberlerinden Seçim
         if GEMINI_AVAILABLE and self.gemini_client and news_df is not None and not news_df.empty:
             try:
                 titles = news_df['title'].tolist()
@@ -218,25 +792,22 @@ class TrendEngine:
                 unused = [t for t in titles if not self._is_used_recently(t)]
                 pool = (unused if unused else titles)[:20]
                 prompt = (
-                    "You are a technical EV analyst for the 'Evcarix' channel. "
-                    "Pick the ONE most data-driven, technical, or performance-related headline. "
-                    "Focus on batteries, range, charging, efficiency, or real-world tests. "
+                    "You are a technical EV analyst for 'Evcarix'. "
+                    "Pick the ONE most data-driven, technical headline. "
                     "Return ONLY the headline text.\n\n"
                     + "\n".join(f"- {t}" for t in pool)
                 )
                 response = self.gemini_client.models.generate_content(
-                    model='gemini-2.0-flash',
-                    contents=prompt
+                    model='gemini-2.0-flash', contents=prompt
                 )
                 selected = response.text.strip()
                 if any(t.lower() in selected.lower() or selected.lower() in t.lower() for t in pool):
-                    print(f"[TrendEngine] Gemini RSS selection: {selected}")
+                    print(f"[TrendEngine] Gemini RSS: {selected}")
                     self._save_topic_history(selected)
                     return selected
             except Exception as e:
                 print(f"[TrendEngine] Gemini error: {e}")
 
-        # 4) Geniş Core Topics Fallback — Geçmişte kullanılmayanı seç
         core_topics = [
             "Real-world EV range test vs manufacturer claims",
             "Battery degradation: LFP vs NMC after 100k miles",
@@ -247,22 +818,12 @@ class TrendEngine:
             "Solid-state battery progress: real timeline and data",
             "EV efficiency: Wh/km breakdown by model",
             "Tesla Model 3 vs BYD Seal: head-to-head efficiency test",
-            "Hyundai IONIQ 6 real-world range: the real numbers",
-            "EV battery warranty: what manufacturers don't tell you",
             "DC fast charging impact on battery health: long-term data",
-            "Rivian R1T range in cold weather: real test results",
-            "EV vs hybrid: total cost comparison over 5 years",
-            "Home charging vs public charging costs: full breakdown",
-            "LFP battery advantages: why BYD keeps winning on cost",
-            "800V ultra-fast charging: which EVs actually support it",
-            "EV depreciation rates: which models hold value best",
-            "Regenerative braking efficiency: how much range does it add",
-            "Used EV battery health: how to check before buying",
         ]
         unused_core = [t for t in core_topics if not self._is_used_recently(t)]
         pool = unused_core if unused_core else core_topics
         selected_core = random.choice(pool)
-        print(f"[TrendEngine] Core concept fallback: {selected_core}")
+        print(f"[TrendEngine] Core fallback: {selected_core}")
         self._save_topic_history(selected_core)
         return selected_core
 
@@ -270,5 +831,8 @@ class TrendEngine:
 if __name__ == "__main__":
     engine = TrendEngine()
     news = engine.get_latest_news()
-    print(news[['title', 'source']].head())
-    print(engine.select_trending_topic(news))
+    result = engine.trigger_from_youtube_trend(hours_back=24)
+    if result:
+        print("BAŞARILI:", result['title'])
+    else:
+        print("Trend bulunamadı, normal topic:", engine.select_trending_topic(news))

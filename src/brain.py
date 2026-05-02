@@ -202,6 +202,23 @@ class EvcarixBrain:
 
     def create_daily_plan(self, slot="evening"):
         print("Evcarix Brain: Plan oluşturuluyor...")
+
+        # ── YENİ: Önce YouTube trend tetikleyiciyi dene ──────────────
+        try:
+            triggered_plan = self.trend_engine.trigger_from_youtube_trend(hours_back=6)
+            if triggered_plan:
+                print(f"\n🚀 TREND TETİKLEYİCİ AKTIF!")
+                print(f"   Başlık : {triggered_plan['title']}")
+                print(f"   Konu   : {triggered_plan['topic']}")
+                print(f"   Kaynak : {triggered_plan.get('inspired_by', 'N/A')}")
+                print(f"   NOT    : Görüntü/ses kopyalanmadı — tamamen orijinal içerik")
+                # Geçmişe kaydet
+                self._save_history(triggered_plan)
+                return triggered_plan
+        except Exception as e:
+            print(f"[Brain] Trend tetikleyici hatası (normal moda geçiliyor): {e}")
+        # ── Trend bulunamazsa normal pipeline devam eder ──────────────
+
         config = {"type": "short", "duration": 55}  # Shorts formatı
 
         # Trend haberleri çek (LLM için context)
