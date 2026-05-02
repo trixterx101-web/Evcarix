@@ -164,8 +164,15 @@ class AutoEditor:
         
         # Audio süresi hedeften kısaysa loop ile uzat
         if audio.duration < target_duration:
-            from moviepy import audio as afx
-            audio = afx.audio_loop(audio, duration=target_duration)
+            from moviepy.audio.fx.all import audio_loop
+            try:
+                audio = audio_loop(audio, duration=target_duration)
+            except (AttributeError, ImportError):
+                # fallback: manual loop via concatenation
+                from moviepy.editor import concatenate_audioclips
+                import math
+                repeats = math.ceil(target_duration / audio.duration)
+                audio = concatenate_audioclips([audio] * repeats).subclip(0, target_duration)
         # Audio süresi hedeften uzunsa kırp
         elif audio.duration > target_duration:
             audio = audio.subclip(0, target_duration)
@@ -196,7 +203,14 @@ class AutoEditor:
         if len(clips) >= 2:
             base_video = concatenate_videoclips(clips, method="compose")
             if base_video.duration < target_duration:
-                base_video = base_video.loop(duration=target_duration)
+                from moviepy.video.fx.all import loop as video_loop
+                try:
+                    base_video = video_loop(base_video, duration=target_duration)
+                except (AttributeError, ImportError):
+                    # fallback: manual loop via concatenation
+                    import math
+                    repeats = math.ceil(target_duration / base_video.duration)
+                    base_video = concatenate_videoclips([base_video] * repeats).subclip(0, target_duration)
             else:
                 base_video = base_video.subclip(0, target_duration)
 
@@ -228,7 +242,14 @@ class AutoEditor:
             if img_clips:
                 base_video = CompositeVideoClip(img_clips, size=(1080, 1920))
                 if base_video.duration < target_duration:
-                    base_video = base_video.loop(duration=target_duration)
+                    from moviepy.video.fx.all import loop as video_loop
+                    try:
+                        base_video = video_loop(base_video, duration=target_duration)
+                    except (AttributeError, ImportError):
+                        # fallback: manual loop via concatenation
+                        import math
+                        repeats = math.ceil(target_duration / base_video.duration)
+                        base_video = concatenate_videoclips([base_video] * repeats).subclip(0, target_duration)
             else:
                 base_video = self._make_motion_background(target_duration)
         else:
@@ -325,7 +346,14 @@ class AutoEditor:
 
         final_video = concatenate_videoclips(clips, method="compose")
         if final_video.duration < audio.duration:
-            final_video = final_video.loop(duration=audio.duration)
+            from moviepy.video.fx.all import loop as video_loop
+            try:
+                final_video = video_loop(final_video, duration=audio.duration)
+            except (AttributeError, ImportError):
+                # fallback: manual loop via concatenation
+                import math
+                repeats = math.ceil(audio.duration / final_video.duration)
+                final_video = concatenate_videoclips([final_video] * repeats).subclip(0, audio.duration)
         else:
             final_video = final_video.subclip(0, audio.duration)
 
@@ -333,7 +361,15 @@ class AutoEditor:
             from moviepy.editor import CompositeAudioClip
             bg = AudioFileClip(bg_music_path).volumex(0.1)
             if bg.duration < audio.duration:
-                bg = bg.loop(duration=audio.duration)
+                from moviepy.audio.fx.all import audio_loop
+                try:
+                    bg = audio_loop(bg, duration=audio.duration)
+                except (AttributeError, ImportError):
+                    # fallback: manual loop via concatenation
+                    from moviepy.editor import concatenate_audioclips
+                    import math
+                    repeats = math.ceil(audio.duration / bg.duration)
+                    bg = concatenate_audioclips([bg] * repeats).subclip(0, audio.duration)
             else:
                 bg = bg.subclip(0, audio.duration)
             final_video = final_video.set_audio(CompositeAudioClip([audio, bg]))
