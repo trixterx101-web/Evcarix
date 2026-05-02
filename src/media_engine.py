@@ -486,44 +486,74 @@ class MediaEngine:
 
     # ─── Ana İndirme Metodu — Pexels + Pixabay + Coverr birleşik ──────────────
     def download_stock_videos(self, query, output_dir="assets/temp_videos", count=4, orientation="portrait", category=None):
-        """Pexels, Pixabay, Coverr, OEM Press Kit, NASA/DOE ve YouTube CC'den video indirir."""
+        """
+        Video kaynaklarını kalite sırasına göre indirir:
+        1. OEM Press Kit (Tesla/Hyundai/BMW) - En kaliteli 4K/1080p profesyonel
+        2. NASA/DOE - Kamu malı, yüksek kalite
+        3. Pexels - Ücretsiz ama kaliteli
+        4. Pixabay - Ücretsiz, orta kalite
+        5. Coverr - Ücretsiz
+        6. YouTube CC - Değişken kalite
+        """
         os.makedirs(output_dir, exist_ok=True)
 
-        pexels_count = (count + 1) // 4
-        pixabay_count = (count + 1) // 4
-        coverr_count = (count + 1) // 4
-        remaining = count - pexels_count - pixabay_count - coverr_count
+        # Öncelik: En kaliteli kaynaklar daha fazla alır
+        oem_count = min(count, 2)
+        nasa_count = min(max(count - oem_count, 0), 2)
+        pexels_count = min(max(count - oem_count - nasa_count, 0), 2)
+        pixabay_count = min(max(count - oem_count - nasa_count - pexels_count, 0), 1)
+        coverr_count = min(max(count - oem_count - nasa_count - pexels_count - pixabay_count, 0), 1)
+        yt_count = max(count - oem_count - nasa_count - pexels_count - pixabay_count - coverr_count, 0)
 
-        pexels_paths = self._download_from_pexels(query, output_dir, pexels_count, orientation, category=category)
-        pixabay_paths = self._download_from_pixabay(query, output_dir, pixabay_count, orientation, category=category)
-        coverr_paths = self._download_from_coverr(query, output_dir, coverr_count, orientation, category=category)
+        # Sıralı indir (kalite sırası)
+        all_paths = []
 
-        all_paths = pexels_paths + pixabay_paths + coverr_paths
-        remaining = max(0, count - len(all_paths))
-
-        # OEM Press Kit
-        if remaining > 0:
-            oem_count = min(remaining, 2)
+        # 1. OEM Press Kit (En kaliteli)
+        if oem_count > 0:
             oem_paths = self._download_from_oem_presskit(output_dir, oem_count, category)
             all_paths += oem_paths
-            remaining = max(0, count - len(all_paths))
-            print(f"[MediaEngine] OEM PressKit: {len(oem_paths)} klip")
+            print(f"[MediaEngine] OEM PressKit (4K/Pro): {len(oem_paths)} klip")
 
-        # NASA/DOE Public Domain
-        if remaining > 0:
-            pub_count = min(remaining, 2)
-            pub_paths = self._download_public_domain(output_dir, pub_count)
+        # 2. NASA/DOE (Yüksek kalite)
+        if nasa_count > 0 and len(all_paths) < count:
+            pub_paths = self._download_public_domain(output_dir, nasa_count)
             all_paths += pub_paths
-            remaining = max(0, count - len(all_paths))
-            print(f"[MediaEngine] NASA/DOE: {len(pub_paths)} klip")
+            print(f"[MediaEngine] NASA/DOE (High Quality): {len(pub_paths)} klip")
 
-        # YouTube CC
-        if remaining > 0 and self.ytdlp_available:
-            yt_count = min(remaining, 2)
-            yt_paths = self._download_from_youtube_cc(query, output_dir, yt_count)
+        # 3. Pexels (Kaliteli)
+        if pexels_count > 0 and len(all_paths) < count:
+            remaining_pex = min(pexels_count, count - len(all_paths))
+            pex_paths = self._download_from_pexels(query, output_dir, remaining_pex, orientation, category=category)
+            all_paths += pex_paths
+            print(f"[MediaEngine] Pexels (Quality): {len(pex_paths)} klip")
+
+        # 4. Pixabay (Orta kalite)
+        if pixabay_count > 0 and len(all_paths) < count:
+            remaining_pix = min(pixabay_count, count - len(all_paths))
+            pix_paths = self._download_from_pixabay(query, output_dir, remaining_pix, orientation, category=category)
+            all_paths += pix_paths
+            print(f"[MediaEngine] Pixabay (Medium): {len(pix_paths)} klip")
+
+        # 5. Coverr (Değişken)
+        if coverr_count > 0 and len(all_paths) < count:
+            remaining_cov = min(coverr_count, count - len(all_paths))
+            cov_paths = self._download_from_coverr(query, output_dir, remaining_cov, orientation, category=category)
+            all_paths += cov_paths
+            print(f"[MediaEngine] Coverr (Variable): {len(cov_paths)} klip")
+
+        # 6. YouTube CC (Son çare)
+        if yt_count > 0 and len(all_paths) < count and self.ytdlp_available:
+            remaining_yt = min(yt_count, count - len(all_paths))
+            yt_paths = self._download_from_youtube_cc(query, output_dir, remaining_yt)
             all_paths += yt_paths
-            remaining = max(0, count - len(all_paths))
-            print(f"[MediaEngine] YouTube CC: {len(yt_paths)} klip")
+            print(f"[MediaEngine] YouTube CC (Fallback): {len(yt_paths)} klip")
+
+        # Eksik varsa Pexels ile tamamla
+        if len(all_paths) < count:
+            extra_needed = count - len(all_paths)
+            extra = self._download_from_pexels(query, output_dir, extra_needed, orientation, category=category)
+            all_paths += extra
+            print(f"[MediaEngine] Pexels ile tamamlandı: {len(extra)} klip")
 
         random.shuffle(all_paths)
 
@@ -531,12 +561,7 @@ class MediaEngine:
             print("[MediaEngine] Tüm kaynaklardan video alınamadı!")
             return []
 
-        if len(all_paths) < count:
-            extra_needed = count - len(all_paths)
-            extra = self._download_from_pexels(query, output_dir, extra_needed, orientation, category=category)
-            all_paths += extra
-
-        print(f"[MediaEngine] Toplam {len(all_paths)} klip hazır ({len(pexels_paths)} Pexels + {len(pixabay_paths)} Pixabay + {len(coverr_paths)} Coverr + {len(oem_paths) if 'oem_paths' in locals() else 0} OEM + {len(pub_paths) if 'pub_paths' in locals() else 0} NASA/DOE)")
+        print(f"[MediaEngine] ✅ Toplam {len(all_paths)} klip hazır (Kalite sırasıyla)")
         return all_paths[:count]
 
     # ─── NASA / DOE Kamu Malı Videolar ───────────────────────────────────────
