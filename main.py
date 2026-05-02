@@ -51,7 +51,11 @@ class EvcarixOrchestrator:
         print(f"{'='*60}\n")
 
         # ── 1. Plan ───────────────────────────────────────────────
-        plan = self.brain.create_daily_plan(slot=slot)
+        # CONTENT_MODE: trend (YouTube'tan ilham) veya auto (sistem konusu)
+        content_mode = os.getenv("CONTENT_MODE", "auto")
+        slot = os.getenv("UPLOAD_SLOT", "evening")
+        
+        plan = self.brain.create_daily_plan(slot=slot, content_mode=content_mode)
         script      = plan['script']
         topic       = plan['topic']
         full_topic  = plan['full_topic']
