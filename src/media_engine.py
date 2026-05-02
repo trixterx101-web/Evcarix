@@ -11,6 +11,7 @@ from PIL import Image
 from src.voice_engine import VoiceEngine
 from src.query_builder import get_queries, get_queries_for_script
 from src.oem_scraper import OEMScraper
+from src.ai_video_generator import AIVideoGenerator
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -571,6 +572,25 @@ class MediaEngine:
             pix_fresh = self._filter_used_clips(pix)
             all_paths += [p for p in pix_fresh if p not in all_paths]
             print(f"[MediaEngine] Pixabay: {len(pix_fresh)} taze klip")
+
+        # 3.5. AI Video Generator (topic-relevant prompts)
+        if len(all_paths) < count:
+            print("[MediaEngine] 🤖 AI video generator deneniyor...")
+            try:
+                ai_gen = AIVideoGenerator()
+                topic_str = (plan.get("topic", "") or plan.get("title", "") or query) if plan else query
+                category_str = plan.get("category_id", "") if plan else ""
+                ai_clips = ai_gen.generate(
+                    topic       = topic_str,
+                    category_id = category_str,
+                    count       = count - len(all_paths),
+                    duration    = 6,
+                    video_type  = os.environ.get("VIDEO_TYPE", "short"),
+                )
+                all_paths += ai_clips
+                print(f"[MediaEngine] AI Video: +{len(ai_clips)} klip")
+            except Exception as e:
+                print(f"[MediaEngine] AI Video hata: {e}")
 
         # 4. OEM Press Kit
         if len(all_paths) < count:
@@ -1184,63 +1204,22 @@ class MediaEngine:
             return None
 
     # ─── Generate Multiple Video Clips from AI Services ───────────────────
-    def generate_ai_video_clips(self, topic, count=6, output_dir="assets/ai_videos", duration=5):
-        """Birden fazla AI video klip üretir (Stability, Replicate, Kling, Qwen, HuggingFace)."""
-        # Hiç AI video API key'i yoksa hızlıca çık
-        has_any_key = any([
-            self.stability_api_key,
-            self.replicate_api_key,
-            self.kling_access_key,
-            self.dashscope_api_key,
-            self.hf_token,
-        ])
-        if not has_any_key:
-            print("[AI Videos] Hiç AI video API key'i yok, stok videoya geçiliyor.")
-            return []
-
-        os.makedirs(output_dir, exist_ok=True)
-        clips = []
-
-        prompts = [
-            f"futuristic electric car driving on highway at sunset, cinematic 4k, dramatic lighting, {topic}",
-            f"EV battery technology close up, laboratory, lithium cells, futuristic blue glow, {topic}",
-            f"electric vehicle charging station at night, city lights, cyberpunk aesthetic, {topic}",
-            f"Tesla or modern EV dashboard display, holographic interface, technology, {topic}",
-            f"aerial view of electric car on winding road, mountains, golden hour, cinematic, {topic}",
-            f"electric motor engine technology close up, heat visualization, futuristic, {topic}",
-        ]
-
-        # Try each service for each clip
-        services = [
-            ("Stability", self.generate_stability_video),
-            ("Replicate", self.generate_replicate_video),
-            ("Kling", self.generate_kling_video),
-            ("Qwen", self.generate_qwen_video),
-            ("HuggingFace", self.generate_huggingface_video),
-        ]
-        
-        for i in range(min(count, len(prompts))):
-            prompt = prompts[i % len(prompts)]
-            output_path = os.path.join(output_dir, f"ai_clip_{i}.mp4")
-            
-            # Try each service until one succeeds
-            for service_name, service_func in services:
-                try:
-                    print(f"[AI Videos] {service_name} deneniyor (klip {i+1}/{count})...")
-                    result = service_func(prompt, output_path, duration=duration)
-                    if result and os.path.exists(result):
-                        clips.append(result)
-                        print(f"[AI Videos] ✅ {service_name} ile klip {i+1} oluşturuldu")
-                        break
-                except Exception as e:
-                    print(f"[AI Videos] {service_name} hatası: {e}")
-                    continue
-            
-            if len(clips) <= i:
-                print(f"[AI Videos] ⚠️ Klip {i+1} oluşturulamadı")
-        
-        print(f"[AI Videos] Toplam {len(clips)}/{count} klip oluşturuldu")
-        return clips
+    def generate_ai_video_clips(self, topic, count=6, output_dir="assets/ai_videos", duration=5, category_id="", video_type="short"):
+        """AI video generator kullanarak topic-relevant klipler üretir."""
+        from src.ai_video_generator import AIVideoGenerator
+        ai_gen = AIVideoGenerator()
+        ai_clips = ai_gen.generate(
+            topic       = topic,
+            category_id = category_id,
+            count       = count,
+            duration    = duration,
+            video_type  = video_type,
+        )
+        if ai_clips:
+            print(f"[MediaEngine] ✅ AI video: {len(ai_clips)} klip")
+        else:
+            print("[MediaEngine] AI video yok, stok videoya geçiliyor.")
+        return ai_clips
 
     def generate_thumbnail(self, video_path, title, output_path,
                            channel_name="EVCARIX", slogan="No hype. Just numbers."):

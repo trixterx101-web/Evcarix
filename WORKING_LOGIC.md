@@ -99,29 +99,43 @@ Evcarix, YouTube Shorts formatında otomatik EV (Electric Vehicle) içerik üret
 
 ### 4.1 AI Video Üretimi (ÖNCELİKLI)
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  generate_ai_video_clips()                              │
-│  └─ Stability AI (Stable Video Diffusion)               │
-│  └─ Replicate (ZeroScope V2)                            │
-│  └─ Kling AI (Kling Video)                              │
-│  └─ API key yoksa → Stok videoya geç                    │
-└─────────────────────────────────────────────────────────┘
-```
+**AI Video Generation Chain**:
+- Provider 1 — Kling AI (KLING_API_KEY) — best quality
+- Provider 2 — Runway ML (RUNWAY_API_KEY) — cinematic
+- Provider 3 — Luma Dream (LUMA_API_KEY) — realistic
+- Provider 4 — Stability AI (STABILITY_API_KEY) — fast
+- Provider 5 — HuggingFace (no key, FREE) — always available
+
+**Prompt Selection**:
+9 category-specific prompts in `get_prompt()`:
+- battery → glowing lithium cells, circuit patterns
+- range → aerial drone shot, highway driving
+- charging → EV connector sparks, slow motion
+- ownership → coin vs fuel animation
+- comparison → two EVs in showroom
+- market → world map EV adoption dots
+- infrastructure → charging station aerial
+- education → electric motor cross-section
+- tools → futuristic data dashboard
 
 ### 4.2 Stok Video İndirme (FALLBACK)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  download_stock_videos(count=5-10)                      │
-│  └─ Pexels API (öncelikli)                              │
-│  └─ Pixabay API                                         │
+│  └─ Pexels API (topic-relevant queries)                 │
+│  └─ Pixabay API (topic-relevant queries)                │
+│  └─ AI Video Generator (Kling → Runway → Luma → HF)     │
 │  └─ OEM Press Kit (Tesla, Lucid, Waymo)                 │
 │  └─ NASA/DOE Public Videos                              │
+│  └─ FreeVideoSources (Coverr, Mixkit, Dareful)          │
+│  └─ OEM Scraper (25 press sites)                        │
 │  └─ Kullanılan klip hash'leriyle filtrele               │
-│  └─ Konu anahtar kelimeleriyle alakalı sorgular         │
 └─────────────────────────────────────────────────────────┘
 ```
+
+**Full Media Fallback Chain** (in order):
+Pexels → Pixabay → AI Video → FreeVideoSources → OEM Scraper → AI video + tekrar kullanım
 
 ### 4.3 Stok Biterse Fallback
 
