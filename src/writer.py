@@ -450,22 +450,64 @@ class CreativeWriter:
                 f"Return:\nSES: [male or female]\nSENARYO: [script]"
             )
         else:
+            # Long-form script with explicit word count and structure
+            target_duration = 360  # 6 minutes for long-form
+            min_words = int(target_duration * 1.8)
+            max_words = int(target_duration * 2.5)
+            
             system = (
                 "You are Evcarix's senior analyst. Write data-rich EV scripts. "
                 "American English only. Return: SES: [male/female]\nSENARYO: [script]"
             )
-            user = (
-                f"Write a 6-8 minute YouTube script for Evcarix.\n"
-                f"Topic: {topic}\nCategory: {category or 'general'}\n"
-                f"Category guide: {cat_extra}\n\n"
-                f"Structure: Hook(30s) → 4-5 data sections(90s each) → Conclusion(30s) → CTA\n"
-                f"Regions: USA, Europe, China ONLY — NEVER Turkey\n\n"
-                f"Return:\nSES: [male or female]\nSENARYO: [script]"
-            )
+            user = f"""
+Write a full YouTube video narration script for Evcarix channel.
+Topic: {topic}
+Duration: {target_duration} seconds ({target_duration // 60} minutes)
+Word count: {min_words} to {max_words} words
+(at ~130 words/minute speaking pace this fills {target_duration}s exactly)
 
-        raw = self._call_llm(system, user, max_tokens=1000)
+CRITICAL: Write the COMPLETE script from start to finish.
+Do NOT write a summary. Do NOT write section headings only.
+Write every single sentence that will be spoken.
+
+Structure (write all sections in full):
+[INTRO - 30s]: Hook question + what we will cover today
+[SECTION 1 - 60s]: Background and common misconceptions
+[SECTION 2 - 60s]: Real-world data and test results
+[SECTION 3 - 60s]: Comparison with alternatives
+[DATA REVEAL - 60s]: The key numbers and what they mean
+[CONCLUSION - 30s]: Main takeaway
+[CTA - 20s]: Subscribe to Evcarix for real EV data, no hype
+
+Channel name pronunciation note: spell it as "Ev-CAR-ix" in the script.
+Tone: Data-driven, no hype, factual, slightly dramatic on data reveals.
+Language: English.
+Category: {category or 'general'}
+Category guide: {cat_extra}
+Regions: USA, Europe, China ONLY — NEVER Turkey
+
+Return ONLY the spoken script text, no section headers, no stage
+directions, no formatting — just the words to be spoken continuously.
+
+Return:
+SES: [male or female]
+SENARYO: [script]
+"""
+
+        raw = self._call_llm(system, user, max_tokens=2000)
         if raw:
-            return self._parse_response(raw)
+            parsed = self._parse_response(raw)
+            # Word count validation for long-form
+            if format_type != "short":
+                actual_words = len(parsed["script"].split())
+                if actual_words < min_words:
+                    print(f"[Writer] ⚠️ Script too short ({actual_words} words, need {min_words}). Retrying...")
+                    # Retry with explicit word count reminder
+                    user += f"\n\nIMPORTANT: Your previous response was too short. Write at least {min_words} words."
+                    raw = self._call_llm(system, user, max_tokens=2000)
+                    if raw:
+                        parsed = self._parse_response(raw)
+            return parsed
 
         return {
             "voice": "female",

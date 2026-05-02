@@ -19,6 +19,23 @@ except Exception:
 TOPIC_HISTORY_FILE = "used_topics.json"
 TOPIC_HISTORY_LIMIT = 14
 
+ALLOWED_TOPICS = [
+    "battery", "range", "charging", "ownership", "cost",
+    "degradation", "LFP", "NMC", "heat pump", "efficiency",
+    "winter range", "charging speed", "fast charging", "BMS",
+    "real world test", "kWh", "electric vehicle data",
+    "EV comparison", "electric car test", "charging network",
+    "depreciation", "total cost", "solid state", "WLTP",
+]
+
+BLOCKED_TOPICS = [
+    "lamborghini", "ferrari", "bugatti", "koenigsegg", "hypercar",
+    "supercar", "luxury car", "exotic car", "racing", "drift",
+    "formula", "NASCAR", "rally", "stunt", "prank", "vlog",
+    "reaction", "challenge", "india", "hindi", "rupee",
+    "three wheeler", "scooter", "moped", "rickshaw",
+]
+
 
 class TrendEngine:
     def __init__(self):
@@ -67,10 +84,31 @@ class TrendEngine:
         self.mistral_key       = os.getenv("MISTRAL_API_KEY")
         self.cohere_key        = os.getenv("COHERE_API_KEY")
         self.together_key      = os.getenv("TOGETHER_API_KEY")
-        self.perplexity_key    = os.getenv("PERPLEXITY_API_KEY")
-        self.deepseek_key      = os.getenv("DEEPSEEK_API_KEY")
-        self.huggingface_key   = os.getenv("HUGGINGFACE_API_KEY")
-        self.ollama_url        = os.getenv("OLLAMA_URL", "http://localhost:11434")
+
+    def _is_relevant(self, title: str) -> bool:
+        """Check if video title is relevant to EV data topics."""
+        title_lower = title.lower()
+        # Reject if any blocked term found
+        for blocked in BLOCKED_TOPICS:
+            if blocked in title_lower:
+                return False
+        # Accept if any allowed term found
+        for allowed in ALLOWED_TOPICS:
+            if allowed in title_lower:
+                return True
+        # Default: reject if no EV data keyword found
+        return False
+
+    def _pick_from_topic_pool(self) -> str | None:
+        """Randomly pick a topic from data/topics.csv as fallback."""
+        try:
+            topics_df = pd.read_csv("data/topics.csv")
+            pool = topics_df["topic"].tolist()
+            if pool:
+                return random.choice(pool)
+        except Exception:
+            pass
+        return None
 
     # ─── JSON Temizleyici ──────────────────────────────────────────
     def _clean_json(self, text: str) -> str:
@@ -692,9 +730,15 @@ Return ONLY this JSON (no markdown, no backticks):
             print("[TrendEngine] Yeni EV Short bulunamadı, normal moda geçiliyor.")
             return None
 
+        # Apply topic relevance filter
+        candidates = [v for v in recent_videos if self._is_relevant(v["title"])]
+        if not candidates:
+            print("[TrendEngine] ⚠️ Hiç uygun trend yok, konu havuzuna geçiliyor.")
+            return None
+
         # Kullanılmamış video seç
         selected_video = None
-        for video in recent_videos:
+        for video in candidates:
             if not self._is_used_recently(video["title"]):
                 selected_video = video
                 break
