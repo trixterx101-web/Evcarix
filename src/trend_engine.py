@@ -7,6 +7,8 @@ import feedparser
 import requests
 import pandas as pd
 from datetime import timezone, timedelta
+from dotenv import load_dotenv
+load_dotenv()
 
 try:
     from google import genai
