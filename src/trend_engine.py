@@ -677,7 +677,7 @@ Return ONLY this JSON (no markdown, no backticks):
         print("[LLM] ❌ Tüm LLM'ler başarısız. Script üretilemedi.")
         return None
 
-    def trigger_from_youtube_trend(self, hours_back=6) -> dict | None:
+    def trigger_from_youtube_trend(self, hours_back=48) -> dict | None:
         """
         Ana tetikleyici:
         1. Son X saatteki EV Short'larını bul
@@ -1165,7 +1165,7 @@ Return ONLY this JSON (no markdown, no backticks):
         return None
 
     # ── Ana Trend Tetikleyici ───────────────────────────────────────
-    def trigger_from_youtube_trend(self, hours_back=6) -> dict | None:
+    def trigger_from_youtube_trend(self, hours_back=48) -> dict | None:
         """
         1. Son X saatteki EV Short'larını bul
         2. Kullanılmamış birini seç

@@ -205,7 +205,7 @@ class EvcarixBrain:
 
         # ── YouTube Trend Tetikleyici (öncelikli) ────────────────────
         try:
-            triggered_plan = self.trend_engine.trigger_from_youtube_trend(hours_back=6)
+            triggered_plan = self.trend_engine.trigger_from_youtube_trend(hours_back=48)
             if triggered_plan:
                 print(f"\n🚀 TREND MOD AKTİF!")
                 print(f"   Başlık : {triggered_plan['title']}")
