@@ -1,14 +1,14 @@
 """
 Evcarix AI Video Generator
 Generates topic-relevant AI videos using multiple providers.
-Fallback chain: Kling → Runway → Luma → Stability → HuggingFace (free)
+Fallback chain: Kling → Runway → Luma → Stability → HuggingFace → Upsampler → Wan 2.2 (all free)
 
 Environment variables (add to GitHub Secrets):
   KLING_API_KEY       — Kling AI (https://klingai.com)
   RUNWAY_API_KEY      — Runway ML (https://runwayml.com)
   LUMA_API_KEY        — Luma Dream Machine (https://lumalabs.ai)
   STABILITY_API_KEY   — Stability AI (https://stability.ai)
-  (HuggingFace: free, no key needed)
+  (HuggingFace, Upsampler, Wan 2.2: free, no key needed)
 """
 
 import os
@@ -164,8 +164,10 @@ class AIVideoGenerator:
             chain.append(("Luma Dream",    self._luma))
         if self.stability_key:
             chain.append(("Stability AI",  self._stability))
-        # HuggingFace is always available (free, no key)
+        # Free providers (no API key needed) - always available
         chain.append(("HuggingFace",   self._huggingface))
+        chain.append(("Upsampler",      self._upsampler))
+        chain.append(("Wan 2.2 Spaces", self._wan22_spaces))
         return chain
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -517,6 +519,102 @@ class AIVideoGenerator:
                     print(f"[HuggingFace] {r.status_code}: {r.text[:80]}")
             except Exception as e:
                 print(f"[HuggingFace] {e}")
+            time.sleep(3)
+        return clips
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ── Provider: Upsampler.com (FREE — Wan 2.2, no signup) ─────────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    def _upsampler(self, prompt: str, count: int,
+                   duration: int, aspect: str) -> list[str]:
+        """
+        Upsampler.com free video generator - Wan 2.2 model.
+        No signup, no watermark, unlimited.
+        URL: https://upsampler.com/free-video-generator-no-signup
+        """
+        clips = []
+        for i in range(count):
+            try:
+                print(f"[Upsampler] Generating video {i+1}/{count}...")
+                # Upsampler uses a simple POST to their free endpoint
+                r = requests.post(
+                    "https://api.upsampler.com/v1/generate",
+                    headers={"Content-Type": "application/json"},
+                    json={
+                        "prompt": prompt,
+                        "model": "wan2.2",
+                        "duration": min(duration, 10),
+                        "aspect_ratio": aspect,
+                    },
+                    timeout=120,
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    url = data.get("video_url") or data.get("url", "")
+                    if url:
+                        path = self._download_video(url, f"upsampler_{i}")
+                        if path:
+                            clips.append(path)
+                elif r.status_code == 429:
+                    print(f"[Upsampler] Rate limited, bekleniyor...")
+                    time.sleep(10)
+                else:
+                    print(f"[Upsampler] {r.status_code}: {r.text[:80]}")
+            except Exception as e:
+                print(f"[Upsampler] {e}")
+            time.sleep(2)
+        return clips
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ── Provider: HuggingFace Spaces Wan 2.2 (FREE — unlimited) ───────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    def _wan22_spaces(self, prompt: str, count: int,
+                      duration: int, aspect: str) -> list[str]:
+        """
+        HuggingFace Spaces Wan 2.2 - completely free, no API key, unlimited.
+        URL: https://huggingface.co/spaces/Wan-AI/Wan2.2
+        Queue-based, may require waiting but always available.
+        """
+        clips = []
+        for i in range(count):
+            try:
+                print(f"[Wan2.2] Generating video {i+1}/{count} (queue-based)...")
+                r = requests.post(
+                    "https://wan-ai-wan2-2.hf.space/run/predict",
+                    headers={"Content-Type": "application/json"},
+                    json={
+                        "data": [
+                            prompt,  # prompt
+                            25,      # num_inference_steps
+                            7.5,     # guidance_scale
+                            16,      # num_frames
+                            512,     # height
+                            512,     # width
+                        ]
+                    },
+                    timeout=300,  # 5 min timeout for queue
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    # HuggingFace Spaces returns data in different format
+                    if isinstance(data, dict):
+                        url = data.get("data", [{}])[0].get("url", "") if data.get("data") else ""
+                    elif isinstance(data, list) and len(data) > 0:
+                        url = data[0].get("url", "") if isinstance(data[0], dict) else ""
+                    else:
+                        url = ""
+                    
+                    if url:
+                        path = self._download_video(url, f"wan22_{i}")
+                        if path:
+                            clips.append(path)
+                elif r.status_code == 503:
+                    print(f"[Wan2.2] Queue dolu, bekleniyor...")
+                    time.sleep(15)
+                else:
+                    print(f"[Wan2.2] {r.status_code}: {r.text[:80]}")
+            except Exception as e:
+                print(f"[Wan2.2] {e}")
             time.sleep(3)
         return clips
 

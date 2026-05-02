@@ -105,6 +105,8 @@ Evcarix, YouTube Shorts formatında otomatik EV (Electric Vehicle) içerik üret
 - Provider 3 — Luma Dream (LUMA_API_KEY) — realistic
 - Provider 4 — Stability AI (STABILITY_API_KEY) — fast
 - Provider 5 — HuggingFace (no key, FREE) — always available
+- Provider 6 — Upsampler.com (no key, FREE) — Wan 2.2 model, no signup, no watermark
+- Provider 7 — HuggingFace Spaces Wan 2.2 (no key, FREE) — unlimited, queue-based
 
 **Prompt Selection**:
 9 category-specific prompts in `get_prompt()`:
