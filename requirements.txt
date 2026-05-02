@@ -14,3 +14,5 @@ stability-sdk
 replicate
 numpy
 opencv-python
+yt-dlp
+gradio_client

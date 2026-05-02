@@ -1,6 +1,7 @@
 import os
 import re
 import random
+import subprocess
 import requests
 import urllib.parse
 from PIL import Image
@@ -8,6 +9,75 @@ from src.voice_engine import VoiceEngine
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# ═══════════════════════════════════════════════════════════════════
+#  NASA / DOE KAMU MALI URL'LERİ  (API gerektirmez, doğrudan CDN)
+# ═══════════════════════════════════════════════════════════════════
+NASA_PUBLIC_VIDEOS = [
+    "https://images-assets.nasa.gov/video/NHQ_2022_0214_EVSE_Charging_Stations/NHQ_2022_0214_EVSE_Charging_Stations~orig.mp4",
+    "https://images-assets.nasa.gov/video/KSC-20220503-MH-CST01-0001-Kennedy_Electric_Vehicle/KSC-20220503-MH-CST01-0001-Kennedy_Electric_Vehicle~orig.mp4",
+]
+
+DOE_PUBLIC_VIDEOS = [
+    "https://www.energy.gov/sites/default/files/2022-02/ev-charging-broll.mp4",
+    "https://www.energy.gov/sites/default/files/2023-04/argonne-battery-lab.mp4",
+]
+
+# ═══════════════════════════════════════════════════════════════════
+#  OEM PRESS KIT ARAMA TANIMLARI
+# ═══════════════════════════════════════════════════════════════════
+OEM_PRESS_SEARCH = {
+    "tesla": {
+        "direct_videos": [
+            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-3-Desktop-NA.mp4",
+            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-Y-Desktop-NA.mp4",
+            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Cybertruck-Homepage-Desktop.mp4",
+            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Model-S-Homepage-Desktop-LHD-01.mp4",
+            "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Model-X-Homepage-Desktop.mp4",
+        ]
+    },
+    "hyundai": {
+        "direct_videos": [
+            "https://www.hyundainews.com/assets/blt1e15b5a1ee2e7a35/IONIQ5_Exterior_01.mp4",
+            "https://www.hyundainews.com/assets/blt9b73ef77742c5c54/IONIQ6_Exterior_Reveal.mp4",
+        ]
+    },
+    "bmw": {
+        "direct_videos": [
+            "https://media.bmwgroup.com/content/dam/bmwgroup_master/bba/Videos/i4/BMW_i4_Driving_1920x1080.mp4",
+            "https://media.bmwgroup.com/content/dam/bmwgroup_master/bba/Videos/iX/BMW_iX_Driving_1920x1080.mp4",
+        ]
+    },
+    "kia": {
+        "direct_videos": [
+            "https://www.kiamedia.com/us/en/media/asset/EV6_Exterior_Driving_01.mp4",
+            "https://www.kiamedia.com/us/en/media/asset/EV9_Exterior_Reveal.mp4",
+        ]
+    },
+    "rivian": {
+        "direct_videos": [
+            "https://media.rivian.com/r1t-driving-offroad.mp4",
+            "https://media.rivian.com/r1s-highway-driving.mp4",
+        ]
+    },
+    "ford": {
+        "direct_videos": [
+            "https://media.ford.com/content/fordmedia/fna/us/en/news/2022/05/19/f-150-lightning/_jcr_content/image.video.mp4",
+        ]
+    },
+}
+
+# ═══════════════════════════════════════════════════════════════════
+#  YOUTUBE CC EV ARAMA TERİMLERİ (yt-dlp ile CC lisanslı)
+# ═══════════════════════════════════════════════════════════════════
+YTCC_EV_QUERIES = [
+    "electric car review 2024 creative commons",
+    "EV battery technology explained creative commons",
+    "electric vehicle charging station creative commons",
+    "Tesla Model 3 range test creative commons",
+    "electric car comparison 2024 creative commons",
+    "EV vs gasoline real world test creative commons",
+]
 
 
 
@@ -23,6 +93,15 @@ class MediaEngine:
         self.hf_token = os.getenv("HF_TOKEN")
         self.coverr_api_key = os.getenv("COVERR_API_KEY")
         self.voice_engine = VoiceEngine()
+
+        # yt-dlp kurulu mu kontrol et
+        try:
+            subprocess.run(["yt-dlp", "--version"],
+                           capture_output=True, check=True, timeout=10)
+            self.ytdlp_available = True
+        except Exception:
+            self.ytdlp_available = False
+            print("[MediaEngine] yt-dlp bulunamadı. pip install yt-dlp ile kurun.")
 
     async def generate_voiceover(self, text, output_path, voice_type="female", rate="+10%"):
         return await self.voice_engine.generate_voice(text, output_path, voice_type=voice_type, rate=rate)
@@ -407,22 +486,49 @@ class MediaEngine:
 
     # ─── Ana İndirme Metodu — Pexels + Pixabay + Coverr birleşik ──────────────
     def download_stock_videos(self, query, output_dir="assets/temp_videos", count=4, orientation="portrait", category=None):
-        """Pexels, Pixabay ve Coverr'dan video indirir, birleştirir ve karıştırır."""
+        """Pexels, Pixabay, Coverr, OEM Press Kit, NASA/DOE ve YouTube CC'den video indirir."""
         os.makedirs(output_dir, exist_ok=True)
 
-        pexels_count = (count + 1) // 3
-        pixabay_count = (count + 1) // 3
-        coverr_count = count - pexels_count - pixabay_count
+        pexels_count = (count + 1) // 4
+        pixabay_count = (count + 1) // 4
+        coverr_count = (count + 1) // 4
+        remaining = count - pexels_count - pixabay_count - coverr_count
 
         pexels_paths = self._download_from_pexels(query, output_dir, pexels_count, orientation, category=category)
         pixabay_paths = self._download_from_pixabay(query, output_dir, pixabay_count, orientation, category=category)
         coverr_paths = self._download_from_coverr(query, output_dir, coverr_count, orientation, category=category)
 
         all_paths = pexels_paths + pixabay_paths + coverr_paths
+        remaining = max(0, count - len(all_paths))
+
+        # OEM Press Kit
+        if remaining > 0:
+            oem_count = min(remaining, 2)
+            oem_paths = self._download_from_oem_presskit(output_dir, oem_count, category)
+            all_paths += oem_paths
+            remaining = max(0, count - len(all_paths))
+            print(f"[MediaEngine] OEM PressKit: {len(oem_paths)} klip")
+
+        # NASA/DOE Public Domain
+        if remaining > 0:
+            pub_count = min(remaining, 2)
+            pub_paths = self._download_public_domain(output_dir, pub_count)
+            all_paths += pub_paths
+            remaining = max(0, count - len(all_paths))
+            print(f"[MediaEngine] NASA/DOE: {len(pub_paths)} klip")
+
+        # YouTube CC
+        if remaining > 0 and self.ytdlp_available:
+            yt_count = min(remaining, 2)
+            yt_paths = self._download_from_youtube_cc(query, output_dir, yt_count)
+            all_paths += yt_paths
+            remaining = max(0, count - len(all_paths))
+            print(f"[MediaEngine] YouTube CC: {len(yt_paths)} klip")
+
         random.shuffle(all_paths)
 
         if not all_paths:
-            print("[MediaEngine] Her üç kaynaktan da video alınamadı!")
+            print("[MediaEngine] Tüm kaynaklardan video alınamadı!")
             return []
 
         if len(all_paths) < count:
@@ -430,8 +536,144 @@ class MediaEngine:
             extra = self._download_from_pexels(query, output_dir, extra_needed, orientation, category=category)
             all_paths += extra
 
-        print(f"[MediaEngine] Toplam {len(all_paths)} klip hazır ({len(pexels_paths)} Pexels + {len(pixabay_paths)} Pixabay + {len(coverr_paths)} Coverr)")
+        print(f"[MediaEngine] Toplam {len(all_paths)} klip hazır ({len(pexels_paths)} Pexels + {len(pixabay_paths)} Pixabay + {len(coverr_paths)} Coverr + {len(oem_paths) if 'oem_paths' in locals() else 0} OEM + {len(pub_paths) if 'pub_paths' in locals() else 0} NASA/DOE)")
         return all_paths[:count]
+
+    # ─── NASA / DOE Kamu Malı Videolar ───────────────────────────────────────
+    def _download_public_domain(self, output_dir, count):
+        """NASA ve DOE kamu malı EV/enerji videolarını indirir. Telif yok."""
+        from pathlib import Path
+        os.makedirs(output_dir, exist_ok=True)
+        all_urls = NASA_PUBLIC_VIDEOS + DOE_PUBLIC_VIDEOS
+        random.shuffle(all_urls)
+        paths = []
+
+        for url in all_urls:
+            if len(paths) >= count:
+                break
+            try:
+                fname = f"pubdomain_{Path(url).name[:40]}"
+                if not fname.endswith(".mp4"):
+                    fname += ".mp4"
+                out = os.path.join(output_dir, fname)
+
+                if os.path.exists(out) and os.path.getsize(out) > 100_000:
+                    paths.append(out)
+                    print(f"[PubDomain] ♻️  Önbellekten: {fname}")
+                    continue
+
+                print(f"[PubDomain] NASA/DOE indiriliyor: {fname}")
+                r = requests.get(url, stream=True, timeout=60, headers={"User-Agent": "Mozilla/5.0"})
+                if r.status_code == 200:
+                    with open(out, 'wb') as f:
+                        for chunk in r.iter_content(1024 * 1024):
+                            if chunk:
+                                f.write(chunk)
+                    if os.path.getsize(out) > 100_000:
+                        paths.append(out)
+                        print(f"[PubDomain] ✅ {fname}")
+                    else:
+                        os.remove(out)
+            except Exception as e:
+                print(f"[PubDomain] Hata: {e}")
+        return paths
+
+    # ─── OEM Press Kit Videolar ───────────────────────────────────────────────
+    def _download_from_oem_presskit(self, output_dir, count, category=None):
+        """Tesla, Hyundai, BMW vb. üreticilerin basın kiti videolarını indirir."""
+        from pathlib import Path
+        os.makedirs(output_dir, exist_ok=True)
+        paths = []
+
+        priority = {
+            "battery_science": ["tesla", "bmw"],
+            "range_tests": ["tesla", "hyundai", "kia"],
+            "charging": ["tesla", "rivian", "ford"],
+            "comparisons": ["hyundai", "kia", "bmw"],
+        }
+        brands = priority.get(category, list(OEM_PRESS_SEARCH.keys()))
+        random.shuffle(brands)
+
+        for brand in brands:
+            if len(paths) >= count:
+                break
+            brand_data = OEM_PRESS_SEARCH.get(brand, {})
+            direct_urls = brand_data.get("direct_videos", [])
+            random.shuffle(direct_urls)
+
+            for url in direct_urls:
+                if len(paths) >= count:
+                    break
+                try:
+                    fname = f"oem_{brand}_{Path(url).stem[:30]}.mp4"
+                    out = os.path.join(output_dir, fname)
+
+                    if os.path.exists(out) and os.path.getsize(out) > 100_000:
+                        paths.append(out)
+                        print(f"[OEM] ♻️  Önbellekten: {fname}")
+                        continue
+
+                    print(f"[OEM] {brand.upper()} basın kiti indiriliyor: {fname}")
+                    r = requests.get(url, stream=True, timeout=60,
+                                     headers={"User-Agent": "Mozilla/5.0 (compatible; Evcarix/1.0)"})
+                    if r.status_code == 200:
+                        with open(out, 'wb') as f:
+                            for chunk in r.iter_content(1024 * 1024):
+                                if chunk:
+                                    f.write(chunk)
+                        if os.path.getsize(out) > 100_000:
+                            paths.append(out)
+                            print(f"[OEM] ✅ {fname}")
+                        else:
+                            os.remove(out)
+                            print(f"[OEM] ⚠️  Dosya çok küçük, atlandı")
+                    else:
+                        print(f"[OEM] HTTP {r.status_code}: {url}")
+                except Exception as e:
+                    print(f"[OEM] {brand} indirme hatası: {e}")
+
+        return paths
+
+    # ─── YouTube CC (yt-dlp) ─────────────────────────────────────────────────
+    def _download_from_youtube_cc(self, query, output_dir, count, max_duration=60):
+        """yt-dlp ile YouTube'dan yalnızca Creative Commons lisanslı EV videolarını indirir."""
+        from pathlib import Path
+        if not self.ytdlp_available:
+            print("[YT-CC] yt-dlp yok, atlanıyor.")
+            return []
+
+        os.makedirs(output_dir, exist_ok=True)
+        q = random.choice(YTCC_EV_QUERIES)
+        paths = []
+
+        try:
+            print(f"[YT-CC] '{q}' CC lisanslı video aranıyor...")
+            cmd = [
+                "yt-dlp",
+                f"ytsearch{count * 3}:{q}",
+                "--match-filter", "license='creativeCommon'",
+                "--match-filter", f"duration < {max_duration}",
+                "-f", "bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4][height<=1080]",
+                "--merge-output-format", "mp4",
+                "-o", os.path.join(output_dir, "ytcc_%(id)s.%(ext)s"),
+                "--no-playlist",
+                "--max-downloads", str(count),
+                "--quiet",
+                "--no-warnings",
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            for f in Path(output_dir).glob("ytcc_*.mp4"):
+                if f.stat().st_size > 100_000:
+                    paths.append(str(f))
+                    print(f"[YT-CC] ✅ {f.name}")
+                if len(paths) >= count:
+                    break
+            print(f"[YT-CC] {len(paths)} CC video indirildi.")
+        except subprocess.TimeoutExpired:
+            print("[YT-CC] Zaman aşımı (3 dk)")
+        except Exception as e:
+            print(f"[YT-CC] Hata: {e}")
+        return paths
 
     def generate_ai_fallback_images(self, topic, count=3, output_dir="assets/ai_fallback"):
         """Stok video bulunamazsa Pollinations.ai'dan EV temalı görüntü üretir."""
