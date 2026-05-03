@@ -213,18 +213,17 @@ class EvcarixBrain:
         text = text.strip(' :;|')
         return text
 
-    def create_daily_plan(self, slot="evening"):
-        print("Evcarix Brain: Plan oluşturuluyor...")
+    def create_daily_plan(self, slot="evening", video_type="short"):
+        print(f"Evcarix Brain: Plan oluşturuluyor ({video_type})...")
 
         # ── YouTube Trend Tetikleyici (öncelikli) ────────────────────
         try:
             triggered_plan = self.trend_engine.trigger_from_youtube_trend(hours_back=48)
             if triggered_plan:
                 print(f"\n🚀 TREND MOD AKTİF!")
-                print(f"   Başlık : {triggered_plan['title']}")
-                print(f"   Konu   : {triggered_plan['topic']}")
-                print(f"   Kaynak : {triggered_plan.get('inspired_by', 'N/A')}")
-                print(f"   ✅ NOT : Görüntü/ses kopyalanmadı — tamamen orijinal içerik")
+                # Update format_type for triggered plan if needed
+                # (Trend engine might have its own logic, but we can override or pass it)
+                triggered_plan["config"]["type"] = video_type
                 self._save_history(triggered_plan)
 
                 # SEO metadata ekle
@@ -257,7 +256,8 @@ class EvcarixBrain:
             print(f"[Brain] Trend tetikleyici hatası (normal moda geçiliyor): {e}")
         # ── Trend bulunamazsa normal pipeline devam eder ─────────────
 
-        config = {"type": "short", "duration": 55}  # Shorts formatı
+        duration = 300 if video_type == "long" else 55
+        config = {"type": video_type, "duration": duration}
 
         # Trend haberleri çek (LLM için context)
         news_df = self.trend_engine.get_latest_news()
@@ -277,17 +277,17 @@ class EvcarixBrain:
         print(f"Geçmiş başlık sayısı: {len(used_titles)}")
 
         # Başlık üret — geçmiş başlıkları vererek tekrarı önle
-        titles = self.writer.generate_title(specific_topic, history_titles=used_titles)
+        titles = self.writer.generate_title(specific_topic, history_titles=used_titles, category=topic_category, format_type=video_type)
         best_title = titles[0] if titles else specific_topic
         print(f"Başlık: {best_title.encode('ascii', 'ignore').decode('ascii')}")
 
         # Senaryo üret — kategoriye göre özel prompt
         writer_output = self.writer.generate_script(
-            full_topic, format_type=config['type'], category=topic_category
+            full_topic, format_type=video_type, category=topic_category
         )
 
         # Etiket üret — kategoriye göre SEO etiketleri
-        tags_list = self.writer.generate_tags(specific_topic, best_title, category=topic_category)
+        tags_list = self.writer.generate_tags(specific_topic, best_title, category=topic_category, format_type=video_type)
         print(f"Etiketler: {len(tags_list)} adet")
 
         # Açıklama üret — kategoriye göre SEO açıklaması
@@ -297,7 +297,8 @@ class EvcarixBrain:
             title=best_title,
             tags_list=tags_list,
             cta_override=variation["cta_style"],
-            category=topic_category
+            category=topic_category,
+            format_type=video_type
         )
         
         # Add editorial disclaimer to description

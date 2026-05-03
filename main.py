@@ -1,44 +1,67 @@
-import asyncio
 import os
-import random
+import sys
 import datetime
 import math
+import random
+import asyncio
 from dotenv import load_dotenv
 
-from src.brain import EvcarixBrain
-from src.media_engine import MediaEngine
-from src.editor import AutoEditor
-from src.uploader import YouTubeUploader
-from src.lip_sync_generator import LipSyncGenerator
-import config
+# ABSOLUTE TOP LEVEL PRINT - Hiçbir kütüphane yüklenmeden önce
+print(">>> [SYSTEM] Python interpreter started main.py", flush=True)
 
 load_dotenv()
 
+def log(msg):
+    print(f">>> {msg}", flush=True)
+
+log("Evcarix Orchestrator script is loading...")
 
 class EvcarixOrchestrator:
     def __init__(self):
-        self.brain = EvcarixBrain()
-        self.media_engine = MediaEngine()
-        self.editor = AutoEditor()
-        self.lip_sync = LipSyncGenerator()
-        self.uploader = None
-
-        self.use_lip_sync = os.getenv("USE_LIP_SYNC", "false").lower() == "true"
-        self.character_image = os.getenv("CHARACTER_IMAGE", "assets/character.jpg")
+        log("Initializating Orchestrator components...")
         
+        # Lazy imports to prevent hang during script startup
+        try:
+            log("Loading Brain...")
+            from src.brain import EvcarixBrain
+            self.brain = EvcarixBrain()
+            
+            log("Loading MediaEngine...")
+            from src.media_engine import MediaEngine
+            self.media_engine = MediaEngine()
+            
+            log("Loading Editor...")
+            from src.editor import AutoEditor
+            self.editor = AutoEditor()
+            
+            log("Loading LipSyncGenerator...")
+            from src.lip_sync_generator import LipSyncGenerator
+            self.lip_sync = LipSyncGenerator()
+            
+            import config
+            self.config_module = config
+        except Exception as e:
+            log(f"FATAL ERROR during component loading: {e}")
+            raise e
+
+        self.uploader = None
+        self.use_lip_sync = os.getenv("USE_LIP_SYNC", "true").lower() == "true"
+        self.character_image = os.getenv("CHARACTER_IMAGE", "assets/characters/evcarix_host.png")
+
         secret_path = os.getenv("YOUTUBE_CLIENT_SECRET_FILE", "client_secret.json")
         if os.path.exists(secret_path):
             try:
+                log("🔑 YouTube Uploader başlatılıyor...")
+                from src.uploader import YouTubeUploader
                 self.uploader = YouTubeUploader(secret_path)
-                print("✅ YouTube Uploader başarıyla başlatıldı.")
+                log("✅ YouTube Uploader başarıyla başlatıldı.")
             except Exception as e:
-                print(f"❌ YouTube Uploader başlatılamadı: {e}")
-                # Hata durumunda işlemi durdur ki neden yüklenemediğini anlayalım
-                if os.getenv("CI"):
+                log(f"❌ YouTube Uploader başlatılamadı: {e}")
+                if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
                     raise Exception(f"YouTube uploader başlatılamadı: {e}")
         else:
-            print("⚠️ client_secret.json bulunamadı.")
-            if os.getenv("CI"):
+            log("⚠️ client_secret.json bulunamadı.")
+            if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
                 raise FileNotFoundError("GitHub Actions ortamında client_secret.json eksik!")
 
     async def run_daily_shorts_workflow(self):
@@ -48,21 +71,21 @@ class EvcarixOrchestrator:
         ts = now.strftime("%Y%m%d_%H%M%S")
 
         # Hedef süre: 25-50 saniye (config'den al)
-        target_duration = random.randint(config.SHORT_VIDEO_DURATION_MIN, config.SHORT_VIDEO_DURATION_MAX)
+        target_duration = random.randint(self.config_module.SHORT_VIDEO_DURATION_MIN, self.config_module.SHORT_VIDEO_DURATION_MAX)
         clip_count = max(4, math.ceil(target_duration / 8))  # Her klip ~8 saniye, min 4 klip
 
-        print(f"\n{'='*60}")
-        print(f"  Evcarix Auto-Studio — {now.strftime('%d %b %Y, %H:%M')}")
-        print(f"  Format: 1080x1920 (9:16), {target_duration}s")
-        print(f"  Slot: {slot.upper()}")
-        print(f"{'='*60}\n")
+        print(f"\n{'='*60}", flush=True)
+        print(f"  Evcarix Auto-Studio — {now.strftime('%d %b %Y, %H:%M')}", flush=True)
+        print(f"  Format: 1080x1920 (9:16), {target_duration}s", flush=True)
+        print(f"  Slot: {slot.upper()}", flush=True)
+        print(f"{'='*60}\n", flush=True)
 
         # ── 1. Plan ───────────────────────────────────────────────
         # CONTENT_MODE: trend (YouTube'tan ilham) veya auto (sistem konusu)
         content_mode = os.getenv("CONTENT_MODE", "auto")
         slot = os.getenv("UPLOAD_SLOT", "evening")
         
-        plan = self.brain.create_daily_plan(slot=slot)
+        plan = self.brain.create_daily_plan(slot=slot, video_type="short")
         script      = plan['script']
         topic       = plan['topic']
         full_topic  = plan['full_topic']
@@ -70,20 +93,20 @@ class EvcarixOrchestrator:
         description = plan.get('description', f"{topic}\n\n#EV #Evcarix #Shorts")
         tags        = plan.get('tags', ["ev", "electric car", "Evcarix", "Shorts"])
 
-        print(f"\n[1/6] Plan Hazır")
+        print(f"\n[1/6] Plan Hazır", flush=True)
         if plan.get("inspired_by"):
-            print(f"      🔥 MOD    : TREND (YouTube trend'inden ilham alındı)")
-            print(f"      🔗 İlham  : {plan.get('inspired_by')}")
-            print(f"      ⚠️  NOT   : Görüntü/ses kopyalanmadı — orijinal içerik")
+            print(f"      🔥 MOD    : TREND (YouTube trend'inden ilham alındı)", flush=True)
+            print(f"      🔗 İlham  : {plan.get('inspired_by')}", flush=True)
+            print(f"      ⚠️  NOT   : Görüntü/ses kopyalanmadı — orijinal içerik", flush=True)
         else:
-            print(f"      📋 MOD   : NORMAL (havuz konusu)")
-        print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}")
-        print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
+            print(f"      📋 MOD   : NORMAL (havuz konusu)", flush=True)
+        print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}", flush=True)
+        print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}", flush=True)
 
         # ── Lip-Sync Mode Check ───────────────────────────────────────
         if self.use_lip_sync and os.path.exists(self.character_image):
-            print(f"\n⚡ Lip-Sync Mode aktif - Karakter konuşan video oluşturuluyor...")
-            print(f"      Karakter: {self.character_image}")
+            print(f"\n⚡ Lip-Sync Mode aktif - Karakter konuşan video oluşturuluyor...", flush=True)
+            print(f"      Karakter: {self.character_image}", flush=True)
             
             lip_sync_output_dir = f"assets/lip_sync/{ts}"
             lip_sync_result = await self.lip_sync.generate_lipsync_video(
@@ -99,7 +122,7 @@ class EvcarixOrchestrator:
                 
                 # Upload to YouTube
                 if self.uploader and os.path.exists(final_video_path):
-                    print("\n[6/6] YouTube'a yükleniyor...")
+                    print("\n[6/6] YouTube'a yükleniyor...", flush=True)
                     try:
                         video_id = self.uploader.upload_video(
                             file_path=final_video_path,
@@ -108,96 +131,56 @@ class EvcarixOrchestrator:
                             tags=tags,
                             playlist_name="Short Video"
                         )
-                        print(f"      ✅ Yüklendi! Video ID: {video_id}")
-                        print(f"      🔗 https://www.youtube.com/watch?v={video_id}")
+                        print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
+                        print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
                     except Exception as e:
                         print(f"      ❌ YouTube yükleme hatası: {e}")
                 
                 print(f"\n{'='*60}")
-                print(f"  ✅ TAMAMLANDI!")
-                print(f"  Video    : {final_video_path}")
-                print(f"  Başlık   : {title.encode('ascii', 'ignore').decode('ascii')}")
+                print(f"  ✅ DAILY SHORTS TAMAMLANDI!")
+                print(f"  Video: {final_video_path}")
                 print(f"{'='*60}\n")
                 return
-            else:
-                print("⚠️ Lip-sync başarısız, normal moda geçiliyor...")
 
-        # ── 2. OEM Press + Stok Video İndirme (öncelikli) ────────────────
-        print("\n[2/6] OEM press & stok videolar indiriliyor...")
-        import re
-        search_query = re.sub(r'[^\w\s]', '', topic).strip()
+        # ── 2. Medya Toplama ──────────────────────────────────────
+        print("\n[2/6] Stok videolar indiriliyor...", flush=True)
         video_paths = self.media_engine.download_stock_videos(
-            query=search_query,
-            output_dir=f"assets/temp_videos/{ts}",
-            count=6,
+            topic=full_topic,
+            count=clip_count,
             orientation="portrait",
-            category=plan.get("category", "general"),
-            plan=plan
+            category=plan.get('category', 'general')
         )
-        print(f"      ✅ {len(video_paths)} HD klip hazır (OEM + stok)")
 
-        # ── 3. AI Video Klip Üretimi (stok yetersizse) ────────────────
-        ai_video_clips = []
-        if len(video_paths) < 4:
-            print(f"\n[3/6] Stok yetersiz ({len(video_paths)} klip) — AI video üretiliyor...")
-            ai_video_clips = self.media_engine.generate_ai_video_clips(
-                topic=topic,
-                count=6 - len(video_paths),
-                output_dir=f"assets/ai_videos/{ts}",
-                duration=8
-            )
-        else:
-            print(f"\n[3/6] Stok video yeterli — AI video üretimi atlandı.")
-
-        # Tüm klipleri birleştir (stok önce, AI sonra)
-        all_video_clips = video_paths + ai_video_clips
-        random.shuffle(all_video_clips)
-
-        # Son çare: Pollinations AI görüntü fallback
-        ai_fallback_images = []
-        if len(all_video_clips) < 2:
-            print("⚠️ Video kaynağı yetersiz — Pollinations AI görüntü fallback devreye giriyor...")
-            ai_fallback_images = self.media_engine.generate_ai_fallback_images(
-                topic, count=5, output_dir=f"assets/ai_fallback/{ts}"
-            )
-
-        # ── 4. Seslendirme ────────────────────────────────────────
-        print("\n[4/6] Seslendirme yapılıyor...")
-        audio_path = os.path.abspath(f"assets/voice_{ts}.mp3")
-        voice_result = await self.media_engine.generate_voiceover(
+        # ── 3. Ses Üretimi ────────────────────────────────────────
+        print("\n[3/6] Ses ve zamanlama üretiliyor...", flush=True)
+        audio_output = f"assets/audio/{ts}.mp3"
+        voice_data = await self.media_engine.voice_engine.generate_voice(
             text=script,
-            output_path=audio_path,
-            voice_type=plan.get('voice', 'female'),
-            rate=random.choice(["+0%", "+2%", "-2%"])   # Hafif hız varyasyonu
+            output_path=audio_output,
+            voice_type=plan.get("voice", "female")
         )
-        word_timings = voice_result['word_timings']
+        audio_path = voice_data["audio_path"]
+        word_timings = voice_data["word_timings"]
 
-        # ── 5. Video montajı ──
-        print("\n[5/6] Video montajlanıyor...")
-        output_filename = f"shorts_{ts}.mp4"
+        # ── 4. Montaj ─────────────────────────────────────────────
+        print("\n[4/6] Video montajlanıyor (MoviePy)...", flush=True)
+        output_filename = f"evcarix_shorts_{ts}.mp4"
         final_video_path = self.editor.assemble_short(
-            video_paths=all_video_clips,
+            video_paths=video_paths,
             audio_path=audio_path,
             word_timings=word_timings,
             output_filename=output_filename,
-            ai_fallback_images=ai_fallback_images if ai_fallback_images else None,
-            category=plan.get("category", "general")
+            category=plan.get('category', 'general')
         )
 
-        # ── Kullanılan klipleri kaydet — bir daha seçilmesin ──────────
-        if all_video_clips:
-            self.media_engine.mark_clips_as_used(all_video_clips)
-        print(f"[Main] 🔄 Klip geçmişi güncellendi — bir sonraki video farklı görüntüler kullanacak.")
+        # ── 5. Kapak (Thumbnail) ──────────────────────────────────
+        print("\n[5/6] Thumbnail oluşturuluyor...", flush=True)
+        thumb_output = f"output/thumb_{ts}.png"
+        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output)
 
-        # ── 7. YouTube'a yükle ────────────────────────────────────
+        # ── 6. YouTube Yükleme ─────────────────────────────────────
         if self.uploader and os.path.exists(final_video_path):
-            print("\n[7/7] YouTube'a yükleniyor...")
-
-            # İnsan gibi küçük bir bekleme (5-25 sn) yükleme öncesi
-            pre_upload_delay = random.randint(5, 25)
-            print(f"      Yükleme öncesi {pre_upload_delay}sn bekleniyor...")
-            await asyncio.sleep(pre_upload_delay)
-
+            print("\n[6/6] YouTube'a yükleniyor...", flush=True)
             try:
                 video_id = self.uploader.upload_video(
                     file_path=final_video_path,
@@ -206,17 +189,15 @@ class EvcarixOrchestrator:
                     tags=tags,
                     playlist_name="Short Video"
                 )
-                print(f"      ✅ Yüklendi! Video ID: {video_id}")
-                print(f"      🔗 https://www.youtube.com/watch?v={video_id}")
-
+                print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
+                print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
             except Exception as e:
                 print(f"      ❌ YouTube yükleme hatası: {e}")
-                raise e # GitHub Actions'ın hata olduğunu anlaması için hatayı fırlatıyoruz
         else:
-            print("\n[6/6] YouTube yükleme atlandı (uploader yok veya video bulunamadı).")
+            print("\n[6/6] Uploader pasif veya video yok, yükleme atlandı.", flush=True)
 
         print(f"\n{'='*60}")
-        print(f"  ✅ TAMAMLANDI!")
+        print(f"  ✅ DAILY SHORTS TAMAMLANDI!")
         print(f"  Video    : {final_video_path}")
         print(f"  Başlık   : {title.encode('ascii', 'ignore').decode('ascii')}")
         print(f"{'='*60}\n")
@@ -224,6 +205,7 @@ class EvcarixOrchestrator:
     async def run_weekly_long_video_workflow(self):
         """Haftalık uzun formatlı video (1920x1080, 4-6 dakika) pipeline."""
         import random
+        import gc
 
         # ── Zaman damgası & slot bilgisi ──────────────────────────
         now = datetime.datetime.now()
@@ -231,124 +213,89 @@ class EvcarixOrchestrator:
         ts = now.strftime("%Y%m%d_%H%M%S")
 
         # Hedef süre: 240-360 saniye (4-6 dakika) - config'den al
-        target_duration = random.randint(config.LONG_VIDEO_DURATION_MIN, config.LONG_VIDEO_DURATION_MAX)
+        target_duration = random.randint(self.config_module.LONG_VIDEO_DURATION_MIN, self.config_module.LONG_VIDEO_DURATION_MAX)
         clip_count = math.ceil(target_duration / 8)  # Her klip ~8 saniye
         
-        print(f"\n{'='*60}")
-        print(f"  Evcarix Weekly Long Video — {now.strftime('%d %b %Y, %H:%M')}")
-        print(f"  Format: 1920x1080 (16:9), {target_duration}s ({target_duration//60}dk)")
-        print(f"  Slot: {slot}")
-        print(f"{'='*60}\n")
+        print(f"\n{'='*60}", flush=True)
+        print(f"  Evcarix Weekly Long Video — {now.strftime('%d %b %Y, %H:%M')}", flush=True)
+        print(f"  Format: 1920x1080 (16:9), {target_duration}s ({target_duration//60}dk)", flush=True)
+        print(f"  Slot: {slot}", flush=True)
+        print(f"{'='*60}\n", flush=True)
 
-        # ── 1. Plan (long-form script) ───────────────────────────
-        print("\n[1/7] Long-form plan oluşturuluyor...")
-        content_mode = os.getenv("CONTENT_MODE", "auto")
-        
-        plan = self.brain.create_daily_plan(slot=slot)
-        script = plan['script']
-        topic = plan['topic']
-        full_topic = plan['full_topic']
-        title = plan.get('title', topic)
-        description = plan.get('description', f"{topic}\n\n#EV #Evcarix #LongForm")
-        tags = plan.get('tags', ["ev", "electric car", "Evcarix", "long form", "deep dive"])
+        # ── 1. Plan ───────────────────────────────────────────────
+        print("\n[1/7] Long-form plan oluşturuluyor...", flush=True)
+        plan = self.brain.create_daily_plan(slot=slot, video_type="long")
+        script      = plan['script']
+        topic       = plan['topic']
+        full_topic  = plan['full_topic']
+        title       = plan.get('title', topic)
+        description = plan.get('description', f"{topic}\n\n#EV #Evcarix #Data")
+        tags        = plan.get('tags', ["ev", "electric car", "Evcarix"])
 
-        print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}")
-        print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
-        print(f"      Süre  : {target_duration}s")
+        print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}", flush=True)
+        print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}", flush=True)
 
-        # ── 2. OEM Press + Stok Video İndirme (öncelikli) ───────────
-        print(f"\n[2/7] OEM press & stok videolar indiriliyor ({clip_count} klip hedef)...")
-        import re
-        search_query = re.sub(r'[^\w\s]', '', topic).strip()
+        # ── 2. Medya Toplama ──────────────────────────────────────
+        print(f"\n[2/7] {clip_count} adet stok video indiriliyor (16:9)...", flush=True)
         video_paths = self.media_engine.download_stock_videos(
-            query=search_query,
-            output_dir=f"assets/temp_videos/{ts}",
+            topic=full_topic,
             count=clip_count,
             orientation="landscape",
-            category=plan.get("category", "general"),
-            plan=plan
+            category=plan.get('category', 'general')
         )
-        print(f"      ✅ {len(video_paths)} HD klip hazır (OEM + stok)")
 
-        # ── 3. AI Video Klip Üretimi (stok yetersizse) ───────────
-        ai_video_clips = []
-        if len(video_paths) < clip_count:
-            print(f"\n[3/7] Stok yetersiz ({len(video_paths)}/{clip_count}) — AI video üretiliyor...")
-            ai_video_clips = self.media_engine.generate_ai_video_clips(
-                topic=topic,
-                count=clip_count - len(video_paths),
-                output_dir=f"assets/ai_videos/{ts}",
-                duration=8
-            )
-        else:
-            print(f"\n[3/7] Stok video yeterli — AI video üretimi atlandı.")
-
-        # Tüm klipleri birleştir (stok önce, AI sonra)
-        all_video_clips = video_paths + ai_video_clips
-        random.shuffle(all_video_clips)
-        
-        # ── 4. Seslendirme (long-form) ───────────────────────────
-        print("\n[4/7] Long-form seslendirme yapılıyor...")
-        audio_path = os.path.abspath(f"assets/voice_{ts}.mp3")
-        voice_result = await self.media_engine.generate_voiceover(
+        # ── 3. Ses Üretimi ────────────────────────────────────────
+        # Not: Uzun videolarda script daha uzun olacağı için TTS süresi artar
+        print("\n[3/7] Uzun format ses üretiliyor...", flush=True)
+        audio_output = f"assets/audio/long_{ts}.mp3"
+        voice_data = await self.media_engine.voice_engine.generate_voice(
             text=script,
-            output_path=audio_path,
-            voice_type='male',  # Long form için erkek ses
-            rate="+0%"
+            output_path=audio_output,
+            voice_type=plan.get("voice", "female")
         )
-        word_timings = voice_result['word_timings']
+        audio_path = voice_data["audio_path"]
 
-        # ── 5. Video montajı (long-form, 1920x1080) ───────────────
-        print("\n[5/7] Long-form video montajlanıyor (1920x1080)...")
-        output_filename = f"weekly_long_{ts}.mp4"
-        final_video_path = self.editor.assemble_weekly_long_video(
-            video_clips=all_video_clips,
+        # ── 4. Montaj (Ağır İşlem) ────────────────────────────────
+        print("\n[4/7] Video montajlanıyor (4-6 dakika, 1080p)...", flush=True)
+        gc.collect() # Bellek temizliği
+        output_filename = f"evcarix_weekly_{ts}.mp4"
+        
+        # Uzun videolarda subtitle yerine title card ve temiz video tercih edilebilir
+        # Şimdilik standart assemble kullanıyoruz ama 16:9 formatında
+        final_video_path = self.editor.assemble_long_video(
+            video_paths=video_paths,
             audio_path=audio_path,
-            title=title,
-            target_duration=target_duration,
-            output_path=output_filename
+            script_text=script,
+            output_filename=output_filename
         )
+        gc.collect()
 
-        # ── Kullanılan klipleri kaydet ───────────────────────────
-        if all_video_clips:
-            self.media_engine.mark_clips_as_used(all_video_clips)
-        print(f"[Main] 🔄 Klip geçmişi güncellendi.")
+        # ── 5. Kapak (Thumbnail) ──────────────────────────────────
+        print("\n[5/7] HD Thumbnail oluşturuluyor...", flush=True)
+        thumb_output = f"output/thumb_long_{ts}.png"
+        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output)
 
-        # ── 5.5 Thumbnail oluştur ───────────────────────────────
-        print("\n[5.5/7] Thumbnail oluşturuluyor...")
-        from src.thumbnail_generator import ThumbnailGenerator
-        thumb_gen = ThumbnailGenerator()
-        thumb_path = thumb_gen.create(
-            title=title,
-            stat=plan.get("stat", ""),
-            category=plan.get("category_id", "default")
-        )
+        # ── 6. Chapters & SEO ─────────────────────────────────────
+        # Uzun videolarda description içine timestamp eklemek SEO için kritiktir
+        # Bu aşama writer.py içinde description üretilirken hallediliyor
 
-        # ── 6. YouTube'a yükle (Weekly Deep Dives playlist) ───────
+        # ── 7. YouTube Yükleme ─────────────────────────────────────
         if self.uploader and os.path.exists(final_video_path):
-            print("\n[6/7] YouTube'a yükleniyor (Weekly Deep Dives)...")
-            
-            pre_upload_delay = random.randint(5, 25)
-            print(f"      Yükleme öncesi {pre_upload_delay}sn bekleniyor...")
-            await asyncio.sleep(pre_upload_delay)
-
+            print("\n[7/7] YouTube'a yükleniyor (Long-form)...", flush=True)
             try:
                 video_id = self.uploader.upload_video(
                     file_path=final_video_path,
                     title=title,
                     description=description,
                     tags=tags,
-                    category_id="28",
-                    playlist_name="Weekly Deep Dives",
-                    thumbnail_path=thumb_path
+                    playlist_name="EV Data Reports"
                 )
-                print(f"      ✅ Yüklendi! Video ID: {video_id}")
-                print(f"      🔗 https://www.youtube.com/watch?v={video_id}")
+                print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
+                print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
             except Exception as e:
                 print(f"      ❌ YouTube yükleme hatası: {e}")
-                raise e
         else:
-            print("\n[6/7] YouTube yükleme atlandı.")
+            print("\n[7/7] Uploader pasif veya video yok, yükleme atlandı.", flush=True)
 
         print(f"\n{'='*60}")
         print(f"  ✅ HAFTALIK UZUN VIDEO TAMAMLANDI!")
@@ -359,7 +306,9 @@ class EvcarixOrchestrator:
 
 
 if __name__ == "__main__":
+    # Orchestrator'ı oluştur (Lazy loading burada başlar)
     orchestrator = EvcarixOrchestrator()
+    
     video_type = os.environ.get("VIDEO_TYPE", "short").strip().lower()
     upload_slot = os.environ.get("UPLOAD_SLOT", "evening").strip()
 
@@ -371,6 +320,9 @@ if __name__ == "__main__":
             asyncio.run(orchestrator.run_weekly_long_video_workflow())
         else:
             asyncio.run(orchestrator.run_daily_shorts_workflow())
+    except Exception as e:
+        print(f">>> [FATAL] Critical error in main loop: {e}", flush=True)
+        sys.exit(1)
     finally:
         # MoviePy'nin kök dizinde bıraktığı geçici dosyaları temizle
         import glob
@@ -381,7 +333,7 @@ if __name__ == "__main__":
                 try:
                     os.remove(f)
                     cleaned += 1
-                except Exception:
+                except:
                     pass
-        if cleaned:
-            print(f"[Cleanup] 🗑️ {cleaned} geçici MoviePy dosyası silindi.")
+        if cleaned > 0:
+            print(f">>> [System] {cleaned} temporary MoviePy files cleaned.", flush=True)

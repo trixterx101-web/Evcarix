@@ -326,8 +326,59 @@ class CreativeWriter:
         print("[LLM] ❌ Tüm LLM servisleri başarısız.")
         return None
 
+    # ── SEO Anahtar Kelime Çıkarıcı (tag + title için) ─────────────
+    def _extract_seo_keywords(self, topic: str) -> dict:
+        topic_lower = topic.lower()
+        
+        # Markalar ve Modeller
+        brand_map = {
+            "tesla": ["Tesla Model Y", "Tesla Model 3", "Tesla FSD"],
+            "byd": ["BYD Seal", "BYD Atto 3", "BYD Dolphin"],
+            "hyundai": ["Hyundai IONIQ 5", "Hyundai IONIQ 6"],
+            "kia": ["Kia EV6", "Kia EV9"],
+            "bmw": ["BMW iX", "BMW i4"],
+            "mercedes": ["Mercedes EQS", "Mercedes EQE"],
+            "volkswagen": ["VW ID.4", "VW ID.3", "ID.7"],
+            "audi": ["Audi Q4 e-tron", "Audi e-tron GT"],
+            "porsche": ["Porsche Taycan"],
+            "rivian": ["Rivian R1S", "Rivian R1T"],
+            "lucid": ["Lucid Air"],
+            "nio": ["NIO ET7", "NIO ET5"],
+            "polestar": ["Polestar 2", "Polestar 3"],
+            "ford": ["Ford Mach-E", "F-150 Lightning"],
+            "chevrolet": ["Chevy Blazer EV", "Equinox EV"],
+        }
+        
+        # Teknolojiler (Search Volume Yüksek)
+        tech_map = {
+            "lfp": ["LFP battery degradation", "LFP vs NMC"],
+            "nmc": ["NMC battery efficiency"],
+            "range": ["real-world EV range", "EV highway range test"],
+            "charging": ["EV fast charging speed", "800V charging architecture"],
+            "winter": ["EV winter range loss", "cold weather performance"],
+            "degradation": ["battery health", "100k mile test"],
+            "solid state": ["solid state battery 2026", "new battery tech"],
+            "cost": ["EV ownership cost", "is EV cheaper than gas"],
+            "used": ["used EV market", "buying used electric car"],
+        }
+        
+        found_brands = []
+        for kw, tags in brand_map.items():
+            if kw in topic_lower:
+                found_brands.extend(tags)
+                
+        found_tech = []
+        for kw, tags in tech_map.items():
+            if kw in topic_lower:
+                found_tech.extend(tags)
+                
+        return {
+            "primary": found_brands[:1] + found_tech[:1],
+            "secondary": found_brands[1:3] + found_tech[1:3]
+        }
+
     # ── Başlık ─────────────────────────────────────────────────────
-    def generate_title(self, topic, history_titles=None, category=None):
+    def generate_title(self, topic, history_titles=None, category=None, format_type="short"):
         history_block = ""
         if history_titles:
             recent = history_titles[-20:]
@@ -336,33 +387,48 @@ class CreativeWriter:
                 + "\n".join(f"- {t}" for t in recent) + "\n"
             )
 
-        template_hint = ""
-        if category and category in VIRAL_TITLE_TEMPLATES:
-            samples = random.sample(VIRAL_TITLE_TEMPLATES[category],
-                                    min(2, len(VIRAL_TITLE_TEMPLATES[category])))
-            template_hint = "\nViral patterns for this category:\n" + "\n".join(f"- {s}" for s in samples)
+        keywords = self._extract_seo_keywords(topic)
+        primary_kw = keywords["primary"][0] if keywords["primary"] else topic.split()[0]
+        
+        if format_type == "long":
+            char_range = "60-75"
+            format_rules = (
+                f"LONG VIDEO TITLE RULES (Search Focus):\n"
+                f"1. START with the Primary Keyword: '{primary_kw}'\n"
+                f"2. Use colon or vertical bar: 'Primary Keyword: Secondary Detail (Result)'\n"
+                f"3. Add 2025/2026 year tag for freshness\n"
+                f"4. Add parenthetical for CTR: (Honest Truth), (Data Revealed), (Real World Test)\n"
+                f"Example: '{primary_kw}: Real Range Loss After 3 Years (2025 Data)'"
+            )
+        else:
+            char_range = "50-62"
+            format_rules = (
+                f"SHORTS TITLE RULES (Viral/Suggested Focus):\n"
+                f"1. SHOCKING NUMBER first to stop the scroll\n"
+                f"2. Mention '{primary_kw}' in the first 3 words if possible\n"
+                f"3. Zero filler words (no 'The', 'How to', 'Look at')\n"
+                f"Example: '23% Battery Loss? {primary_kw} Cold Weather Test ❄️'"
+            )
 
         system = (
-            "You are YouTube's #1 Shorts growth strategist for EV content. "
-            "Titles get 15-25% CTR. American English only. "
-            "Return ONLY a valid JSON array of exactly 5 strings. No extra text."
+            "You are a YouTube Metadata Master. Your goal is to get videos to #1 in Search and "
+            "into the 'Up Next' suggested feed. You understand that Search = Exact Keywords, "
+            "Suggested = High CTR + Topic SIGNAL. American English only."
         )
         user = (
-            f"Write 5 viral YouTube Shorts titles for Evcarix (EV data channel).\n"
-            f"Topic: {topic}\nCategory: {category or 'general'}\n\n"
-            f"REQUIREMENTS:\n"
-            f"1. 50-65 characters each\n"
-            f"2. MUST contain specific number: %, $, kWh, miles, km, kW, or minutes\n"
-            f"3. Power words: exposed, hidden, real, truth, cost, drain, fail, freeze, beats\n"
-            f"4. Hook types: myth-busting, shocking data, hidden truth, unexpected comparison\n"
-            f"5. NO generic: 'Real Data', 'You Won't Believe', 'Amazing', 'Incredible'\n"
-            f"6. USA/Europe/China examples ONLY — NEVER Turkey\n"
-            f"{template_hint}\n"
-            f"{history_block}\n"
-            f'Return: ["Title 1", "Title 2", "Title 3", "Title 4", "Title 5"]'
+            f"Write 5 high-performing YouTube title variants for Evcarix.\n"
+            f"Topic: {topic}\nCategory: {category or 'general'}\n"
+            f"Target Format: {'Long-form Deep Dive' if format_type == 'long' else 'Shorts'}\n\n"
+            f"{format_rules}\n\n"
+            f"SEO REQUIREMENTS:\n"
+            f"- Length: {char_range} chars (YouTube truncates at 70 on mobile)\n"
+            f"- Numbers: MUST include real data (%, $, miles, kWh, minutes, years)\n"
+            f"- Power words: REAL, BRUTAL, TRUTH, EXPOSED, HONEST, COST, FAILED\n"
+            f"- Geography: USA/Europe/China ONLY — NO Turkey/Middle East references\n"
+            f"- Return ONLY a JSON array of 5 strings."
         )
 
-        raw = self._call_llm(system, user, max_tokens=400)
+        raw = self._call_llm(system, user, max_tokens=500)
         if raw:
             try:
                 cleaned = self._clean_json(raw)
@@ -377,6 +443,7 @@ class CreativeWriter:
                 print(f"[Writer] Title parse: {e}")
 
         # Fallback
+        max_c = 75 if format_type == "long" else 65
         templates = VIRAL_TITLE_TEMPLATES.get(category, [
             f"Real {topic[:30]} Data: {random.randint(10,40)}% Gap Exposed",
             f"Why {topic[:25]} Costs ${random.randint(200,800)} More",
@@ -384,7 +451,7 @@ class CreativeWriter:
             f"The Hidden Truth About {topic[:25]}",
             f"{topic[:30]} After {random.randint(50,200)}k Miles: Brutal Truth",
         ])
-        return [t[:65] for t in templates[:5]]
+        return [t[:max_c] for t in templates[:5]]
 
     # ── Senaryo ────────────────────────────────────────────────────
     def generate_script(self, topic, format_type="short", category=None):
@@ -535,115 +602,165 @@ SENARYO: [script]
         return {"voice": voice, "script": script}
 
     # ── Açıklama ───────────────────────────────────────────────────
-    def generate_description(self, topic, title, tags_list, cta_override=None, category=None):
-        cta = cta_override or "Subscribe to Evcarix for real EV data every day."
-
-        hashtag_str = " ".join(TOP_SHORTS_HASHTAGS[:8])
-        topic_hashtags = " ".join(
-            [f"#{w.capitalize()}" for w in topic.split() if len(w) > 3][:5]
-        )
-        tag_hashtags = " ".join(
-            [f"#{t.replace(' ', '').replace('-', '')}" for t in tags_list[:8]]
-        )
+    def generate_description(self, topic, title, tags_list, cta_override=None, category=None, format_type="short"):
+        cta = cta_override or "Subscribe to Evcarix — No hype. Just numbers. ⚡"
 
         channel_about = (
-            "\n🔋 About Evcarix:\n"
-            "Data-driven EV channel. No hype. Just numbers. ⚡\n"
-            "Real-world range tests | Battery degradation | LFP vs NMC | "
-            "Fast charging impact | EV efficiency breakdowns.\n"
-            "If you care about real EV data — welcome to Evcarix."
+            "\n\n🔋 About Evcarix:\n"
+            "Data-driven EV channel. Real-world range tests | Battery degradation | "
+            "LFP vs NMC | Fast charging impact | EV cost breakdowns.\n"
+            "If you want real EV numbers — welcome to Evcarix. ⚡"
         )
 
-        system = (
-            "You are a YouTube SEO expert for viral Shorts. "
-            "American English only. Write descriptions that rank on YouTube search AND suggested feed."
-        )
-        user = (
-            f"Write a YouTube Shorts description for Evcarix.\n"
-            f"Title: '{title}'\nTopic: {topic}\nCategory: {category or 'general'}\n\n"
-            f"STRUCTURE:\n"
-            f"Line 1-2: HOOK — strong statement with specific number (shows in search preview)\n\n"
-            f"What you'll learn:\n"
-            f"— [4 data-driven bullets, each with a real number]\n\n"
-            f"[2-sentence 'Why Evcarix' paragraph]\n\n"
-            f"CTA: {cta}\n\n"
-            f"Timestamps:\n0:00 Hook\n0:10 Key Data\n0:25 Takeaway\n\n"
-            f"RULES:\n"
-            f"- Max 350 words\n"
-            f"- 5-7 long-tail keywords naturally embedded\n"
-            f"- USA/Europe/China ONLY — NEVER Turkey\n"
-            f"- Real numbers: %, $, kWh, miles, kW, minutes\n"
-            f"Return only description text."
-        )
+        # YouTube shows max 3 hashtags ABOVE the video title — choose wisely
+        top_hashtags = "#EV #ElectricCar #Evcarix"
+        if format_type == "short":
+            top_hashtags = "#Shorts #EV #Evcarix"
 
-        seo_body = self._call_llm(system, user, max_tokens=500)
+        if format_type == "long":
+            system = (
+                "You are a YouTube SEO expert for long-form EV videos. "
+                "Descriptions must start with the primary keyword in sentence 1 (YouTube indexes this). "
+                "Generate 12-15 realistic chapter timestamps for a 12-15 min deep-dive. "
+                "American English only. Return only the description body text."
+            )
+            user = (
+                f"Write a YouTube long-form video description for Evcarix.\n"
+                f"Title: '{title}'\nTopic: {topic}\nCategory: {category or 'general'}\n\n"
+                f"STRUCTURE (follow exactly):\n\n"
+                f"[OPENING — 2-3 sentences]: Primary keyword in first sentence + specific number. "
+                f"What this video proves/reveals. Must be compelling enough to rank in search.\n\n"
+                f"📊 What this video covers:\n"
+                f"— [6 specific data-driven bullets with real numbers and units]\n\n"
+                f"⏱ CHAPTERS:\n"
+                f"0:00 Introduction\n"
+                f"[Generate 11-13 more chapters with realistic timestamps for the topic — "
+                f"use times like 1:24, 3:15, 5:40, 7:55, 9:30, 11:10, 12:45, 14:00, 15:20]\n\n"
+                f"🔔 {cta}\n"
+                f"📚 EV Data Playlists: Weekly Deep Dives | Battery Science | Range Tests\n\n"
+                f"[CLOSING — 60 words]: Keyword-rich paragraph. Mention topic, USA/Europe/China, "
+                f"Evcarix channel value. Include 4-5 searchable long-tail phrases naturally.\n\n"
+                f"RULES: Primary keyword 4-6x | Real numbers throughout | "
+                f"USA/Europe/China ONLY | Max 600 words total."
+            )
+            max_tok = 900
+        else:
+            system = (
+                "You are a YouTube Shorts SEO expert. "
+                "First 125 characters of description show in mobile search results — make them count. "
+                "American English only. Return only the description body text."
+            )
+            user = (
+                f"Write a YouTube Shorts description for Evcarix.\n"
+                f"Title: '{title}'\nTopic: {topic}\nCategory: {category or 'general'}\n\n"
+                f"STRUCTURE (follow exactly):\n\n"
+                f"[LINE 1-2 — CRITICAL]: Primary keyword + specific number. "
+                f"This appears in search results — must hook AND contain keyword.\n\n"
+                f"⚡ What the data shows:\n"
+                f"— [4 data bullets, max 12 words each, must include number/unit]\n\n"
+                f"⏱ Timestamps:\n"
+                f"0:00 The stat that changes everything\n"
+                f"0:10 Real-world test data\n"
+                f"0:32 What this means for EV buyers\n"
+                f"0:52 Key takeaway\n\n"
+                f"🔔 {cta}\n\n"
+                f"RULES: Max 220 words | Primary keyword in first 10 words | "
+                f"5-6 long-tail keywords embedded | USA/Europe/China ONLY."
+            )
+            max_tok = 400
+
+        seo_body = self._call_llm(system, user, max_tokens=max_tok)
 
         if not seo_body:
-            seo_body = (
-                f"{title}\n\n"
-                f"Real data on {topic} — no marketing spin, no hype. Just numbers.\n\n"
-                f"What you'll learn:\n"
-                f"— Real-world performance vs manufacturer claims\n"
-                f"— Battery efficiency and degradation data with real percentages\n"
-                f"— True ownership cost breakdown in dollars\n"
-                f"— Head-to-head comparison with real-world numbers\n\n"
-                f"{cta}\n\n"
-                f"Timestamps:\n0:00 Hook\n0:10 Key Data\n0:25 Takeaway"
-            )
+            if format_type == "long":
+                seo_body = (
+                    f"{topic} — real-world data with no manufacturer spin. "
+                    f"This video breaks down the actual numbers from USA, Europe, and China.\n\n"
+                    f"📊 What this video covers:\n"
+                    f"— Real performance data vs official claims\n"
+                    f"— Battery efficiency and degradation percentages\n"
+                    f"— True 5-year ownership cost in dollars\n"
+                    f"— Side-by-side comparison with verified numbers\n\n"
+                    f"⏱ CHAPTERS:\n"
+                    f"0:00 Introduction\n1:30 The Data\n5:00 Analysis\n10:00 Conclusion\n\n"
+                    f"🔔 {cta}"
+                )
+            else:
+                seo_body = (
+                    f"{topic} — real data, no hype. Here's what the numbers actually show.\n\n"
+                    f"⚡ What the data shows:\n"
+                    f"— Real-world performance vs manufacturer claims\n"
+                    f"— Actual efficiency and cost numbers\n"
+                    f"— Data from USA, Europe, and China\n"
+                    f"— What this means for EV buyers\n\n"
+                    f"⏱ Timestamps:\n"
+                    f"0:00 The stat\n0:10 Data\n0:32 Analysis\n0:52 Takeaway\n\n"
+                    f"🔔 {cta}"
+                )
 
-        return (
-            f"{seo_body}\n\n"
-            f"{hashtag_str}\n"
-            f"{topic_hashtags}\n"
-            f"{tag_hashtags}\n"
-            f"{channel_about}"
-        )
+        return f"{seo_body}{channel_about}\n\n{top_hashtags}"
 
     # ── Etiketler ──────────────────────────────────────────────────
-    def generate_tags(self, topic, title, category=None):
+    def generate_tags(self, topic, title, category=None, format_type="short"):
+        # Exact-match seed tags per category (what people actually search)
         cat_seed = {
             "battery_science": ["LFP battery", "NMC battery", "EV battery degradation",
-                                 "solid state battery", "battery cycle life", "battery chemistry"],
+                                 "solid state battery", "battery cycle life", "LFP vs NMC",
+                                 "EV battery chemistry", "lithium battery lifespan"],
             "range_tests":     ["EV range test", "real world EV range", "EPA vs real range",
-                                 "EV winter range", "electric car range 2025"],
+                                 "EV winter range loss", "electric car range 2025",
+                                 "EV highway range test", "EV range cold weather"],
             "charging":        ["EV charging speed", "DC fast charging", "800V charging",
-                                 "EV charging cost", "home charging vs fast charging"],
+                                 "EV charging cost", "home charging vs fast charging",
+                                 "EV charging network", "how fast does EV charge"],
             "comparisons":     ["EV comparison 2025", "electric car comparison",
-                                 "EV head to head", "best electric car 2025"],
-            "cost_ownership":  ["EV total cost", "electric car ownership cost",
-                                 "EV vs gas cost", "EV depreciation", "EV insurance"],
-            "market_data":     ["EV market share", "electric car sales 2025",
-                                 "EV adoption rate", "global EV sales", "BYD vs Tesla"],
-            "education":       ["how EV works", "EV explained", "heat pump EV",
-                                 "EV efficiency explained", "electric motor explained"],
-            "infrastructure":  ["EV charging network", "charging infrastructure",
-                                 "EV grid impact", "smart charging"],
+                                 "best electric car 2025", "Tesla vs BYD comparison",
+                                 "EV head to head test", "electric car ranking 2025"],
+            "cost_ownership":  ["EV total cost of ownership", "electric car vs gas cost",
+                                 "EV depreciation", "EV insurance cost",
+                                 "EV maintenance cost", "is EV cheaper than gas"],
+            "market_data":     ["EV market share 2025", "electric car sales data",
+                                 "BYD vs Tesla sales", "EV adoption rate",
+                                 "global EV market", "best selling electric car 2025"],
+            "education":       ["how EV battery works", "EV heat pump explained",
+                                 "regenerative braking explained", "EV efficiency explained",
+                                 "electric motor explained", "EV thermal management"],
+            "infrastructure":  ["EV charging network", "EV charging infrastructure",
+                                 "home EV charger", "public charging cost",
+                                 "EV grid impact", "smart charging EV"],
         }
-        seed = cat_seed.get(category, ["EV data", "electric vehicle test", "battery technology"])
+        keywords = self._extract_seo_keywords(topic)
+        brand_tags = keywords["primary"] + keywords["secondary"]
+        format_tags = ["Shorts", "EVShorts"] if format_type == "short" else ["EV deep dive", "electric car guide", "EV data analysis"]
 
         system = (
-            "You are a YouTube SEO specialist. "
-            "Return ONLY a comma-separated tag list. No hashtags. No numbering. American English."
+            "You are a YouTube SEO specialist. Tags help YouTube understand your video topic for "
+            "search indexing and topic clustering (Suggested Videos). "
+            "Return ONLY a comma-separated list. No hashtags. No numbering. American English."
         )
         user = (
-            f"Generate YouTube tags.\nTitle: '{title}'\nTopic: {topic}\nCategory: {category or 'general'}\n\n"
-            f"Strategy:\n"
+            f"Generate optimized YouTube tags for Evcarix video.\n"
+            f"Title: '{title}'\nTopic: {topic}\nCategory: {category or 'general'}\n"
+            f"Format: {'Long-form video' if format_type == 'long' else 'YouTube Shorts'}\n\n"
+            f"TAG STRATEGY (YouTube uses tags for search + topic clustering):\n"
             f"BROAD (3): ev, electric car, electric vehicle\n"
-            f"MEDIUM (8): specific to topic — models, technologies, brands\n"
-            f"LONG-TAIL (7): 3-5 word phrases people search (e.g., 'tesla model 3 real range test 2025')\n"
-            f"TRENDING (4): current EV news terms (ev news 2025, EV market 2025)\n"
-            f"CHANNEL (2): evcarix, no hype just numbers\n\n"
-            f"Seed tags: {', '.join(seed)}\n"
-            f"Always include: {', '.join(CHANNEL_CORE_TAGS[:4])}\n\n"
+            f"EXACT-MATCH (5): exact phrases people search for this topic\n"
+            f"BRAND/MODEL (4): specific car brands or battery tech in topic\n"
+            f"LONG-TAIL (6): 3-5 word phrases — e.g. 'tesla model y real range 2025'\n"
+            f"YEAR (2): include '2025' or '2026' in some tags\n"
+            f"CHANNEL (2): evcarix, EV data channel\n\n"
+            f"Pre-selected seeds (include these): {', '.join(seed[:4])}\n"
+            f"Brand tags detected: {', '.join(brand_tags) if brand_tags else 'none'}\n"
+            f"Always include: ev, electric car, {', '.join(CHANNEL_CORE_TAGS[:3])}\n\n"
             f"CONSTRAINTS:\n"
-            f"- Total under 490 characters when joined with commas\n"
-            f"- Each tag: 2-30 chars, no hashtags\n"
+            f"- Total joined length: under 490 characters\n"
+            f"- Each tag: 2-30 chars, no # symbols\n"
             f"- USA/Europe/China brands ONLY — NEVER Turkey\n"
-            f"- Include data tags with numbers (100k miles, 800V, 10-80%)\n\n"
+            f"- Include numeric tags where relevant: 100k miles, 800V, 10-80 percent\n"
             f"Return: tag1, tag2, tag3, ..."
         )
 
-        raw = self._call_llm(system, user, max_tokens=300)
+        raw = self._call_llm(system, user, max_tokens=350)
         if raw:
             raw = raw.replace("\n", "").replace("Tags:", "").replace("```", "").strip()
             if raw.startswith("[") and raw.endswith("]"):
@@ -656,6 +773,13 @@ SENARYO: [script]
                 tag = ''.join(c for c in tag if c.isalnum() or c in (' ', '-')).strip()
                 if 2 <= len(tag) <= 30:
                     valid.append(tag)
+
+            # Önce brand + format tags ekle
+            priority = brand_tags + format_tags
+            for pt in priority:
+                clean = ''.join(c for c in pt if c.isalnum() or c in (' ', '-')).strip()
+                if 2 <= len(clean) <= 30 and clean not in valid:
+                    valid.insert(0, clean)
 
             # Core tag'leri öne ekle
             for core in CHANNEL_CORE_TAGS[:3]:
@@ -673,15 +797,16 @@ SENARYO: [script]
             if final:
                 return final
 
-        return CHANNEL_CORE_TAGS + [
-            "EV range test", "battery degradation", "charging speed",
-            "electric car review 2025", "EV data analysis"
+        return CHANNEL_CORE_TAGS + seed[:4] + brand_tags[:3] + [
+            "EV range test 2025", "battery degradation", "EV charging speed"
         ]
 
 
 if __name__ == "__main__":
     w = CreativeWriter()
-    titles = w.generate_title("LFP vs NMC battery after 100k miles", category="battery_science")
-    print("Titles:", titles[:2])
+    titles = w.generate_title("LFP vs NMC battery after 100k miles", category="battery_science", format_type="short")
+    print("Titles (Short):", titles[:2])
+    titles_long = w.generate_title("LFP vs NMC battery after 100k miles", category="battery_science", format_type="long")
+    print("Titles (Long):", titles_long[:2])
     script = w.generate_script("LFP vs NMC battery", category="battery_science")
     print("Script:", script['script'][:100])

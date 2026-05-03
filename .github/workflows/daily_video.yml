@@ -120,11 +120,13 @@ jobs:
             ${{ github.event.inputs.video_type
               || (github.event.schedule == '0 8 * * 0' && 'long')
               || 'short' }}
+          PYTHONUNBUFFERED: 1
         run: |
+          set -e
           # Kimlik dosyalarını secrets'den oluştur
-          python src/setup_secrets.py
+          python3 -u src/setup_secrets.py
           # Üretim & yükleme
-          python main.py
+          python3 -u main.py
 
       # ── 7. İçerik geçmişini cache'e kaydet (başarılı run sonrası) ──
       - name: Save Content History Cache

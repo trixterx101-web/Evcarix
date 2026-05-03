@@ -31,19 +31,31 @@ class YouTubeUploader:
         # Eğer geçerli kimlik bilgisi yoksa veya süresi dolmuşsa yenile/oluştur
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+                print("[Uploader] Token süresi dolmuş, yenileniyor...", flush=True)
+                try:
+                    creds.refresh(Request())
+                    print("[Uploader] ✅ Token başarıyla yenilendi.", flush=True)
+                except Exception as e:
+                    print(f"[Uploader] ❌ Token yenileme hatası: {e}", flush=True)
+                    if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
+                        raise Exception(f"CI ortamında token yenilenemedi: {e}")
             else:
-                # CI/CD ortamında bu aşamaya gelmemeli, token.json önceden hazırlanmalı
-                if os.getenv("CI"):
-                    print("[Uploader] ⚠️ GitHub Actions ortamında geçerli token.json bulunamadı!")
+                # CI/CD ortamında bu aşamaya gelmemeli
+                if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
+                    print("[Uploader] ❌ Gerekli token.json bulunamadı veya geçersiz!", flush=True)
+                    print("Lütfen yerelinizde 'refresh_token.py' çalıştırıp çıkan JSON'ı secret'a ekleyin.", flush=True)
                     raise Exception("GitHub Actions ortamında geçerli token.json bulunamadı!")
                 
+                print("[Uploader] 🔑 Tarayıcı üzerinden giriş yapılması bekleniyor...", flush=True)
                 flow = InstalledAppFlow.from_client_secrets_file(self.client_secrets_file, self.scopes)
                 creds = flow.run_local_server(port=0)
             
             # Gelecek kullanım için sakla
+        try:
             with open(token_file, "w") as token:
                 token.write(creds.to_json())
+        except Exception as e:
+            print(f"[Uploader] ⚠️ token.json yazılamadı: {e}", flush=True)
         
         return build("youtube", "v3", credentials=creds)
 
@@ -54,36 +66,33 @@ class YouTubeUploader:
         503/500 transient sunucu hatalarında exponential backoff ile retry yapar.
         """
         from googleapiclient.errors import ResumableUploadError
-        # #Shorts etiketini ekle — YouTube algoritması için kritik
-        if "#Shorts" not in title and len(title) < 90:
-            shorts_title = title  # başlığa #Shorts eklemiyoruz, açıklamaya ekliyoruz
-        else:
-            shorts_title = title[:97]
+        # Title shortening if needed
+        shorts_title = title[:97] if len(title) > 97 else title
         
-        # Tags listesine Shorts ekle ve temizle
+        # Tags listesine Shorts ekle (Sadece Shorts playlisti ise)
         final_tags = list(tags) if tags else []
-        for must_have in ["Shorts", "EVShorts", "ElectricCarShorts"]:
-            if must_have not in final_tags:
-                final_tags.append(must_have)
+        if playlist_name == "Short Video":
+            for must_have in ["Shorts", "EVShorts", "ElectricCarShorts"]:
+                if must_have not in final_tags:
+                    final_tags.append(must_have)
 
         # YouTube tag gereksinimleri:
         # - Her tag en az 2 karakter, max 30 karakter
         # - Toplam max 500 karakter
-        # - Boşluk veya özel karakter olmamalı
         cleaned_tags = []
         for tag in final_tags:
-            # Boşluk ve özel karakterleri kaldır
-            clean = re.sub(r'[^a-zA-Z0-9]', '', str(tag))
+            # Boşluklara ve tirelere izin ver (SEO için önemli), diğer özel karakterleri temizle
+            clean = re.sub(r'[^a-zA-Z0-9\s\-]', '', str(tag)).strip()
             if len(clean) >= 2 and len(clean) <= 30:
                 cleaned_tags.append(clean)
 
         # Toplam karakter limiti kontrol
-        total_chars = sum(len(t) + 1 for t in cleaned_tags)  # +1 for comma
+        total_chars = sum(len(t) + 1 for t in cleaned_tags)
         while total_chars > 500 and cleaned_tags:
             cleaned_tags.pop()
             total_chars = sum(len(t) + 1 for t in cleaned_tags)
 
-        final_tags = cleaned_tags[:30]  # Max 30 tag
+        final_tags = cleaned_tags[:40]  # Max 40 tag (YouTube limiti ~500 char)
 
         body = {
             "snippet": {

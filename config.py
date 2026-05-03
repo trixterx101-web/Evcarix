@@ -29,8 +29,8 @@ SHORT_VIDEO_DURATION_MIN = 25  # seconds
 SHORT_VIDEO_DURATION_MAX = 50  # seconds
 
 # Long video (YouTube normal)
-LONG_VIDEO_DURATION_MIN = 240  # seconds (4 minutes)
-LONG_VIDEO_DURATION_MAX = 360  # seconds (6 minutes)
+LONG_VIDEO_DURATION_MIN = 180  # seconds (3 minutes)
+LONG_VIDEO_DURATION_MAX = 240  # seconds (4 minutes)
 
 # Legacy settings (for backward compatibility)
 VIDEO_DURATION_MIN = 25  # seconds
