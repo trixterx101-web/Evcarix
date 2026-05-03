@@ -774,8 +774,10 @@ class MediaEngine:
                     continue
                 files = sorted(vd.get("video_files", []),
                                key=lambda x: x.get("width", 0), reverse=True)
-                # HD tercih: en az 1280px genişlik
-                hd_files = [f for f in files if f.get("width", 0) >= 1920]
+                # HD tercih: tam 1920px (4K > 1920px klipler montaji yavaslatir)
+                hd_files = [f for f in files if f.get("width", 0) == 1920]
+                if not hd_files:
+                    hd_files = [f for f in files if 1280 <= f.get("width", 0) < 1920]
                 if not hd_files:
                     hd_files = [f for f in files if f.get("width", 0) >= 1280]
                 if not hd_files:

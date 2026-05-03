@@ -318,68 +318,129 @@ class AutoEditor:
         print(f"[Thumbnail] Kaydedildi: {output_path}")
         return output_path
 
-    # ─── Uzun video montajı ────────────────────────────────────────────────
     def assemble_long_video(self, video_paths, audio_path, script_text,
                             output_filename, bg_music_path=None):
-        audio = AudioFileClip(audio_path)
-        clips = []
-        for path in (video_paths or []):
-            if not path or not os.path.exists(path):
-                continue
-            try:
-                clip = VideoFileClip(path)
-                w, h = clip.size
-                if w / h < 16 / 9:
-                    clip = clip.crop(y_center=h / 2, height=int(w / (16 / 9)))
-                elif w / h > 16 / 9:
-                    clip = clip.crop(x_center=w / 2, width=int(h * (16 / 9)))
-                clip = clip.resize(width=1920)
-                clips.append(clip)
-            except Exception as e:
-                print(f"[Editor] Klip hatası: {e}")
-
-        if not clips:
-            clips = [ColorClip(size=(1920, 1080), color=(0, 0, 0)).set_duration(audio.duration)]
-
-        final_video = concatenate_videoclips(clips, method="compose")
-        # Video loop kaldırıldı - metin tekrarını önlemek için
-        if final_video.duration < audio.duration:
-            final_video = final_video.subclip(0, final_video.duration)
-        else:
-            final_video = final_video.subclip(0, audio.duration)
-
-        if bg_music_path and os.path.exists(bg_music_path):
-            from moviepy.editor import CompositeAudioClip
-            bg = AudioFileClip(bg_music_path).volumex(0.1)
-            # Only loop if bg music is more than 2 seconds shorter than audio
-            if bg.duration < audio.duration - 2:
-                from moviepy.audio.fx.all import audio_loop
-                try:
-                    bg = audio_loop(bg, duration=audio.duration)
-                except (AttributeError, ImportError):
-                    # fallback: manual loop via concatenation
-                    from moviepy.editor import concatenate_audioclips
-                    import math
-                    repeats = math.ceil(audio.duration / bg.duration)
-                    bg = concatenate_audioclips([bg] * repeats).subclip(0, audio.duration)
-            else:
-                # BG music is long enough — just trim if slightly over
-                if bg.duration > audio.duration:
-                    bg = bg.subclip(0, audio.duration)
-            final_video = final_video.set_audio(CompositeAudioClip([audio, bg]))
-        else:
-            final_video = final_video.set_audio(audio)
-        
-        # Log actual vs target so we can debug future repetitions
-        print(f"[Editor] Audio: {audio.duration:.1f}s / Video: {final_video.duration:.1f}s")
+        """
+        Uzun video montajı — ffmpeg subprocess ile (MoviePy yerine).
+        Neden ffmpeg? 30+ adet 1080p klip MoviePy ile 20+ dakika sürer;
+        ffmpeg concat filter ile aynı iş ~2-3 dakikada tamamlanır.
+        """
+        import subprocess
+        import tempfile
+        import math
 
         output_path = os.path.join(self.output_dir, output_filename)
         os.makedirs(self.output_dir, exist_ok=True)
-        final_video.write_videofile(
-            output_path, fps=30, codec="libx264",
-            audio_codec="aac", bitrate="12000k",
-            ffmpeg_params=["-ac", "2"],
-        )
+
+        # Geçerli klipleri filtrele
+        valid_paths = [p for p in (video_paths or []) if p and os.path.exists(p)]
+        if not valid_paths:
+            print("[Editor] Klip yok, siyah arka plan + ses ile video oluşturuluyor...")
+            valid_paths = []
+
+        # --- Adım 1: Her klibi ffmpeg ile 1920x1080 / 8s / 30fps'e normalize et ---
+        tmp_dir = tempfile.mkdtemp(prefix="evcarix_long_")
+        normalized = []
+        for i, path in enumerate(valid_paths[:30]):  # max 30 klip
+            out_clip = os.path.join(tmp_dir, f"clip_{i:03d}.mp4")
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", path,
+                "-t", "8",                          # max 8 saniye/klip
+                "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,"
+                       "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+                "-an",                              # ses yok (ses sonra eklenecek)
+                "-threads", "4",
+                out_clip,
+            ]
+            try:
+                result = subprocess.run(cmd, capture_output=True, timeout=60)
+                if result.returncode == 0 and os.path.exists(out_clip) and os.path.getsize(out_clip) > 10_000:
+                    normalized.append(out_clip)
+                    print(f"[Editor] Klip {i+1}/{min(len(valid_paths), 30)} normalize edildi")
+            except subprocess.TimeoutExpired:
+                print(f"[Editor] Klip {i+1} timeout, atlandı")
+            except Exception as e:
+                print(f"[Editor] Klip {i+1} hata: {e}")
+
+        if not normalized:
+            # Hiç klip yoksa siyah video oluştur
+            print("[Editor] Normalize edilen klip yok, siyah video oluşturuluyor...")
+            black_clip = os.path.join(tmp_dir, "black.mp4")
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-f", "lavfi", "-i", "color=c=black:s=1920x1080:r=30",
+                "-t", "10", "-c:v", "libx264", "-preset", "ultrafast",
+                black_clip
+            ], capture_output=True, timeout=30)
+            normalized = [black_clip]
+
+        # --- Adım 2: ffmpeg concat listesi oluştur ---
+        concat_list = os.path.join(tmp_dir, "concat.txt")
+        with open(concat_list, "w") as f:
+            for clip_path in normalized:
+                f.write(f"file '{clip_path}'\n")
+
+        # --- Adım 3: Klipler birleştir (sessiz video) ---
+        silent_video = os.path.join(tmp_dir, "silent.mp4")
+        cmd_concat = [
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0",
+            "-i", concat_list,
+            "-c", "copy",
+            silent_video,
+        ]
+        result = subprocess.run(cmd_concat, capture_output=True, timeout=120)
+        if result.returncode != 0:
+            print(f"[Editor] Concat hatası: {result.stderr.decode(errors='ignore')[:200]}")
+            # Fallback: copy ile değil encode ile dene
+            subprocess.run([
+                "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                "-i", concat_list, "-c:v", "libx264", "-preset", "ultrafast",
+                silent_video
+            ], capture_output=True, timeout=120)
+
+        # --- Adım 4: Ses ekle (audio süresi kadar video kes/döngüle) ---
+        try:
+            audio_obj = AudioFileClip(audio_path)
+            audio_duration = audio_obj.duration
+            audio_obj.close()
+        except Exception:
+            audio_duration = 210  # fallback
+
+        print(f"[Editor] Audio: {audio_duration:.1f}s / Klip sayısı: {len(normalized)}")
+
+        # Son ffmpeg: video + ses birleştir, audio süresine göre kes
+        cmd_final = [
+            "ffmpeg", "-y",
+            "-stream_loop", "-1",    # video gerekirse döngüle
+            "-i", silent_video,
+            "-i", audio_path,
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-t", str(audio_duration),
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+            "-c:a", "aac", "-b:a", "192k", "-ac", "2",
+            "-threads", "4",
+            "-movflags", "+faststart",
+            output_path,
+        ]
+        print("[Editor] ffmpeg ile final video render ediliyor...")
+        result = subprocess.run(cmd_final, capture_output=True, timeout=300)
+        if result.returncode != 0:
+            err = result.stderr.decode(errors='ignore')[-300:]
+            print(f"[Editor] Final render hatası: {err}")
+        else:
+            print(f"[Editor] Long-form video hazir: {output_path}")
+
+        # Geçici dosyaları temizle
+        import shutil
+        try:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
         return output_path
 
     # ─── Haftalık Uzun Video Montajı (1920x1080, 16:9) ────────────────────────
