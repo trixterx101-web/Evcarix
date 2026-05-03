@@ -145,7 +145,7 @@ class EvcarixOrchestrator:
         # ── 2. Medya Toplama ──────────────────────────────────────
         print("\n[2/6] Stok videolar indiriliyor...", flush=True)
         video_paths = self.media_engine.download_stock_videos(
-            topic=full_topic,
+            query=full_topic,
             count=clip_count,
             orientation="portrait",
             category=plan.get('category', 'general')
@@ -238,7 +238,7 @@ class EvcarixOrchestrator:
         # ── 2. Medya Toplama ──────────────────────────────────────
         print(f"\n[2/7] {clip_count} adet stok video indiriliyor (16:9)...", flush=True)
         video_paths = self.media_engine.download_stock_videos(
-            topic=full_topic,
+            query=full_topic,
             count=clip_count,
             orientation="landscape",
             category=plan.get('category', 'general')
