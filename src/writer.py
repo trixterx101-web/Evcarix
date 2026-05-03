@@ -532,9 +532,9 @@ SENARYO: [script]
 """
         else:
             # Long-form script with explicit word count and structure
-            target_duration = 360  # 6 minutes for long-form
-            min_words = int(target_duration * 2.0)  # 720 words minimum
-            max_words = int(target_duration * 2.8)  # 1008 words maximum
+            target_duration = 210  # 3.5 minutes (range: 3-4 min = 180-240s)
+            min_words = int(target_duration * 2.0)  # 420 words minimum
+            max_words = int(target_duration * 2.8)  # 588 words maximum
             
             system = (
                 "You are Evcarix's senior analyst. Write data-rich EV scripts. "

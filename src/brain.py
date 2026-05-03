@@ -256,7 +256,7 @@ class EvcarixBrain:
             print(f"[Brain] Trend tetikleyici hatası (normal moda geçiliyor): {e}")
         # ── Trend bulunamazsa normal pipeline devam eder ─────────────
 
-        duration = 300 if video_type == "long" else 55
+        duration = 210 if video_type == "long" else 37  # long: 3-4 min (180-240s), short: 25-50s
         config = {"type": video_type, "duration": duration}
 
         # Trend haberleri çek (LLM için context)
