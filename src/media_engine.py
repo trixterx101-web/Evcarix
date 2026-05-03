@@ -22,9 +22,16 @@ load_dotenv()
 #  Tüm URL'ler test edilmiş çalışan HD video linkleri
 # ═══════════════════════════════════════════════════════════════════
 OEM_BRAND_VIDEOS = {
+    # ── Sadece Tesla CDN URL'leri doğrulanmış çalışıyor ──────────────────────
+    # Diğer OEM markaların CDN URL'leri sık değişiyor / erişim engelli olabiliyor.
+    # Bu nedenle sadece Tesla'nın güvenilir CDN adresleri tutulmaktadır.
+    # Diğer markalar için Pexels/Pixabay API kullanılmaktadır.
     "tesla": {
         "keywords": ["tesla", "model 3", "model y", "model s", "model x",
-                     "cybertruck", "supercharger", "autopilot", "fsd"],
+                     "cybertruck", "supercharger", "autopilot", "fsd",
+                     "ev", "electric vehicle", "electric car", "battery",
+                     "charging", "range", "byd", "hyundai", "kia", "bmw",
+                     "volkswagen", "ford", "rivian", "lucid", "polestar"],
         "videos": [
             "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-Y-Desktop-NA.mp4",
             "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-3-Desktop-NA.mp4",
@@ -34,125 +41,13 @@ OEM_BRAND_VIDEOS = {
         ],
         "priority": 1,
     },
-    "hyundai": {
-        "keywords": ["hyundai", "ioniq", "ioniq 5", "ioniq 6", "ioniq 9",
-                     "nexo", "kona electric"],
-        "videos": [
-            "https://www.hyundai.com/content/dam/hyundai/ww/en/images/hyundai-motorstudio/stories/ioniq6/ioniq6-exterior-01.mp4",
-            "https://www.hyundai.com/content/dam/hyundai/ww/en/images/hyundai-motorstudio/stories/ioniq5/ioniq5-exterior-driving.mp4",
-        ],
-        "priority": 2,
-    },
-    "kia": {
-        "keywords": ["kia", "ev6", "ev9", "ev3", "niro ev", "soul ev"],
-        "videos": [
-            "https://www.kia.com/content/dam/kwcms/kme/global/en/assets/contents/utility/ev6/ev6-exterior-driving-01.mp4",
-            "https://www.kia.com/content/dam/kwcms/kme/global/en/assets/contents/utility/ev9/ev9-exterior-reveal.mp4",
-        ],
-        "priority": 2,
-    },
-    "bmw": {
-        "keywords": ["bmw", "bmw i4", "bmw ix", "bmw i5", "bmw i7",
-                     "bmw i3", "bmw electric"],
-        "videos": [
-            "https://www.bmw.com/content/dam/bmw/marketBMWCOM/bmw_com/categories/electric/i4/bmw-i4-driving-exterior.mp4",
-            "https://www.bmw.com/content/dam/bmw/marketBMWCOM/bmw_com/categories/electric/ix/bmw-ix-driving-exterior.mp4",
-        ],
-        "priority": 2,
-    },
-    "mercedes": {
-        "keywords": ["mercedes", "eqs", "eqe", "eqb", "eqa", "eqc",
-                     "eqs suv", "mercedes electric", "amg eq"],
-        "videos": [
-            "https://media.mercedes-benz.com/content/dam/mb-web/pressdossier/mercedes-benz/2022/eqs-sedan/video/EQS-Exterior-Driving-HD.mp4",
-        ],
-        "priority": 2,
-    },
-    "volkswagen": {
-        "keywords": ["volkswagen", "vw", "id.4", "id.3", "id.7", "id.buzz",
-                     "id4", "id3", "id7"],
-        "videos": [
-            "https://media.vw.com/content/dam/video/id4/ID4-Exterior-Driving.mp4",
-            "https://media.vw.com/content/dam/video/id3/ID3-Exterior-City.mp4",
-        ],
-        "priority": 2,
-    },
-    "rivian": {
-        "keywords": ["rivian", "r1t", "r1s", "rivian truck", "rivian suv",
-                     "rivian electric"],
-        "videos": [
-            "https://rivian.com/media/r1t-adventure-exterior.mp4",
-            "https://rivian.com/media/r1s-mountain-driving.mp4",
-        ],
-        "priority": 2,
-    },
-    "lucid": {
-        "keywords": ["lucid", "lucid air", "lucid gravity", "lucid motors",
-                     "lucid pure", "lucid touring"],
-        "videos": [
-            "https://www.lucidmotors.com/media/video/lucid-air-exterior-driving.mp4",
-            "https://www.lucidmotors.com/media/video/lucid-air-interior.mp4",
-        ],
-        "priority": 2,
-    },
-    "polestar": {
-        "keywords": ["polestar", "polestar 2", "polestar 3", "polestar 4",
-                     "polestar electric"],
-        "videos": [
-            "https://www.polestar.com/media/polestar2-driving-exterior.mp4",
-            "https://www.polestar.com/media/polestar3-exterior-reveal.mp4",
-        ],
-        "priority": 3,
-    },
-    "byd": {
-        "keywords": ["byd", "byd seal", "byd atto", "byd han", "byd tang",
-                     "byd dolphin", "byd seagull", "byd electric"],
-        "videos": [
-            "https://www.byd.com/content/dam/byd-site/videos/seal/byd-seal-exterior-driving.mp4",
-            "https://www.byd.com/content/dam/byd-site/videos/atto3/byd-atto3-exterior.mp4",
-        ],
-        "priority": 1,
-    },
-    "nio": {
-        "keywords": ["nio", "nio et5", "nio et7", "nio es6", "nio es8",
-                     "nio el6", "nio electric"],
-        "videos": [
-            "https://www.nio.com/assets/video/et5-exterior-driving.mp4",
-            "https://www.nio.com/assets/video/et7-night-exterior.mp4",
-        ],
-        "priority": 3,
-    },
-    "ford": {
-        "keywords": ["ford", "mustang mach-e", "f-150 lightning", "ford electric",
-                     "mach-e", "f150 lightning"],
-        "videos": [
-            "https://media.ford.com/content/fordmedia/fna/us/en/media/videos/mache-exterior-driving.mp4",
-            "https://media.ford.com/content/fordmedia/fna/us/en/media/videos/f150-lightning-exterior.mp4",
-        ],
-        "priority": 2,
-    },
-    "gm_chevrolet": {
-        "keywords": ["chevrolet", "chevy", "silverado ev", "blazer ev",
-                     "equinox ev", "gm electric", "cadillac lyriq"],
-        "videos": [
-            "https://media.gm.com/content/dam/Media/gmcom/vehicle/2024/silverado-ev/video/silverado-ev-exterior.mp4",
-        ],
-        "priority": 3,
-    },
-    "stellantis": {
-        "keywords": ["jeep", "ram", "dodge", "fiat", "alfa romeo",
-                     "stellantis", "jeep wrangler 4xe", "ram 1500 rev"],
-        "videos": [
-            "https://media.stellantis.com/content/dam/video/jeep-wrangler-4xe-exterior.mp4",
-        ],
-        "priority": 3,
-    },
 }
 
-# Genel EV içeriği için kullanılacak tüm OEM videoları (marka spesifik değil)
+# Genel EV içeriği için kullanılacak videoları (marka spesifik değil)
 OEM_GENERAL_VIDEOS = [
     "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-Y-Desktop-NA.mp4",
     "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Megapack-Homepage-Desktop.mp4",
+    "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-3-Desktop-NA.mp4",
 ]
 
 # Kategori bazlı OEM öncelikleri
@@ -299,7 +194,7 @@ class MediaEngine:
                 out = os.path.join(output_dir, fname)
 
                 # Önbellekte varsa kullan
-                if os.path.exists(out) and os.path.getsize(out) > 500_000:
+                if os.path.exists(out) and os.path.getsize(out) > 200_000:
                     if self._get_clip_hash(out) not in self._used_clips:
                         paths.append(out)
                         print(f"[OEM] ♻️  Önbellekten: {fname}")
@@ -308,23 +203,32 @@ class MediaEngine:
                 try:
                     print(f"[OEM] {brand.upper()} HD video indiriliyor: {fname}")
                     r = requests.get(
-                        url, stream=True, timeout=60,
-                        headers={"User-Agent": "Mozilla/5.0 (compatible; Evcarix/2.0)"}
+                        url, stream=True, timeout=30,
+                        headers={
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                            "Accept": "video/mp4,video/*,*/*",
+                            "Referer": "https://www.tesla.com/",
+                        }
                     )
-                    if r.status_code == 200:
+                    ct = r.headers.get("content-type", "")
+                    if r.status_code == 200 and ("video" in ct or "octet-stream" in ct or not ct):
                         with open(out, "wb") as f:
+                            downloaded = 0
                             for chunk in r.iter_content(1024 * 1024):
                                 if chunk:
                                     f.write(chunk)
+                                    downloaded += len(chunk)
+                                    if downloaded > 300_000_000:  # max 300MB
+                                        break
                         size = os.path.getsize(out)
-                        if size > 500_000:  # min 500KB = gerçek HD video
+                        if size > 200_000:  # min 200KB = gerçek video
                             paths.append(out)
                             print(f"[OEM] ✅ {fname} ({size//1024//1024}MB)")
                         else:
                             os.remove(out)
                             print(f"[OEM] ⚠️  Çok küçük ({size} byte), atlandı")
                     else:
-                        print(f"[OEM] HTTP {r.status_code}: {brand}")
+                        print(f"[OEM] HTTP {r.status_code} / content-type={ct}: {brand}")
                 except Exception as e:
                     print(f"[OEM] {brand} hata: {e}")
 
@@ -578,32 +482,15 @@ class MediaEngine:
         os.makedirs(output_dir, exist_ok=True)
         all_paths = []
 
-        # 1. OEM Marka Basın Kiti — Gerçek press/newsroom scraper
-        try:
-            from src.oem_scraper import OEMScraper
-            oem_scraper = OEMScraper()
-            video_type = "short" if orientation == "portrait" else "long"
-            category_id = category or ""
-            oem_clips = oem_scraper.get_clips(
-                topic=query,
-                category_id=category_id,
-                count=min(count, 4),
-                video_type=video_type,
-            )
-            oem_fresh = self._filter_used_clips(oem_clips)
-            all_paths += oem_fresh
-            print(f"[MediaEngine] OEM Press HD: {len(oem_fresh)} taze klip")
-        except Exception as e:
-            print(f"[MediaEngine] OEM Scraper hata: {e}")
+        # 1. OEM Static — Tesla CDN (doğrulanmış çalışan URL'ler)
+        # NOT: OEM Scraper (HTML scraping) kaldırıldı — press siteleri JS render
+        # kullanıyor, raw HTML'den .mp4 bulunamıyor ve 20+ siteye boşa zaman harcanıyor.
+        oem_static = self._download_from_oem(query, output_dir, min(count, 3), category)
+        oem_static_fresh = self._filter_used_clips(oem_static)
+        all_paths += oem_static_fresh
+        print(f"[MediaEngine] OEM Tesla CDN: {len(oem_static_fresh)} taze klip")
 
-        # 2. OEM'den yeterli yoksa hardcoded OEM brand videos ile tamamla
-        if len(all_paths) < min(count, 2):
-            oem_static = self._download_from_oem(query, output_dir, min(count - len(all_paths), 3), category)
-            oem_static_fresh = self._filter_used_clips(oem_static)
-            all_paths += [p for p in oem_static_fresh if p not in all_paths]
-            print(f"[MediaEngine] OEM Static HD: {len(oem_static_fresh)} taze klip")
-
-        # 3. Pexels HD
+        # 2. Pexels HD (birincil stok video kaynağı)
         if len(all_paths) < count:
             needed = count - len(all_paths)
             pex = self._download_from_pexels(query, output_dir,
