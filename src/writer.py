@@ -733,6 +733,9 @@ SENARYO: [script]
         brand_tags = keywords["primary"] + keywords["secondary"]
         format_tags = ["Shorts", "EVShorts"] if format_type == "short" else ["EV deep dive", "electric car guide", "EV data analysis"]
 
+        # Kategoriye göre seed tag'leri seç veya varsayılanı kullan
+        seed = cat_seed.get(category, cat_seed["range_tests"])
+
         system = (
             "You are a YouTube SEO specialist. Tags help YouTube understand your video topic for "
             "search indexing and topic clustering (Suggested Videos). "
