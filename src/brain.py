@@ -269,8 +269,8 @@ class EvcarixBrain:
                 }
                 print(f"[Brain] 📊 Upload önerisi: {next_best:02d}:00 UTC | Hedef CTR: %12-18")
                 return triggered_plan
-        except Exception as e:
-            print(f"[Brain] Trend tetikleyici hatası (normal moda geçiliyor): {e}")
+            except Exception as e:
+                print(f"[Brain] Trend tetikleyici hatası (normal moda geçiliyor): {e}")
         # ── Trend bulunamazsa normal pipeline devam eder ─────────────
 
         duration = 210 if video_type == "long" else 37  # long: 3-4 min (180-240s), short: 25-50s
