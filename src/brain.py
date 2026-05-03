@@ -286,6 +286,14 @@ class EvcarixBrain:
             cta_override=variation["cta_style"],
             category=topic_category
         )
+        
+        # Add editorial disclaimer to description
+        disclaimer = (
+            "\n\nStock footage courtesy of Pexels, Pixabay (CC0). "
+            "Manufacturer press imagery used for editorial/informational purposes only. "
+            "No affiliation with any manufacturer shown."
+        )
+        description += disclaimer
 
         plan = {
             "timestamp":  datetime.datetime.now().strftime('%Y%m%d_%H%M%S'),

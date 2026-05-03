@@ -488,11 +488,44 @@ clip_count = math.ceil(target_duration / 8)  # Her klip ~8 saniye
 
 ### 18.11 Video Kaynakları
 
-Haftalık uzun video için daha fazla klip gerekir:
-- AI video: Stability AI, Replicate, Kling
-- Stock video: Pexels, Pixabay (landscape orientation)
-- OEM Press Kit: Tesla, Lucid, Waymo
-- NASA/DOE Public Videos
+**Strict Topic Relevance Fallback Chain**:
+
+Stage 1 — Pexels CC0 (topic-specific queries from QueryBuilder)
+  → Sadece konuyla ilgili sorgular kullanılır
+  → QueryBuilder'dan gelen ilk 3 sorgu dener
+
+Stage 2 — Pixabay CC0 (topic-specific queries)
+  → Sadece konuyla ilgili sorgular kullanılır
+  → QueryBuilder'dan gelen ilk 3 sorgu dener
+
+Stage 3 — OEM Press/Newsroom (Editorial Only)
+  → Tesla, BMW, Hyundai, VW, Kia, Volvo, Polestar
+  → Mercedes, Audi, Ford, Rivian, Lucid, Nissan
+  → CATL, Panasonic, Samsung SDI, QuantumScape
+  → ChargePoint, ABB, DOE, Argonne
+  → Sadece Press/Newsroom sayfaları (reklam değil)
+  → Watermark/reklam URL'leri otomatik reddedilir
+  → Konuya göre relevance filtresi
+
+Stage 4 — AI Video (fal.ai → Kling → Runway → HF)
+  → fal.ai LTX-Video (FAL_KEY) — en iyi kalite
+  → Kling AI (KLING_API_KEY)
+  → Runway ML (RUNWAY_API_KEY)
+  → HuggingFace Gradio/Router (HF_TOKEN)
+
+Stage 5 — Free Sources (Coverr/Dareful/Mixkit CC0)
+  → QueryBuilder'dan gelen ilk 2 sorgu
+
+**OEM Press Rules**:
+  ✅ Allowed: Press/Newsroom/Media Center pages
+  ✅ Allowed: Government research (DOE, Argonne)
+  ❌ Blocked: Product pages, ads, commercials, watermarked content
+  ℹ️  Disclaimer added to every video description automatically
+
+**Disclaimer** (her video açıklamasında otomatik):
+  "Stock footage courtesy of Pexels, Pixabay (CC0). 
+   Manufacturer press imagery used for editorial/informational purposes only. 
+   No affiliation with any manufacturer shown."
 
 ### 18.12 Fallback Mekanizmaları
 

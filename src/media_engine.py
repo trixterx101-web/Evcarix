@@ -536,143 +536,116 @@ class MediaEngine:
                               count=6, orientation="portrait", category=None, plan=None):
         """
         Tüm kaynaklardan taze video indirir.
-        Daha önce kullanılan klipler otomatik olarak hariç tutulur.
-        Öncelik: Pexels → Pixabay → OEM PressKit → NASA/DOE → Pexels (ek)
+        Strict topic relevance enforced at every stage.
+        Fallback chain: Pexels → Pixabay → OEM Press → AI Video → Free Sources
         """
         import json as _json
+        from src.oem_scraper import OEMScraper
+        from src.free_video_sources import FreeVideoSources
+        from src.ai_video_generator import AIVideoGenerator
+
         os.makedirs(output_dir, exist_ok=True)
-        all_paths = []
+        
+        video_type   = os.environ.get("VIDEO_TYPE", "short")
+        topic_text   = plan.get("topic", "") or plan.get("title", "") or query if plan else query
+        category_id  = plan.get("category_id", "") if plan else ""
+        script_text  = plan.get("script", "") or plan.get("narration", "") or "" if plan else ""
+        queries      = get_queries_for_script(script_text, topic_text, category_id)
+        needed       = count
+        all_clips    = []
 
-        # Use QueryBuilder to get relevant search queries
-        script_text = plan.get("script", "") or plan.get("narration", "") or "" if plan else ""
-        topic_text = plan.get("topic", "") or plan.get("title", "") or query if plan else query
-        category_id = plan.get("category_id", "") if plan else ""
-        queries = get_queries_for_script(script_text, topic_text, category_id)
-        primary_query = queries[0] if queries else query
+        # ── Stage 1: Pexels (topic-specific queries only) ──────────────────────────
+        print("[MediaEngine] Stage 1: Pexels...")
+        for query_item in queries[:3]:
+            if len(all_clips) >= needed:
+                break
+            new = self._download_from_pexels(
+                query=query_item,
+                output_dir=output_dir,
+                count=needed - len(all_clips),
+                orientation=orientation,
+                category=category,
+            )
+            new_fresh = self._filter_used_clips(new)
+            all_clips.extend(new_fresh)
+        print(f"[MediaEngine] Pexels: {len(all_clips)} klip")
 
-        # 1. Pexels (kalite öncelikli)
-        pex_q = self._get_professional_query(primary_query, category)
-        pex = self._download_from_pexels(pex_q, output_dir, 3, orientation, category=category)
-        pex_fresh = self._filter_used_clips(pex)
-        all_paths += pex_fresh
-        print(f"[MediaEngine] Pexels (kalite): {len(pex_fresh)} taze klip")
+        # ── Stage 2: Pixabay (topic-specific queries only) ─────────────────────────
+        if len(all_clips) < needed:
+            print("[MediaEngine] Stage 2: Pixabay...")
+            for query_item in queries[:3]:
+                if len(all_clips) >= needed:
+                    break
+                new = self._download_from_pixabay(
+                    query=query_item,
+                    output_dir=output_dir,
+                    count=needed - len(all_clips),
+                    orientation=orientation,
+                    category=category,
+                )
+                new_fresh = self._filter_used_clips(new)
+                all_clips.extend(new_fresh)
+            print(f"[MediaEngine] Pixabay: {len(all_clips)} klip")
 
-        # 2. Pexels (topic bazlı — farklı sorgu)
-        if len(all_paths) < count and len(queries) > 1:
-            topic_query = queries[1]  # Use second query from QueryBuilder
-            pex2 = self._download_from_pexels(topic_query, output_dir, count, orientation, category=category)
-            pex2_fresh = self._filter_used_clips(pex2)
-            all_paths += [p for p in pex2_fresh if p not in all_paths]
-            print(f"[MediaEngine] Pexels (topic): {len(pex2_fresh)} taze klip")
+        # ── Stage 3: OEM Press/Newsroom pages ──────────────────────────────────────
+        if len(all_clips) < needed:
+            print("[MediaEngine] Stage 3: OEM Press sayfaları...")
+            try:
+                oem   = OEMScraper()
+                new   = oem.get_clips(
+                    topic      = topic_text,
+                    category_id= category_id,
+                    count      = needed - len(all_clips),
+                    video_type = video_type,
+                )
+                all_clips.extend(new)
+                print(f"[MediaEngine] OEM: {len(all_clips)} klip")
+            except Exception as e:
+                print(f"[MediaEngine] OEM hata: {e}")
 
-        # 3. Pixabay
-        if len(all_paths) < count:
-            pix = self._download_from_pixabay(primary_query, output_dir,
-                                               count - len(all_paths), orientation, category=category)
-            pix_fresh = self._filter_used_clips(pix)
-            all_paths += [p for p in pix_fresh if p not in all_paths]
-            print(f"[MediaEngine] Pixabay: {len(pix_fresh)} taze klip")
-
-        # 3.5. AI Video Generator (topic-relevant prompts)
-        if len(all_paths) < count:
-            print("[MediaEngine] 🤖 AI video generator deneniyor...")
+        # ── Stage 4: AI Video (fal.ai → Kling → Runway → HF) ──────────────────────
+        if len(all_clips) < needed:
+            print("[MediaEngine] Stage 4: AI video üretimi...")
             try:
                 ai_gen = AIVideoGenerator()
-                topic_str = (plan.get("topic", "") or plan.get("title", "") or query) if plan else query
-                category_str = plan.get("category_id", "") if plan else ""
-                ai_clips = ai_gen.generate(
-                    topic       = topic_str,
-                    category_id = category_str,
-                    count       = count - len(all_paths),
-                    duration    = 6,
-                    video_type  = os.environ.get("VIDEO_TYPE", "short"),
+                new    = ai_gen.generate(
+                    topic      = topic_text,
+                    category_id= category_id,
+                    count      = needed - len(all_clips),
+                    duration   = 6,
+                    video_type = video_type,
                 )
-                all_paths += ai_clips
-                print(f"[MediaEngine] AI Video: +{len(ai_clips)} klip")
+                all_clips.extend(new)
+                print(f"[MediaEngine] AI video: {len(all_clips)} klip")
             except Exception as e:
-                print(f"[MediaEngine] AI Video hata: {e}")
+                print(f"[MediaEngine] AI video hata: {e}")
 
-        # 4. OEM Press Kit
-        if len(all_paths) < count:
-            oem = self._download_from_oem_presskit(output_dir, 3, category)
-            oem_fresh = self._filter_used_clips(oem)
-            all_paths += [p for p in oem_fresh if p not in all_paths]
-            print(f"[MediaEngine] OEM PressKit: {len(oem_fresh)} taze klip")
-
-        # 5. NASA/DOE
-        if len(all_paths) < count:
-            pub = self._download_public_domain(output_dir, 2)
-            pub_fresh = self._filter_used_clips(pub)
-            all_paths += [p for p in pub_fresh if p not in all_paths]
-            print(f"[MediaEngine] NASA/DOE: {len(pub_fresh)} taze klip")
-
-        # 5.5. Free video sources fallback (no API key needed)
-        if len(all_paths) < count:
-            print("[MediaEngine] 🆓 Ücretsiz video kaynakları deneniyor...")
-            from src.free_video_sources import FreeVideoSources, EV_SEARCH_TERMS
-            free_src = FreeVideoSources()
-            ev_terms = random.sample(EV_SEARCH_TERMS, min(3, len(EV_SEARCH_TERMS)))
-            needed_count = count - len(all_paths)
-            for term in ev_terms:
-                if len(all_paths) >= count:
-                    break
-                free_clips = free_src.download_clips(
-                    query=term,
-                    count=needed_count,
-                    video_type=os.environ.get("VIDEO_TYPE", "short")
-                )
-                all_paths += [p for p in free_clips if p not in all_paths]
-                print(f"[MediaEngine] FreeVideoSources: {len(free_clips)} klip")
-
-        # 5.75. OEM Press Scraper (final fallback)
-        if len(all_paths) < count:
-            print("[MediaEngine] 🏭 OEM press sitelerinden video çekiliyor...")
+        # ── Stage 5: Free sources (Coverr, Dareful, Mixkit) ───────────────────────
+        if len(all_clips) < needed:
+            print("[MediaEngine] Stage 5: Ücretsiz kaynaklar...")
             try:
-                oem_scraper = OEMScraper()
-                topic_str = (plan.get("topic", "") or plan.get("title", "") or query) + " " + (plan.get("category_id", "") if plan else "")
-                oem_clips = oem_scraper.get_clips(
-                    topic      = topic_str,
-                    count      = count - len(all_paths),
-                    video_type = os.environ.get("VIDEO_TYPE", "short"),
-                )
-                all_paths += oem_clips
-                print(f"[MediaEngine] OEM Scraper: +{len(oem_clips)} klip")
+                free = FreeVideoSources()
+                for query_item in queries[:2]:
+                    if len(all_clips) >= needed:
+                        break
+                    new = free.download_clips(
+                        query      = query_item,
+                        count      = needed - len(all_clips),
+                        video_type = video_type,
+                    )
+                    all_clips.extend(new)
+                print(f"[MediaEngine] Free: {len(all_clips)} klip")
             except Exception as e:
-                print(f"[MediaEngine] OEM Scraper hata: {e}")
+                print(f"[MediaEngine] Free hata: {e}")
 
-        # 6. Stok biterse: AI video + tekrar kullanım fallback
-        if len(all_paths) < count:
-            print("[MediaEngine] ⚠️  Stok videolar tükendi. AI video + tekrar kullanım devreye giriyor...")
-            
-            # 6a. AI video üret (varsa)
-            ai_clips = self.generate_ai_video_clips(query, count=count - len(all_paths))
-            if ai_clips:
-                all_paths += [p for p in ai_clips if p not in all_paths]
-                print(f"[MediaEngine] 🤖 AI video: {len(ai_clips)} klip eklendi")
-            
-            # 6b. Yine yetersizse hash temizle ve tekrar dene (başşa dön)
-            if len(all_paths) < count:
-                print("[MediaEngine] 🔄 Hash geçmişi temizleniyor, klipler tekrar kullanılacak...")
-                self._used_clips.clear()
-                self._save_used_clips()
-                # Tekrar Pexels'ten indir (bu sefer filtresiz)
-                retry = self._download_from_pexels(
-                    self._get_professional_query(query, category),
-                    output_dir + "_retry",
-                    count, orientation, category=category
-                )
-                all_paths += [p for p in retry if p not in all_paths]
-                print(f"[MediaEngine] Yeniden indirme: {len(retry)} klip")
+        # ── Final check ────────────────────────────────────────────────────────────
+        if not all_clips:
+            print("[MediaEngine] ❌ Hiç klip bulunamadı!")
+        else:
+            print(f"[MediaEngine] ✅ Toplam {len(all_clips)} klip hazır.")
 
-        random.shuffle(all_paths)
-
-        if not all_paths:
-            print("[MediaEngine] ⚠️  Hiçbir kaynaktan taze video alınamadı!")
-            return []
-
-        final = all_paths[:count]
-        print(f"[MediaEngine] ✅ {len(final)} taze klip hazır (daha önce kullanılanlar hariç)")
-        return final
+        random.shuffle(all_clips)
+        return all_clips[:needed]
 
     # ─── NASA / DOE Kamu Malı Videolar ───────────────────────────────────────
     def _download_public_domain(self, output_dir, count):
