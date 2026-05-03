@@ -176,7 +176,10 @@ class EvcarixOrchestrator:
         # ── 5. Kapak (Thumbnail) ──────────────────────────────────
         print("\n[5/6] Thumbnail oluşturuluyor...", flush=True)
         thumb_output = f"output/thumb_{ts}.png"
-        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output)
+        
+        # İlk videodan bir kare alarak arka plan yap (daha estetik)
+        bg_path = video_paths[0] if video_paths else None
+        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output, bg_image_path=bg_path)
 
         # ── 6. YouTube Yükleme ─────────────────────────────────────────
         if self.uploader and os.path.exists(final_video_path):
@@ -279,7 +282,10 @@ class EvcarixOrchestrator:
         # ── 5. Kapak (Thumbnail) ──────────────────────────────────
         print("\n[5/7] HD Thumbnail oluşturuluyor...", flush=True)
         thumb_output = f"output/thumb_long_{ts}.png"
-        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output)
+        
+        # İlk videodan bir kare alarak arka plan yap
+        bg_path = video_paths[0] if video_paths else None
+        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output, bg_image_path=bg_path)
 
         # ── 6. Chapters & SEO ─────────────────────────────────────
         # Uzun videolarda description içine timestamp eklemek SEO için kritiktir

@@ -570,29 +570,37 @@ SENARYO: [script]
         raw = self._call_llm(system, user, max_tokens=3000)
         if raw:
             parsed = self._parse_response(raw)
-            # Word count validation for both short and long-form
             actual_words = len(parsed["script"].split())
             if format_type == "short":
                 if actual_words < MIN_WORDS_SHORT:
-                    print(f"[Writer] ⚠️ Shorts script too short ({actual_words} words, need {MIN_WORDS_SHORT}). Retrying...")
+                    print(f"[Writer] ⚠️ Shorts too short ({actual_words}/{MIN_WORDS_SHORT}w). Retrying...")
                     user += (f"\n\nCRITICAL: Write EXACTLY {MIN_WORDS_SHORT}-{MAX_WORDS_SHORT} words. "
-                             f"Your previous response had only {actual_words} words which is too short. "
-                             f"Write a complete, flowing narration that fills the full 60-second duration.")
-                    raw = self._call_llm(system, user, max_tokens=2000)
-                    if raw:
-                        parsed = self._parse_response(raw)
+                             f"Your response had only {actual_words} words. Fill the full 60 seconds.")
+                    raw2 = self._call_llm(system, user, max_tokens=2000)
+                    if raw2:
+                        parsed = self._parse_response(raw2)
+                return parsed  # short: always return here, None fallback below handles failure
             else:
-                if actual_words < min_words:
-                    print(f"[Writer] ⚠️ Long script too short ({actual_words} words, need {min_words}). Retrying with stronger prompt...")
-                    user += (f"\n\nCRITICAL FAILURE: You wrote only {actual_words} words. "
-                             f"You MUST write at least {min_words} words or the video will be only ~{actual_words // 130} minute(s) long. "
-                             f"Continue from where you left off or rewrite the complete {min_words}-word script now.")
-                    raw = self._call_llm(system, user, max_tokens=3000)
-                    if raw:
-                        parsed = self._parse_response(raw)
-                        new_words = len(parsed["script"].split())
-                        print(f"[Writer] Retry result: {new_words} words")
-            return parsed
+                # Long: ONLY return if word count passes minimum
+                if actual_words >= min_words:
+                    print(f"[Writer] ✅ Long script OK: {actual_words}w (~{actual_words // 130}min)")
+                    return parsed
+                # Too short → retry once with stronger prompt
+                print(f"[Writer] ⚠️ Long too short ({actual_words}/{min_words}w). Retrying...")
+                user += (f"\n\nCRITICAL FAILURE: You wrote only {actual_words} words = "
+                         f"only ~{actual_words // 130}min audio. MUST be {min_words}+ words for 3-4min video. "
+                         f"Rewrite EVERY sentence in full. Do NOT summarize.")
+                raw2 = self._call_llm(system, user, max_tokens=3000)
+                if raw2:
+                    p2 = self._parse_response(raw2)
+                    n2 = len(p2["script"].split())
+                    print(f"[Writer] Retry: {n2} words")
+                    if n2 >= min_words:
+                        return p2
+                    print(f"[Writer] ⚠️ Retry still short ({n2}w) → template fallback")
+                else:
+                    print(f"[Writer] ⚠️ Retry LLM failed → template fallback")
+                # FALL THROUGH to long template fallback below (do not return here)
 
         if format_type == "long":
             print(f"[Writer] ⚠️ Long script LLM failure, using extended template fallback for: {topic}")

@@ -319,44 +319,87 @@ class AutoEditor:
         return output_path
 
     def generate_thumbnail(self, title: str, output_path: str,
-                           channel_name="EVCARIX", slogan="NO HYPE. JUST NUMBERS.") -> str:
-        """generate_premium_thumbnail ile uyumlu basit alias (video_path olmadan)."""
+                           channel_name="EVCARIX", bg_image_path: str = None) -> str:
+        """
+        Gelişmiş thumbnail oluşturucu.
+        bg_image_path verilirse arka plana yerleştirir, yoksa koyu lacivert kullanır.
+        """
+        from PIL import ImageFilter, ImageEnhance
         W, H = 1280, 720
-        bg = Image.new("RGB", (W, H), (10, 10, 20))
+        
+        if bg_image_path and os.path.exists(bg_image_path):
+            try:
+                # Video dosyası mı yoksa resim mi kontrol et
+                ext = Path(bg_image_path).suffix.lower()
+                if ext in ['.mp4', '.mov', '.avi', '.mkv']:
+                    from moviepy.editor import VideoFileClip
+                    with VideoFileClip(bg_image_path) as clip:
+                        # 2. saniyeden veya sürenin %10'undan kare al
+                        t = min(2.0, clip.duration * 0.1)
+                        frame = clip.get_frame(t)
+                        bg = Image.fromarray(frame).convert("RGB")
+                else:
+                    bg = Image.open(bg_image_path).convert("RGB")
+                
+                bg = bg.resize((W, H), Image.Resampling.LANCZOS)
+                # Arka planı hafif karart ve bulanıklaştır (metin okunsun diye)
+                bg = bg.filter(ImageFilter.GaussianBlur(radius=5))
+                enhancer = ImageEnhance.Brightness(bg)
+                bg = enhancer.enhance(0.4) 
+            except Exception as e:
+                print(f"[Thumbnail] Arka plan yükleme hatası ({bg_image_path}): {e}")
+                bg = Image.new("RGB", (W, H), (10, 10, 25))
+        else:
+            # Lacivert-Siyah gradyan benzeri koyu zemin
+            bg = Image.new("RGB", (W, H), (10, 15, 35))
+
         draw = ImageDraw.Draw(bg)
-        font = self._load_font("bold", 60)
-        # Başlık satırlarına böl
+        
+        # Ana başlık fontu (Bold ve Büyük)
+        font = self._load_font("bold", 72)
+        
+        # Başlığı satırlara böl
         words = title.split()
         lines, cur = [], ""
         for w in words:
             test = (cur + " " + w).strip()
             bbox = draw.textbbox((0, 0), test, font=font)
-            if bbox[2] - bbox[0] > W - 80:
-                if cur:
-                    lines.append(cur)
+            if bbox[2] - bbox[0] > W - 150:
+                if cur: lines.append(cur)
                 cur = w
             else:
                 cur = test
-        if cur:
-            lines.append(cur)
-        y = H // 3
+        if cur: lines.append(cur)
+
+        # Başlığı dikeyde ortala
+        line_height = font.size + 15
+        total_height = len(lines) * line_height
+        y = (H - total_height) // 2 - 30
+
         for line in lines:
             bbox = draw.textbbox((0, 0), line, font=font)
             x = (W - (bbox[2] - bbox[0])) // 2
-            for dx in range(-3, 4):
-                for dy in range(-3, 4):
+            
+            # Kalın siyah gölge (shadow/outline)
+            for dx in range(-4, 5):
+                for dy in range(-4, 5):
                     draw.text((x + dx, y + dy), line, font=font, fill=(0, 0, 0))
-            draw.text((x, y), line, font=font, fill=(255, 235, 0))
-            y += font.size + 12
-        # Alt şerit
-        sf = self._load_font("regular", 32)
-        draw.rectangle([(0, H - 60), (W, H)], fill=(0, 0, 0))
+            
+            # Ana metin (Parlak Sarı/Beyaz)
+            draw.text((x, y), line, font=font, fill=(255, 235, 20))
+            y += line_height
+
+        # Alt şerit (Marka Bilgisi)
+        sf = self._load_font("regular", 36)
+        draw.rectangle([(0, H - 70), (W, H)], fill=(0, 0, 0, 180)) # Yarı şeffaf siyah
+        
         cb = draw.textbbox((0, 0), channel_name, font=sf)
-        draw.text(((W - (cb[2] - cb[0])) // 2, H - 45),
-                  channel_name, font=sf, fill=(50, 255, 100))
+        draw.text(((W - (cb[2] - cb[0])) // 2, H - 55),
+                  channel_name, font=sf, fill=(0, 255, 127)) # Neon yeşil
+
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        bg.save(output_path, "PNG")
-        print(f"[Thumbnail] Kaydedildi: {output_path}")
+        bg.save(output_path, "PNG", quality=95)
+        print(f"[Thumbnail] ✅ Başarıyla oluşturuldu: {output_path}")
         return output_path
 
     def assemble_long_video(self, video_paths, audio_path, script_text,
@@ -498,12 +541,15 @@ class AutoEditor:
         """
         import random
         audio = AudioFileClip(audio_path)
+        print(f"[Editor] 🎤 Audio süresi: {audio.duration:.1f}s | Hedef: {target_duration}s")
         
         # Audio süresini kullan, loop yapma (metin tekrarını önlemek için)
         # Video süresini audio süresine eşitle
         if audio.duration < target_duration:
+            print(f"[Editor] ⚠️ Audio, hedeften kısa ({audio.duration:.1f}s < {target_duration}s). Video süresi audio'ya göre ayarlanıyor.")
             target_duration = audio.duration
         elif audio.duration > target_duration:
+            print(f"[Editor] ✂️ Audio, hedeften uzun. {target_duration}s noktasına kesiliyor.")
             audio = audio.subclip(0, target_duration)
 
         # Video klipleri 16:9 aspect ratio'ya çevir ve 1920x1080'a resize

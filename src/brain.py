@@ -214,17 +214,34 @@ class EvcarixBrain:
         return text
 
     def create_daily_plan(self, slot="evening", video_type="short"):
-        print(f"Evcarix Brain: Plan oluşturuluyor ({video_type})...")
+        mode = os.environ.get("CONTENT_MODE", "auto").lower()
+        print(f"Evcarix Brain: Plan oluşturuluyor ({video_type}, mode={mode})...")
 
-        # ── YouTube Trend Tetikleyici (öncelikli) ────────────────────
-        try:
-            triggered_plan = self.trend_engine.trigger_from_youtube_trend(hours_back=48)
-            if triggered_plan:
-                print(f"\n🚀 TREND MOD AKTİF!")
-                # Update format_type for triggered plan if needed
-                # (Trend engine might have its own logic, but we can override or pass it)
-                triggered_plan["config"]["type"] = video_type
-                self._save_history(triggered_plan)
+        # ── YouTube Trend Tetikleyici (Sadece trend modunda aktif) ──────────
+        if mode == "trend":
+            try:
+                triggered_plan = self.trend_engine.trigger_from_youtube_trend(hours_back=48)
+                if triggered_plan:
+                    print(f"\n🚀 TREND MOD AKTİF!")
+                    triggered_plan["config"]["type"] = video_type
+                    
+                    # EĞER UZUN VİDEO İSE: Trend konusunu alıp CreativeWriter ile UZUN script üret
+                    if video_type == "long":
+                        print(f"[Brain] Trend konusu için UZUN script üretiliyor: {triggered_plan['topic']}")
+                        long_script_data = self.writer.generate_script(
+                            triggered_plan['topic'], format_type="long", category=triggered_plan.get("category", "trend")
+                        )
+                        triggered_plan["script"] = long_script_data["script"]
+                        triggered_plan["voice"]  = long_script_data["voice"]
+                        # SEO meta verilerini de uzun formata göre güncelle
+                        triggered_plan["description"] = self.writer.generate_description(
+                            topic=triggered_plan['topic'],
+                            title=triggered_plan['title'],
+                            tags_list=triggered_plan['tags'],
+                            format_type="long"
+                        )
+
+                    self._save_history(triggered_plan)
 
                 # SEO metadata ekle
                 import datetime as _dt
@@ -265,11 +282,17 @@ class EvcarixBrain:
         if trending_topic:
             trending_topic = self._clean_topic(trending_topic)
 
-        # Ana konu seçimi — havuz + trend haber karışımı
+        # Ana konu seçimi — Havuz (67 konu) veya Trend haber karışımı
         pool_topic, pool_category = self._pick_topic(slot)
-        # Trend haber varsa %40, yoksa havuz %100
-        specific_topic = trending_topic if (random.random() < 0.4 and trending_topic) else pool_topic
-        topic_category = "trend" if (specific_topic == trending_topic and trending_topic) else pool_category
+        
+        # 'auto' modunda sadece havuzdan seçer. 'trend' modunda haberlere de bakar.
+        if mode == "trend" and trending_topic and random.random() < 0.4:
+            specific_topic = trending_topic
+            topic_category = "trend"
+        else:
+            specific_topic = pool_topic
+            topic_category = pool_category
+        
         full_topic = specific_topic
 
         used_titles = self._get_used_titles()
