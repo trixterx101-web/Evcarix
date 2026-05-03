@@ -318,6 +318,47 @@ class AutoEditor:
         print(f"[Thumbnail] Kaydedildi: {output_path}")
         return output_path
 
+    def generate_thumbnail(self, title: str, output_path: str,
+                           channel_name="EVCARIX", slogan="NO HYPE. JUST NUMBERS.") -> str:
+        """generate_premium_thumbnail ile uyumlu basit alias (video_path olmadan)."""
+        W, H = 1280, 720
+        bg = Image.new("RGB", (W, H), (10, 10, 20))
+        draw = ImageDraw.Draw(bg)
+        font = self._load_font("bold", 60)
+        # Başlık satırlarına böl
+        words = title.split()
+        lines, cur = [], ""
+        for w in words:
+            test = (cur + " " + w).strip()
+            bbox = draw.textbbox((0, 0), test, font=font)
+            if bbox[2] - bbox[0] > W - 80:
+                if cur:
+                    lines.append(cur)
+                cur = w
+            else:
+                cur = test
+        if cur:
+            lines.append(cur)
+        y = H // 3
+        for line in lines:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            x = (W - (bbox[2] - bbox[0])) // 2
+            for dx in range(-3, 4):
+                for dy in range(-3, 4):
+                    draw.text((x + dx, y + dy), line, font=font, fill=(0, 0, 0))
+            draw.text((x, y), line, font=font, fill=(255, 235, 0))
+            y += font.size + 12
+        # Alt şerit
+        sf = self._load_font("regular", 32)
+        draw.rectangle([(0, H - 60), (W, H)], fill=(0, 0, 0))
+        cb = draw.textbbox((0, 0), channel_name, font=sf)
+        draw.text(((W - (cb[2] - cb[0])) // 2, H - 45),
+                  channel_name, font=sf, fill=(50, 255, 100))
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        bg.save(output_path, "PNG")
+        print(f"[Thumbnail] Kaydedildi: {output_path}")
+        return output_path
+
     def assemble_long_video(self, video_paths, audio_path, script_text,
                             output_filename, bg_music_path=None):
         """
