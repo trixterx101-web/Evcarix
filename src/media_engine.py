@@ -463,7 +463,8 @@ class MediaEngine:
                 if not hd_files:
                     continue
                 chosen = hd_files[0]
-                fname = f"pexels_{re.sub(r'[^\\w]','_',q)[:25]}_{page}_{i}.mp4"
+                q_slug = re.sub(r'[^\w]', '_', q)[:25]
+                fname = f"pexels_{q_slug}_{page}_{i}.mp4"
                 out = os.path.join(output_dir, fname)
                 dl = requests.get(chosen["link"], stream=True, timeout=60)
                 if dl.status_code == 200:
@@ -543,7 +544,8 @@ class MediaEngine:
                             break
                 if not chosen:
                     continue
-                fname = f"pixabay_{re.sub(r'[^\\w]','_',q)[:25]}_{page}_{i}.mp4"
+                q_slug = re.sub(r'[^\w]', '_', q)[:25]
+                fname = f"pixabay_{q_slug}_{page}_{i}.mp4"
                 out = os.path.join(output_dir, fname)
                 dl = requests.get(chosen["url"], stream=True, timeout=60)
                 if dl.status_code == 200:
