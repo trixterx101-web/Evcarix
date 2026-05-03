@@ -91,17 +91,18 @@ class MediaEngine:
     def __init__(self):
         self.pexels_api_key = os.getenv("PEXELS_API_KEY")
         self.pixabay_api_key = os.getenv("PIXABAY_API_KEY")
-        self.stability_api_key = os.getenv("STABILITY_API_KEY")
-        self.replicate_api_key = os.getenv("REPLICATE_API_TOKEN")
-        self.replicate_key = os.getenv("REPLICATE_API_KEY")
-        self.kling_access_key = os.getenv("KLING_ACCESS_KEY")
-        self.kling_secret_key = os.getenv("KLING_SECRET_KEY")
-        self.kling_key = os.getenv("KLING_API_KEY")  # yeni tek key format
+        self.stability_api_key = os.getenv("STABILITY_API_KEY")   # eski kod uyumu
+        self.replicate_api_key = os.getenv("REPLICATE_API_TOKEN")   # eski kod uyumu
+        self.kling_access_key  = os.getenv("KLING_ACCESS_KEY")    # eski kod uyumu
+        self.kling_secret_key  = os.getenv("KLING_SECRET_KEY")    # eski kod uyumu
+        self.stability_key     = self.stability_api_key            # yeni kod alias
+        self.replicate_key     = self.replicate_api_key            # yeni kod alias
+        self.fal_key           = os.getenv("FAL_KEY") or os.getenv("FAL_API_KEY")
+        self.hf_token          = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
+        self.runway_key        = os.getenv("RUNWAY_API_KEY")
+        self.luma_key          = os.getenv("LUMA_API_KEY")
+        self.kling_key         = os.getenv("KLING_API_KEY") or self.kling_access_key
         self.dashscope_api_key = os.getenv("DASHSCOPE_API_KEY")
-        self.hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
-        self.fal_key = os.getenv("FAL_KEY") or os.getenv("FAL_API_KEY")
-        self.runway_key = os.getenv("RUNWAY_API_KEY")
-        self.luma_key = os.getenv("LUMA_API_KEY")
         self.coverr_api_key = os.getenv("COVERR_API_KEY")
         self.voice_engine = VoiceEngine()
         
