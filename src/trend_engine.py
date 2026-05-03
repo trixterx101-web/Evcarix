@@ -84,6 +84,8 @@ class TrendEngine:
         self.mistral_key       = os.getenv("MISTRAL_API_KEY")
         self.cohere_key        = os.getenv("COHERE_API_KEY")
         self.together_key      = os.getenv("TOGETHER_API_KEY")
+        self.openai_key        = os.getenv("OPENAI_API_KEY")
+        self.ollama_url        = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
     def _is_relevant(self, title: str) -> bool:
         """Check if video title is relevant to EV data topics."""
@@ -400,6 +402,35 @@ Return ONLY this JSON (no markdown, no backticks):
                 continue
         return None
 
+    def _llm_openai(self, system: str, user: str) -> dict | None:
+        """ChatGPT (GPT-4o-mini) ile üret."""
+        if not self.openai_key:
+            return None
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.openai_key}",
+                "Content-Type": "application/json",
+            }
+            data = {
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user",   "content": user},
+                ],
+                "max_tokens": 600,
+                "temperature": 0.7,
+            }
+            r = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers, json=data, timeout=30
+            )
+            r.raise_for_status()
+            raw = r.json()["choices"][0]["message"]["content"].strip()
+            return self._parse_json_safe(raw)
+        except Exception as e:
+            print(f"[LLM] OpenAI hatası: {e}")
+            return None
+
     def _llm_openrouter(self, system: str, user: str) -> dict | None:
         """
         OpenRouter — 200+ model, ücretsiz tier mevcut.
@@ -684,6 +715,7 @@ Return ONLY this JSON (no markdown, no backticks):
 
         llm_pipeline = [
             ("Gemini 2.0 Flash",        lambda: self._llm_gemini(system, user)),
+            ("ChatGPT (GPT-4o-mini)",   lambda: self._llm_openai(system, user)),
             ("Groq Llama3.3-70B",       lambda: self._llm_groq(system, user, "llama-3.3-70b-versatile")),
             ("Groq Llama3.1-8B",        lambda: self._llm_groq(system, user, "llama-3.1-8b-instant")),
             ("OpenRouter Mistral-7B",   lambda: self._llm_openrouter(system, user)),

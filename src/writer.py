@@ -107,6 +107,8 @@ class CreativeWriter:
             os.getenv("GROQ_API_KEY_2"),
             os.getenv("GROQ_API_KEY_3"),
         ] if k]
+        self.openai_key      = os.getenv("OPENAI_API_KEY")
+        self.openrouter_key  = os.getenv("OPENAI_API_KEY") # Shared or fallback
         self.openrouter_key  = os.getenv("OPENROUTER_API_KEY")
         self.mistral_key     = os.getenv("MISTRAL_API_KEY")
         self.cohere_key      = os.getenv("COHERE_API_KEY")
@@ -143,6 +145,22 @@ class CreativeWriter:
                         print("[LLM] Gemini kota aşıldı →")
                     else:
                         print(f"[LLM] Gemini: {e}")
+
+        # 2. ChatGPT (OpenAI)
+        if self.openai_key:
+            try:
+                r = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {self.openai_key}", "Content-Type": "application/json"},
+                    json={"model": "gpt-4o-mini", "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}], "max_tokens": max_tokens, "temperature": 0.7},
+                    timeout=30,
+                )
+                text = r.json()["choices"][0]["message"]["content"].strip()
+                if text:
+                    print("[LLM] ✅ ChatGPT")
+                    return text
+            except Exception as e:
+                print(f"[LLM] ChatGPT: {e}")
 
         # 2. Groq 70B
         for key in self.groq_keys:
