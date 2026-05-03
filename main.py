@@ -122,38 +122,44 @@ class EvcarixOrchestrator:
             else:
                 print("⚠️ Lip-sync başarısız, normal moda geçiliyor...")
 
-        # ── 2. AI Video Klip Üretimi ──────────────────────────────────
-        print("\n[2/6] AI video klip üretimi (5-10 saniye)...")
-        ai_video_clips = self.media_engine.generate_ai_video_clips(
-            topic=topic,
+        # ── 2. OEM Press + Stok Video İndirme (öncelikli) ────────────────
+        print("\n[2/6] OEM press & stok videolar indiriliyor...")
+        import re
+        search_query = re.sub(r'[^\w\s]', '', topic).strip()
+        video_paths = self.media_engine.download_stock_videos(
+            query=search_query,
+            output_dir=f"assets/temp_videos/{ts}",
             count=6,
-            output_dir=f"assets/ai_videos/{ts}",
-            duration=8  # 8 saniye per klip
+            orientation="portrait",
+            category=plan.get("category", "general"),
+            plan=plan
         )
+        print(f"      ✅ {len(video_paths)} HD klip hazır (OEM + stok)")
 
-        # ── 3. Stok videolar (AI yetersizse) ───────────────────────
-        video_paths = []
-        if len(ai_video_clips) < 4:
-            print("\n[3/6] AI videolar yetersiz, stok videolar indiriliyor...")
-            import re
-            search_query = re.sub(r'[^\w\s]', '', topic).strip()
-            video_paths = self.media_engine.download_stock_videos(
-                query=search_query,
-                output_dir=f"assets/temp_videos/{ts}",
-                count=5,
-                orientation="portrait",
-                category=plan.get("category", "general"),
-                plan=plan
+        # ── 3. AI Video Klip Üretimi (stok yetersizse) ────────────────
+        ai_video_clips = []
+        if len(video_paths) < 4:
+            print(f"\n[3/6] Stok yetersiz ({len(video_paths)} klip) — AI video üretiliyor...")
+            ai_video_clips = self.media_engine.generate_ai_video_clips(
+                topic=topic,
+                count=6 - len(video_paths),
+                output_dir=f"assets/ai_videos/{ts}",
+                duration=8
             )
-        
-        # Combine AI clips and stock videos
-        all_video_clips = ai_video_clips + video_paths
+        else:
+            print(f"\n[3/6] Stok video yeterli — AI video üretimi atlandı.")
+
+        # Tüm klipleri birleştir (stok önce, AI sonra)
+        all_video_clips = video_paths + ai_video_clips
         random.shuffle(all_video_clips)
-        
+
+        # Son çare: Pollinations AI görüntü fallback
         ai_fallback_images = []
         if len(all_video_clips) < 2:
-            print("⚠️ Video kaynağı az — AI görüntü fallback devreye giriyor...")
-            ai_fallback_images = self.media_engine.generate_ai_fallback_images(topic, count=5, output_dir=f"assets/ai_fallback/{ts}")
+            print("⚠️ Video kaynağı yetersiz — Pollinations AI görüntü fallback devreye giriyor...")
+            ai_fallback_images = self.media_engine.generate_ai_fallback_images(
+                topic, count=5, output_dir=f"assets/ai_fallback/{ts}"
+            )
 
         # ── 4. Seslendirme ────────────────────────────────────────
         print("\n[4/6] Seslendirme yapılıyor...")
@@ -250,32 +256,35 @@ class EvcarixOrchestrator:
         print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
         print(f"      Süre  : {target_duration}s")
 
-        # ── 2. AI Video Klip Üretimi (daha fazla klip) ───────────
-        print(f"\n[2/7] AI video klip üretimi ({clip_count} klip, 6-10s)...")
-        ai_video_clips = self.media_engine.generate_ai_video_clips(
-            topic=topic,
+        # ── 2. OEM Press + Stok Video İndirme (öncelikli) ───────────
+        print(f"\n[2/7] OEM press & stok videolar indiriliyor ({clip_count} klip hedef)...")
+        import re
+        search_query = re.sub(r'[^\w\s]', '', topic).strip()
+        video_paths = self.media_engine.download_stock_videos(
+            query=search_query,
+            output_dir=f"assets/temp_videos/{ts}",
             count=clip_count,
-            output_dir=f"assets/ai_videos/{ts}",
-            duration=8
+            orientation="landscape",
+            category=plan.get("category", "general"),
+            plan=plan
         )
+        print(f"      ✅ {len(video_paths)} HD klip hazır (OEM + stok)")
 
-        # ── 3. Stok videolar (AI yetersizse) ─────────────────────
-        video_paths = []
-        if len(ai_video_clips) < clip_count:
-            print(f"\n[3/7] AI videolar yetersiz, stok videolar indiriliyor...")
-            import re
-            search_query = re.sub(r'[^\w\s]', '', topic).strip()
-            video_paths = self.media_engine.download_stock_videos(
-                query=search_query,
-                output_dir=f"assets/temp_videos/{ts}",
-                count=clip_count,
-                orientation="landscape",
-                category=plan.get("category", "general"),
-                plan=plan
+        # ── 3. AI Video Klip Üretimi (stok yetersizse) ───────────
+        ai_video_clips = []
+        if len(video_paths) < clip_count:
+            print(f"\n[3/7] Stok yetersiz ({len(video_paths)}/{clip_count}) — AI video üretiliyor...")
+            ai_video_clips = self.media_engine.generate_ai_video_clips(
+                topic=topic,
+                count=clip_count - len(video_paths),
+                output_dir=f"assets/ai_videos/{ts}",
+                duration=8
             )
-        
-        # Combine AI clips and stock videos
-        all_video_clips = ai_video_clips + video_paths
+        else:
+            print(f"\n[3/7] Stok video yeterli — AI video üretimi atlandı.")
+
+        # Tüm klipleri birleştir (stok önce, AI sonra)
+        all_video_clips = video_paths + ai_video_clips
         random.shuffle(all_video_clips)
         
         # ── 4. Seslendirme (long-form) ───────────────────────────

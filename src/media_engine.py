@@ -1,4 +1,3 @@
-```python
 """
 Evcarix MediaEngine
 HD Video Öncelik: OEM Basın Kiti → Pexels → Pixabay → fal.ai → HF → Runway → Luma → Kling → Stability → Replicate → Pollinations
@@ -563,24 +562,46 @@ class MediaEngine:
     #  ANA İNDİRME — TÜM KAYNAKLAR BİRLEŞİK
     # ══════════════════════════════════════════════════════════════
     def download_stock_videos(self, query, output_dir="assets/temp_videos",
-                              count=6, orientation="portrait", category=None):
+                              count=6, orientation="portrait", category=None,
+                              plan=None):
         """
         HD video indirme — öncelik sırası:
-        1. OEM Marka Basın Kiti (HD, telifsiz)
-        2. Pexels HD
-        3. Pixabay HD
-        4. Tekrar Pexels (farklı sorgu)
+        1. OEM Marka Basın Kiti — Gerçek press/newsroom scraper (HD, telifsiz)
+        2. OEM Static — Hardcoded brand press kit URL'leri (backup)
+        3. Pexels HD (API key gerekli)
+        4. Pixabay HD (API key gerekli)
+        5. FreeVideoSources — Coverr, Videvo, Mixkit, Dareful (ücretsiz, key yok)
+        6. Pexels fallback (farklı sorgu)
         """
         os.makedirs(output_dir, exist_ok=True)
         all_paths = []
 
-        # 1. OEM Marka Basın Kiti — HD, telifsiz
-        oem = self._download_from_oem(query, output_dir, min(count, 4), category)
-        oem_fresh = self._filter_used_clips(oem)
-        all_paths += oem_fresh
-        print(f"[MediaEngine] OEM HD: {len(oem_fresh)} taze klip")
+        # 1. OEM Marka Basın Kiti — Gerçek press/newsroom scraper
+        try:
+            from src.oem_scraper import OEMScraper
+            oem_scraper = OEMScraper()
+            video_type = "short" if orientation == "portrait" else "long"
+            category_id = category or ""
+            oem_clips = oem_scraper.get_clips(
+                topic=query,
+                category_id=category_id,
+                count=min(count, 4),
+                video_type=video_type,
+            )
+            oem_fresh = self._filter_used_clips(oem_clips)
+            all_paths += oem_fresh
+            print(f"[MediaEngine] OEM Press HD: {len(oem_fresh)} taze klip")
+        except Exception as e:
+            print(f"[MediaEngine] OEM Scraper hata: {e}")
 
-        # 2. Pexels HD
+        # 2. OEM'den yeterli yoksa hardcoded OEM brand videos ile tamamla
+        if len(all_paths) < min(count, 2):
+            oem_static = self._download_from_oem(query, output_dir, min(count - len(all_paths), 3), category)
+            oem_static_fresh = self._filter_used_clips(oem_static)
+            all_paths += [p for p in oem_static_fresh if p not in all_paths]
+            print(f"[MediaEngine] OEM Static HD: {len(oem_static_fresh)} taze klip")
+
+        # 3. Pexels HD
         if len(all_paths) < count:
             needed = count - len(all_paths)
             pex = self._download_from_pexels(query, output_dir,
@@ -589,7 +610,7 @@ class MediaEngine:
             all_paths += [p for p in pex_fresh if p not in all_paths]
             print(f"[MediaEngine] Pexels HD: {len(pex_fresh)} taze klip")
 
-        # 3. Pixabay HD
+        # 4. Pixabay HD
         if len(all_paths) < count:
             needed = count - len(all_paths)
             pix_or = "horizontal" if orientation == "portrait" else orientation
@@ -599,7 +620,24 @@ class MediaEngine:
             all_paths += [p for p in pix_fresh if p not in all_paths]
             print(f"[MediaEngine] Pixabay HD: {len(pix_fresh)} taze klip")
 
-        # 4. Pexels tekrar (farklı sorgu)
+        # 5. FreeVideoSources — Ücretsiz, key gerektirmeyen kaynaklar
+        if len(all_paths) < count:
+            try:
+                from src.free_video_sources import FreeVideoSources
+                free_src = FreeVideoSources()
+                video_type = "short" if orientation == "portrait" else "long"
+                free_clips = free_src.download_clips(
+                    query=query,
+                    count=count - len(all_paths) + 2,
+                    video_type=video_type,
+                )
+                free_fresh = self._filter_used_clips(free_clips)
+                all_paths += [p for p in free_fresh if p not in all_paths]
+                print(f"[MediaEngine] FreeVideo HD: {len(free_fresh)} taze klip")
+            except Exception as e:
+                print(f"[MediaEngine] FreeVideoSources hata: {e}")
+
+        # 6. Pexels tekrar (farklı fallback sorgu)
         if len(all_paths) < max(2, count // 2):
             fallback_queries = [
                 "electric car 4k cinematic luxury",
