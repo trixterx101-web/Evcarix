@@ -63,14 +63,16 @@ class EvcarixBrain:
         ],
         # ── 2. Menzil & Verimlilik Testleri (8 konu) ─────────────────────
         "range_tests": [
+            "Tesla Model Y vs Hyundai IONIQ 5 winter range loss data Norway",
+            "BMW iX vs Mercedes EQS highway efficiency test 70mph",
+            "BYD Seal vs Tesla Model 3 real world range comparison China",
+            "Lucid Air vs Tesla Model S Plaid efficiency kWh per 100km",
+            "Rivian R1T vs Ford F-150 Lightning towing range impact data",
             "Winter range loss complete data set Norway vs Canada vs US",
             "Summer vs winter range comparison same car same route test",
             "Highway vs city range difference 70mph vs 25mph real data",
-            "How much does AC climate reduce EV range percentage data",
             "Speed and range relationship curve analysis 30 to 80mph",
             "EV consumption breakdown kWh per 100km real driving data",
-            "Regenerative braking how much range does it actually add percent",
-            "Vehicle weight and range relationship kg per km data",
         ],
         # ── 3. Şarj Teknolojisi (8 konu) ────────────────────────────────
         "charging": [
@@ -96,25 +98,36 @@ class EvcarixBrain:
         ],
         # ── 5. Araç Karşılaştırmaları (7 konu) ──────────────────────────
         "comparisons": [
+            "Tesla Model 3 Highland vs Xiaomi SU7 specs and tech data",
+            "Porsche Taycan vs Audi e-tron GT platform sharing analysis",
+            "Volkswagen ID.4 vs Kia EV6 family SUV comparison data",
+            "NIO ET7 vs BMW i7 luxury electric sedan tech comparison",
+            "Volvo EX30 vs Smart #1 platform and efficiency comparison",
             "Same segment EV comparison data only specs vs real world",
             "Platform architecture differences what actually changes EV",
-            "70 EVs big vs small index analysis price range efficiency",
-            "Motor type single axle vs dual axle torque data comparison",
-            "Budget EV comparison under 30000 dollars Europe and USA",
-            "Family car EV which is better space safety cost data",
-            "Global EV buying guide 2026 best value by region data",
         ],
         # ── 6. Pazar & Sektör Verileri (7 konu) ─────────────────────────
         "market_data": [
-            "EV adoption statistics by country USA Europe China data",
-            "Brand market share change 2024 vs 2025 global data",
-            "Chinese EV brands entering Europe sales volume data",
-            "Why did EV sales slow down analysis supply demand data",
-            "What happens if EV incentives end USA Europe China data",
-            "EV price deflation trend analysis cost per kWh data",
-            "Used EV market size and opportunity pricing data",
+            "BYD vs Tesla global sales data 2026 Q1 market share analysis",
+            "European EV market trends VW Group vs Stellantis market share",
+            "Chinese EV brand expansion in Europe NIO Xpeng MG data",
+            "US EV adoption rates by state California vs Texas numbers",
+            "Global battery production capacity CATL vs BYD vs LG Energy",
+            "Global EV market trends year over year percentage growth",
+            "Top 10 selling electric vehicles global sales data set",
         ],
-        # ── 7. Altyapı & Şebeke (7 konu) ────────────────────────────────
+        # ── 7. Marka İncelemeleri & Teknoloji (8 konu) ──────────────────
+        "trend": [
+            "Tesla Cybertruck production ramp up and delivery data",
+            "Xiaomi SU7 ultra performance specs and battery tech",
+            "Rivian R2 platform cost reduction strategy analysis",
+            "Toyota Solid State battery breakthrough 2027 roadmap",
+            "BMW Neue Klasse platform architecture and efficiency",
+            "BYD Blade Battery safety vs NMC technology deep dive",
+            "Mercedes EQG electric G-Wagon quad motor tech data",
+            "Porsche Macan Electric vs Tesla Model Y Performance specs",
+        ],
+        # ── 8. Altyapı & Şebeke (7 konu) ────────────────────────────────
         "infrastructure": [
             "Charging station reliability test results uptime data",
             "Europe charging infrastructure map gaps and coverage data",
@@ -124,7 +137,7 @@ class EvcarixBrain:
             "Renewable energy plus EV combination analysis carbon data",
             "Smart charging V1G V2G does it really matter cost data",
         ],
-        # ── 8. Eğitim & Teknik Açıklamalar (7 konu) ────────────────────────
+        # ── 9. Eğitim & Teknik Açıklamalar (7 konu) ────────────────────────
         "education": [
             "Heat pump how does it work visual explanation efficiency data",
             "PTC heater vs heat pump full comparison range impact data",
@@ -134,7 +147,7 @@ class EvcarixBrain:
             "Why does charging curve drop battery chemistry explained",
             "SOH State of Health what is it how measured accuracy data",
         ],
-        # ── 9. İnteraktif Araçlar & Hesaplayıcılar (7 konu) ────────────────
+        # ── 10. İnteraktif Araçlar & Hesaplayıcılar (7 konu) ────────────────
         "interactive_tools": [
             "Range calculator by temperature interactive data visualization",
             "EV vs diesel cost comparator total 5 year calculation tool",

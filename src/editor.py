@@ -446,9 +446,8 @@ class AutoEditor:
 
         base_video = base_video.set_audio(audio)
 
-        # Title card (5 saniye) - basit text clip
+        # Title card (5 saniye)
         try:
-            from moviepy.video.fx.all import crop
             title_clip = TextClip(
                 title,
                 fontsize=70,
@@ -457,13 +456,12 @@ class AutoEditor:
                 align="center",
                 size=(1920, 1080)
             ).set_position("center").set_duration(5)
-            
             bg_clip = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
             title_card = CompositeVideoClip([bg_clip, title_clip])
         except Exception as e:
             print(f"[Editor] Title card hatası: {e}, atlanıyor...")
             title_card = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
-        
+
         # Outro card (5 saniye)
         try:
             outro_text = "Subscribe for more EV data — Evcarix"
@@ -475,19 +473,18 @@ class AutoEditor:
                 align="center",
                 size=(1920, 1080)
             ).set_position("center").set_duration(5)
-            
             outro_bg = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
             outro_card = CompositeVideoClip([outro_bg, outro_clip])
         except Exception as e:
             print(f"[Editor] Outro card hatası: {e}, atlanıyor...")
             outro_card = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
-        
-        # Video'yu başla (title card'dan sonra)
-        base_video = base_video.set_start(5)
-        
-        # Tüm katmanları birleştir
-        all_layers = [title_card, base_video, outro_card]
-        final_video = CompositeVideoClip(all_layers, size=(1920, 1080))
+
+        # FIX: concatenate_videoclips ile sıralı birleştirme (CompositeVideoClip DEĞİL)
+        # CompositeVideoClip klipler üst üste koyar (overlay); sıralı için concatenate kullanılmalı
+        final_video = concatenate_videoclips(
+            [title_card, base_video, outro_card],
+            method="compose"
+        )
 
         # Video export
         output_full_path = os.path.join(self.output_dir, output_path)
@@ -497,5 +494,7 @@ class AutoEditor:
             audio_codec="aac", preset="medium",
             ffmpeg_params=["-ac", "2"]
         )
+        audio.close()
+        final_video.close()
         print(f"[Editor] Long-form video kaydedildi: {output_full_path}")
         return output_full_path

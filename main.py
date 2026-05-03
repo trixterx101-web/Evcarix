@@ -361,9 +361,27 @@ class EvcarixOrchestrator:
 if __name__ == "__main__":
     orchestrator = EvcarixOrchestrator()
     video_type = os.environ.get("VIDEO_TYPE", "short").strip().lower()
-    
-    # Routing: Video type'a göre workflow seç
-    if video_type == "long":
-        asyncio.run(orchestrator.run_weekly_long_video_workflow())
-    else:
-        asyncio.run(orchestrator.run_daily_shorts_workflow())
+    upload_slot = os.environ.get("UPLOAD_SLOT", "evening").strip()
+
+    # Routing: VIDEO_TYPE=long VEYA UPLOAD_SLOT=SUNDAY_LONG → haftalık uzun video
+    is_long = video_type == "long" or upload_slot == "SUNDAY_LONG"
+
+    try:
+        if is_long:
+            asyncio.run(orchestrator.run_weekly_long_video_workflow())
+        else:
+            asyncio.run(orchestrator.run_daily_shorts_workflow())
+    finally:
+        # MoviePy'nin kök dizinde bıraktığı geçici dosyaları temizle
+        import glob
+        temp_patterns = ["*TEMP_MPY_wvf_snd.mp4", "*TEMP_MPY_wvf_snd.wav"]
+        cleaned = 0
+        for pattern in temp_patterns:
+            for f in glob.glob(pattern):
+                try:
+                    os.remove(f)
+                    cleaned += 1
+                except Exception:
+                    pass
+        if cleaned:
+            print(f"[Cleanup] 🗑️ {cleaned} geçici MoviePy dosyası silindi.")

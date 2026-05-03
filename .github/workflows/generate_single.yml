@@ -57,3 +57,4 @@ jobs:
           else
             git commit -m "🤖 Generated topic #${{ github.event.inputs.topic_id }} [$(date -u +%Y-%m-%d)]"
             git push
+          fi

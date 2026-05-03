@@ -62,6 +62,20 @@ jobs:
 
       # ── 5. İnsan gibi rastgele bekleme (0-5 dakika) ─────────────
       #     YouTube algoritmasına makine gibi görünmemek için
+      # ── 5.1 İçerik geçmişini cache'den yükle ─────────────────────
+      #     Run'lar arası konu/başlık tekrarını önlemek için
+      - name: Restore Content History Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            content_history.json
+            used_topics.json
+          key: evcarix-content-history-${{ github.ref_name }}
+          restore-keys: |
+            evcarix-content-history-
+
+      # ── 5.2 İnsan gibi rastgele bekleme (0-5 dakika) ─────────────
+      #     YouTube algoritmasına makine gibi görünmemek için
       - name: Human-like Random Delay
         run: |
           DELAY=$((RANDOM % 300))
@@ -91,21 +105,38 @@ jobs:
           FAL_KEY:                   ${{ secrets.FAL_KEY }}
           # Mode: trend (YouTube'tan ilham) veya auto (sistem konusu)
           # cron 07:00 UTC -> trend, cron 13:00 UTC -> auto, cron 08:00 UTC Sunday -> long video
+          # FIX: Pazar cron'u (0 8 * * 0) için VIDEO_TYPE=long, UPLOAD_SLOT=SUNDAY_LONG
+          # Sabah cron'u (0 7 * * *) için CONTENT_MODE=trend
+          # Öğleden sonra cron'u (0 13 * * *) için CONTENT_MODE=auto
           CONTENT_MODE: >-
-            ${{ github.event.inputs.content_mode || 'auto' }}
-          # Slot bilgisi
+            ${{ github.event.inputs.content_mode
+              || (github.event.schedule == '0 7 * * *' && 'trend')
+              || 'auto' }}
           UPLOAD_SLOT: >-
-            ${{ github.event.inputs.upload_slot || 'evening' }}
-          # Video type: short (günlük) veya long (haftalık)
+            ${{ github.event.inputs.upload_slot
+              || (github.event.schedule == '0 8 * * 0' && 'SUNDAY_LONG')
+              || 'evening' }}
           VIDEO_TYPE: >-
-            ${{ github.event.inputs.video_type || 'short' }}
+            ${{ github.event.inputs.video_type
+              || (github.event.schedule == '0 8 * * 0' && 'long')
+              || 'short' }}
         run: |
           # Kimlik dosyalarını secrets'den oluştur
           python src/setup_secrets.py
           # Üretim & yükleme
           python main.py
 
-      # ── 7. Çıktıları artifact olarak sakla ───────────────────────
+      # ── 7. İçerik geçmişini cache'e kaydet (başarılı run sonrası) ──
+      - name: Save Content History Cache
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            content_history.json
+            used_topics.json
+          key: evcarix-content-history-${{ github.ref_name }}
+
+      # ── 8. Çıktıları artifact olarak sakla ───────────────────────
       - name: Save Output Artifacts
         if: always()
         uses: actions/upload-artifact@v4

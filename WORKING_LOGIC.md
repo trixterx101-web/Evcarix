@@ -385,6 +385,34 @@ Evcarix, tamamen otomatik bir EV içerik üretim sistemidir. YouTube trend'inden
 
 ---
 
+## 🔧 18. Yapılan Düzeltmeler & Güncellemeler (v2.1)
+
+### 18.1 Kritik Bug Düzeltmeleri
+
+| Dosya | Sorun | Düzeltme |
+|-------|-------|-----------|
+| `src/editor.py` | `assemble_weekly_long_video()` `CompositeVideoClip` kullanıyordu (klipler üst üste geliyordu) | `concatenate_videoclips` ile değiştirildi, `set_start(5)` kaldırıldı, `audio.close()` / `final_video.close()` eklendi |
+| `.github/workflows/daily_video.yml` | Pazar cron'u (`0 8 * * 0`) `VIDEO_TYPE=short` ve `UPLOAD_SLOT=evening` default'larına düşüyordu | `github.event.schedule` ile cron tipi tespit edilerek doğru değerler set edildi |
+| `main.py` | Sadece `VIDEO_TYPE` kontrol ediliyordu, `UPLOAD_SLOT=SUNDAY_LONG` göz ardı ediliyordu | Her ikisi de kontrol ediliyor (`is_long` flag) |
+| `.github/workflows/generate_single.yml` | Shell `if` bloğunun `fi` kapanması eksikti | `fi` eklendi |
+
+### 18.2 İyileştirmeler
+
+| Dosya | İyileştirme |
+|-------|-------------|
+| `requirements.txt` | `anthropic`, `openai`, `cohere` paketleri eklendi (writer.py fallback zinciri için gerekli) |
+| `main.py` | Run sonunda `*TEMP_MPY_wvf_snd.mp4/wav` geçici dosyalarını otomatik temizleyen `finally` bloğu eklendi |
+| `daily_video.yml` | `actions/cache` ile `content_history.json` ve `used_topics.json` run'lar arası persist ediliyor (konu tekrarı önleme artık gerçekten çalışıyor) |
+| `src/brain.py` | Kategori numaraları düzeltildi (6'dan başlayan çift numaralandırma giderildi) |
+
+### 18.3 Doğrulanan Entegrasyonlar
+
+- `media_engine.py` → `voice_engine.py` entegrasyonu **doğru** (`generate_voiceover()` wrapper çalışıyor)
+- `uploader.py` OAuth2 scope'ları **doğru** (`youtube.force-ssl` thumbnail için var)
+- `.gitignore` güvenlik kontrolleri **doğru** (token.json, client_secret.json, .env hepsi ignore edilmiş)
+- `generate_voiceover()` async method: `media_engine.py:482` → `voice_engine.py:14` → `edge-tts`
+
+
 ## 📺 18. Haftalık Uzun Video (Weekly Long-Form)
 
 ### 18.1 Schedule
