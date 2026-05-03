@@ -775,7 +775,9 @@ class MediaEngine:
                 files = sorted(vd.get("video_files", []),
                                key=lambda x: x.get("width", 0), reverse=True)
                 # HD tercih: en az 1280px genişlik
-                hd_files = [f for f in files if f.get("width", 0) >= 1280]
+                hd_files = [f for f in files if f.get("width", 0) >= 1920]
+                if not hd_files:
+                    hd_files = [f for f in files if f.get("width", 0) >= 1280]
                 if not hd_files:
                     hd_files = files
                 if not hd_files:
@@ -886,25 +888,44 @@ class MediaEngine:
                               plan=None):
         """
         HD video indirme — öncelik sırası:
-        1. OEM Marka Basın Kiti — Gerçek press/newsroom scraper (HD, telifsiz)
-        2. OEM Static — Hardcoded brand press kit URL'leri (backup)
-        3. Pexels HD (API key gerekli)
-        4. Pixabay HD (API key gerekli)
-        5. FreeVideoSources — Coverr, Videvo, Mixkit, Dareful (ücretsiz, key yok)
-        6. Pexels fallback (farklı sorgu)
+        1. OEM Scraper   — 20+ marka press/newsroom sayfaları (telifsiz, editoryal)
+        2. OEM Static    — Tesla CDN sabit URL'leri (yedek)
+        3. Pexels HD     — Marka bazlı sorgular (API key gerekli)
+        4. Pixabay HD    — Kategori bazlı sorgular (API key gerekli)
+        5. FreeVideo     — Coverr, Videvo, Mixkit, Dareful (ücretsiz, key yok)
+        6. Pexels extra  — Farklı genel fallback sorgusu
+        7. AI Video      — fal.ai → HuggingFace → Runway → Luma → Kling → Stability → Replicate
+        8. AI Görüntü    — Pollinations.ai → ffmpeg → video klip (kesin son çare)
         """
         os.makedirs(output_dir, exist_ok=True)
         all_paths = []
 
-        # 1. OEM Static — Tesla CDN (doğrulanmış çalışan URL'ler)
-        # NOT: OEM Scraper (HTML scraping) kaldırıldı — press siteleri JS render
-        # kullanıyor, raw HTML'den .mp4 bulunamıyor ve 20+ siteye boşa zaman harcanıyor.
-        oem_static = self._download_from_oem(query, output_dir, min(count, 3), category)
-        oem_static_fresh = self._filter_used_clips(oem_static)
-        all_paths += oem_static_fresh
-        print(f"[MediaEngine] OEM Tesla CDN: {len(oem_static_fresh)} taze klip")
+        # ── ADIM 1: OEM Scraper — 20+ marka press/newsroom ───────────────────────
+        try:
+            from src.oem_scraper import OEMScraper
+            oem_scraper = OEMScraper()
+            _vtype = "short" if orientation == "portrait" else "long"
+            oem_scraped = oem_scraper.get_clips(
+                topic=query,
+                category_id=category or "",
+                count=min(count, 3),
+                video_type=_vtype,
+            )
+            oem_scraped_fresh = self._filter_used_clips(oem_scraped)
+            all_paths += oem_scraped_fresh
+            print(f"[MediaEngine] OEM Scraper (press/newsroom): {len(oem_scraped_fresh)} taze klip")
+        except Exception as e:
+            print(f"[MediaEngine] OEM Scraper hata (atlandı): {e}")
 
-        # 2. Pexels HD (birincil stok video kaynağı)
+        # ── ADIM 2: OEM Static — Tesla CDN (doğrulanmış URL'ler) ─────────────────
+        if len(all_paths) < count:
+            needed = min(count - len(all_paths), 3)
+            oem_static = self._download_from_oem(query, output_dir, needed, category)
+            oem_static_fresh = self._filter_used_clips(oem_static)
+            all_paths += oem_static_fresh
+            print(f"[MediaEngine] OEM Tesla CDN: {len(oem_static_fresh)} taze klip")
+
+        # ── ADIM 3: Pexels HD (marka bazlı sorgular) ─────────────────────────────
         if len(all_paths) < count:
             needed = count - len(all_paths)
             pex = self._download_from_pexels(query, output_dir,
@@ -913,7 +934,7 @@ class MediaEngine:
             all_paths += [p for p in pex_fresh if p not in all_paths]
             print(f"[MediaEngine] Pexels HD: {len(pex_fresh)} taze klip")
 
-        # 4. Pixabay HD
+        # ── ADIM 4: Pixabay HD ────────────────────────────────────────────────────
         if len(all_paths) < count:
             needed = count - len(all_paths)
             pix_or = "horizontal" if orientation == "portrait" else orientation
@@ -923,16 +944,16 @@ class MediaEngine:
             all_paths += [p for p in pix_fresh if p not in all_paths]
             print(f"[MediaEngine] Pixabay HD: {len(pix_fresh)} taze klip")
 
-        # 5. FreeVideoSources — Ücretsiz, key gerektirmeyen kaynaklar
+        # ── ADIM 5: FreeVideoSources — key gerektirmeyen kaynaklar ───────────────
         if len(all_paths) < count:
             try:
                 from src.free_video_sources import FreeVideoSources
                 free_src = FreeVideoSources()
-                video_type = "short" if orientation == "portrait" else "long"
+                _fvtype = "short" if orientation == "portrait" else "long"
                 free_clips = free_src.download_clips(
                     query=query,
                     count=count - len(all_paths) + 2,
-                    video_type=video_type,
+                    video_type=_fvtype,
                 )
                 free_fresh = self._filter_used_clips(free_clips)
                 all_paths += [p for p in free_fresh if p not in all_paths]
@@ -940,7 +961,7 @@ class MediaEngine:
             except Exception as e:
                 print(f"[MediaEngine] FreeVideoSources hata: {e}")
 
-        # 6. Pexels tekrar (farklı fallback sorgu)
+        # ── ADIM 6: Pexels fallback (farklı genel sorgu) ──────────────────────────
         if len(all_paths) < max(2, count // 2):
             fallback_queries = [
                 "electric car 4k cinematic luxury",
@@ -955,15 +976,62 @@ class MediaEngine:
             )
             extra_fresh = self._filter_used_clips(extra)
             all_paths += [p for p in extra_fresh if p not in all_paths]
-            print(f"[MediaEngine] Pexels ek: {len(extra_fresh)} klip")
+            print(f"[MediaEngine] Pexels ek fallback: {len(extra_fresh)} klip")
 
-        # Tüm klipler kullanılmışsa hash'i temizle ve yeniden başla
+        # ── ADIM 7: AI Video Üretimi ──────────────────────────────────────────────
+        if len(all_paths) < max(2, count // 2):
+            print(f"[MediaEngine] ⚡ Stok video yetersiz ({len(all_paths)}/{count}), AI video üretimine geçiliyor...")
+            ai_video_dir = os.path.join(output_dir, "ai_generated")
+            needed = max(1, count - len(all_paths))
+            try:
+                ai_clips = self.generate_ai_video_clips(
+                    topic=query,
+                    count=needed + 1,
+                    output_dir=ai_video_dir,
+                    duration=5,
+                )
+                ai_fresh = self._filter_used_clips(ai_clips)
+                all_paths += [p for p in ai_fresh if p not in all_paths]
+                print(f"[MediaEngine] AI Video: {len(ai_fresh)} klip")
+            except Exception as e:
+                print(f"[MediaEngine] AI Video üretim hatası: {e}")
+
+        # ── ADIM 8: AI Görüntü Fallback — Pollinations.ai (kesin son çare) ────────
         if not all_paths:
-            print("[MediaEngine] ⚠️ Tüm klipler kullanılmış, hash temizleniyor...")
+            print("[MediaEngine] ⚠️ Tüm video kaynakları başarısız, AI görüntü fallback devreye giriyor...")
             self._used_clips.clear()
             self._save_used_clips()
-            return self.download_stock_videos(query, output_dir, count,
-                                              orientation, category)
+            ai_img_dir = os.path.join(output_dir, "ai_fallback")
+            ai_images = self.generate_ai_fallback_images(
+                topic=query,
+                count=count,
+                output_dir=ai_img_dir,
+            )
+            scale = "1080:1920" if orientation == "portrait" else "1920:1080"
+            converted = []
+            for img_path in ai_images:
+                video_path = img_path.rsplit(".", 1)[0] + "_clip.mp4"
+                try:
+                    import subprocess
+                    cmd = [
+                        "ffmpeg", "-y", "-loop", "1",
+                        "-i", img_path,
+                        "-c:v", "libx264", "-t", "5",
+                        "-pix_fmt", "yuv420p",
+                        "-vf", f"scale={scale},setsar=1",
+                        "-r", "30", video_path,
+                    ]
+                    result = subprocess.run(cmd, capture_output=True, timeout=60)
+                    if result.returncode == 0 and os.path.exists(video_path) and os.path.getsize(video_path) > 50_000:
+                        converted.append(video_path)
+                        print(f"[MediaEngine] ✅ AI görüntü → klip: {os.path.basename(video_path)}")
+                except Exception as e:
+                    print(f"[MediaEngine] Görüntü→video dönüşüm hatası: {e}")
+            all_paths += converted
+
+        if not all_paths:
+            print("[MediaEngine] ❌ UYARI: Hiç klip bulunamadı!")
+            return []
 
         random.shuffle(all_paths)
         final = all_paths[:count]
