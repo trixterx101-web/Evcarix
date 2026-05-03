@@ -343,10 +343,10 @@ Rules:
 - Do NOT copy their words or structure
 - Data-driven angle: real stats, percentages, kWh numbers
 - Length: 35-45 seconds spoken (80-100 words)
-- Start with a shocking stat or surprising fact
-- End with: "Subscribe to Evcarix for real EV data."
-- English only, USA/Europe/China examples only
-- Never mention Turkey or Turkish brands
+- Start with: "Welcome to Ev-CAR-ix." then a shocking stat.
+- End with: "Subscribe to Ev-CAR-ix for real EV data."
+- Channel Name: ALWAYS use "Ev-CAR-ix" for pronunciation.
+- English only, USA/Europe/China examples only.
 
 Return ONLY this JSON (no markdown, no backticks):
 {{"topic":"one line topic","title":"YouTube title under 70 chars with specific number","script":"full script text","tags":["tag1","tag2","tag3","tag4","tag5","tag6","tag7"],"hook":"first sentence only","category":"battery_science|range_tests|charging|comparisons|market_data|education"}}"""
