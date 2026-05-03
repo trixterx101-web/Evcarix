@@ -361,6 +361,51 @@ GLOBAL_BRAND_DB = {
         "priority": 3,
     },
 
+    # ── İTALYAN MARKALAR ────────────────────────────────────────────
+    "lamborghini": {
+        "keywords": ["lamborghini", "lanzador", "lamborghini ev",
+                     "lamborghini electric", "lamborghini hybrid", "lamborghini prototype"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Lamborghini supercar luxury sports car exterior cinematic 4k",
+            "exotic supercar futuristic electric hypercar",
+            "Italian supercar performance luxury design HD",
+            "high performance sports car aerodynamic design",
+        ],
+        "priority": 2,
+    },
+    "ferrari": {
+        "keywords": ["ferrari", "ferrari sf90", "ferrari electric", "ferrari hybrid",
+                     "ferrari purosangue"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Ferrari luxury sports car exterior cinematic 4k",
+            "Ferrari SF90 hybrid supercar performance",
+            "Italian luxury supercar red exterior driving HD",
+        ],
+        "priority": 2,
+    },
+    "maserati": {
+        "keywords": ["maserati", "maserati grecale", "maserati granturismo",
+                     "maserati folgore", "maserati electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Maserati luxury electric car exterior cinematic 4k",
+            "Maserati GranTurismo Folgore electric performance",
+            "Italian luxury electric vehicle premium design",
+        ],
+        "priority": 3,
+    },
+    "alfa_romeo": {
+        "keywords": ["alfa romeo", "alfa milan", "alfa junior", "alfa romeo electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Alfa Romeo electric car sporty Italian design 4k",
+            "Alfa Romeo Milano electric compact SUV",
+        ],
+        "priority": 3,
+    },
+
     # ── VİETNAM MARKALARI ────────────────────────────────────────────
     "vinfast": {
         "keywords": ["vinfast", "vf8", "vf9", "vf6", "vinfast electric"],
@@ -579,7 +624,11 @@ class MediaEngine:
 
     def _download_from_oem(self, topic: str, output_dir: str,
                             count: int, category: str = None) -> list:
-        """OEM marka basın kitlerinden HD video indirir."""
+        """
+        OEM marka basın kitlerinden HD video indirir.
+        Önce CDN URL'leri dener; CDN listesi boşsa marka bazlı Pexels sorgusuna geçer.
+        Bu sayede tüm 50+ marka için video indirilebilir, sadece Tesla değil.
+        """
         os.makedirs(output_dir, exist_ok=True)
         paths = []
         brands = self._detect_brands_in_topic(topic, category)
@@ -588,10 +637,11 @@ class MediaEngine:
         for brand in brands:
             if len(paths) >= count:
                 break
-            brand_data = OEM_BRAND_VIDEOS.get(brand, {})
-            video_urls = brand_data.get("videos", [])
+            brand_data = GLOBAL_BRAND_DB.get(brand, {})
+            video_urls = list(brand_data.get("cdn_videos", []))  # CDN URL listesi
             random.shuffle(video_urls)
 
+            cdn_success = False
             for url in video_urls:
                 if len(paths) >= count:
                     break
@@ -602,6 +652,7 @@ class MediaEngine:
                 if os.path.exists(out) and os.path.getsize(out) > 200_000:
                     if self._get_clip_hash(out) not in self._used_clips:
                         paths.append(out)
+                        cdn_success = True
                         print(f"[OEM] ♻️  Önbellekten: {fname}")
                         continue
 
@@ -628,6 +679,7 @@ class MediaEngine:
                         size = os.path.getsize(out)
                         if size > 200_000:  # min 200KB = gerçek video
                             paths.append(out)
+                            cdn_success = True
                             print(f"[OEM] ✅ {fname} ({size//1024//1024}MB)")
                         else:
                             os.remove(out)
@@ -636,6 +688,26 @@ class MediaEngine:
                         print(f"[OEM] HTTP {r.status_code} / content-type={ct}: {brand}")
                 except Exception as e:
                     print(f"[OEM] {brand} hata: {e}")
+
+            # ── CDN yoksa veya başarısızsa: Pexels marka sorgusu ────────────────
+            # Bu sayede tüm markalar (BMW, Hyundai, Lamborghini vb.) için video gelir
+            if not cdn_success and len(paths) < count:
+                brand_queries = brand_data.get("pexels_queries", [])
+                if brand_queries and self.pexels_api_key:
+                    q = random.choice(brand_queries)
+                    print(f"[OEM] {brand.upper()} CDN yok → Pexels fallback: '{q[:60]}'")
+                    try:
+                        pex = self._download_from_pexels(
+                            q, output_dir, 1, "landscape", category
+                        )
+                        pex_fresh = [p for p in pex
+                                     if p and os.path.exists(p)
+                                     and self._get_clip_hash(p) not in self._used_clips]
+                        if pex_fresh:
+                            paths.extend(pex_fresh[:1])
+                            print(f"[OEM] ✅ {brand.upper()} Pexels'tan 1 klip alındı")
+                    except Exception as e:
+                        print(f"[OEM] {brand} Pexels fallback hata: {e}")
 
         print(f"[OEM] {len(paths)} HD marka videosu hazır")
         return paths
