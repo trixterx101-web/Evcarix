@@ -2,6 +2,7 @@ import asyncio
 import os
 import random
 import datetime
+import math
 from dotenv import load_dotenv
 
 from src.brain import EvcarixBrain
@@ -9,6 +10,7 @@ from src.media_engine import MediaEngine
 from src.editor import AutoEditor
 from src.uploader import YouTubeUploader
 from src.lip_sync_generator import LipSyncGenerator
+import config
 
 load_dotenv()
 
@@ -45,8 +47,13 @@ class EvcarixOrchestrator:
         slot = os.getenv("UPLOAD_SLOT", "evening")  # evening | night
         ts = now.strftime("%Y%m%d_%H%M%S")
 
+        # Hedef süre: 25-50 saniye (config'den al)
+        target_duration = random.randint(config.SHORT_VIDEO_DURATION_MIN, config.SHORT_VIDEO_DURATION_MAX)
+        clip_count = max(4, math.ceil(target_duration / 8))  # Her klip ~8 saniye, min 4 klip
+
         print(f"\n{'='*60}")
         print(f"  Evcarix Auto-Studio — {now.strftime('%d %b %Y, %H:%M')}")
+        print(f"  Format: 1080x1920 (9:16), {target_duration}s")
         print(f"  Slot: {slot.upper()}")
         print(f"{'='*60}\n")
 
@@ -210,16 +217,15 @@ class EvcarixOrchestrator:
 
     async def run_weekly_long_video_workflow(self):
         """Haftalık uzun formatlı video (1920x1080, 4-6 dakika) pipeline."""
-        import math
         import random
-        
+
         # ── Zaman damgası & slot bilgisi ──────────────────────────
         now = datetime.datetime.now()
         slot = "SUNDAY_LONG"
         ts = now.strftime("%Y%m%d_%H%M%S")
-        
-        # Hedef süre: 240-360 saniye (4-6 dakika)
-        target_duration = random.randint(240, 360)
+
+        # Hedef süre: 240-360 saniye (4-6 dakika) - config'den al
+        target_duration = random.randint(config.LONG_VIDEO_DURATION_MIN, config.LONG_VIDEO_DURATION_MAX)
         clip_count = math.ceil(target_duration / 8)  # Her klip ~8 saniye
         
         print(f"\n{'='*60}")

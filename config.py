@@ -24,8 +24,18 @@ YOUTUBE_TOKEN_PATH = os.getenv("YOUTUBE_TOKEN_PATH", "token.json")
 CHANNEL_ID = os.getenv("CHANNEL_ID", "UC_YOUR_CHANNEL_ID")
 
 # ── Video Settings ───────────────────────────────────────────────────────────────
+# Short video (YouTube Shorts, TikTok, Reels)
+SHORT_VIDEO_DURATION_MIN = 25  # seconds
+SHORT_VIDEO_DURATION_MAX = 50  # seconds
+
+# Long video (YouTube normal)
+LONG_VIDEO_DURATION_MIN = 240  # seconds (4 minutes)
+LONG_VIDEO_DURATION_MAX = 360  # seconds (6 minutes)
+
+# Legacy settings (for backward compatibility)
 VIDEO_DURATION_MIN = 25  # seconds
-VIDEO_DURATION_MAX = 40  # seconds
+VIDEO_DURATION_MAX = 50  # seconds
+
 VIDEO_WIDTH = 1080
 VIDEO_HEIGHT = 1920  # 9:16 vertical format
 VIDEO_FPS = 30
