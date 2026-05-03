@@ -93,10 +93,15 @@ class MediaEngine:
         self.pixabay_api_key = os.getenv("PIXABAY_API_KEY")
         self.stability_api_key = os.getenv("STABILITY_API_KEY")
         self.replicate_api_key = os.getenv("REPLICATE_API_TOKEN")
+        self.replicate_key = os.getenv("REPLICATE_API_KEY")
         self.kling_access_key = os.getenv("KLING_ACCESS_KEY")
         self.kling_secret_key = os.getenv("KLING_SECRET_KEY")
+        self.kling_key = os.getenv("KLING_API_KEY")  # yeni tek key format
         self.dashscope_api_key = os.getenv("DASHSCOPE_API_KEY")
-        self.hf_token = os.getenv("HF_TOKEN")
+        self.hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
+        self.fal_key = os.getenv("FAL_KEY") or os.getenv("FAL_API_KEY")
+        self.runway_key = os.getenv("RUNWAY_API_KEY")
+        self.luma_key = os.getenv("LUMA_API_KEY")
         self.coverr_api_key = os.getenv("COVERR_API_KEY")
         self.voice_engine = VoiceEngine()
         
@@ -1177,22 +1182,473 @@ class MediaEngine:
             return None
 
     # ─── Generate Multiple Video Clips from AI Services ───────────────────
-    def generate_ai_video_clips(self, topic, count=6, output_dir="assets/ai_videos", duration=5, category_id="", video_type="short"):
-        """AI video generator kullanarak topic-relevant klipler üretir."""
-        from src.ai_video_generator import AIVideoGenerator
-        ai_gen = AIVideoGenerator()
-        ai_clips = ai_gen.generate(
-            topic       = topic,
-            category_id = category_id,
-            count       = count,
-            duration    = duration,
-            video_type  = video_type,
-        )
-        if ai_clips:
-            print(f"[MediaEngine] ✅ AI video: {len(ai_clips)} klip")
-        else:
-            print("[MediaEngine] AI video yok, stok videoya geçiliyor.")
-        return ai_clips
+    def generate_ai_video_clips(self, topic, count=6,
+                                output_dir="assets/ai_videos", duration=5):
+        """
+        AI video klip üretimi.
+        Öncelik: fal.ai → HuggingFace → Runway → Luma → Kling → Stability → Replicate
+        Hiç key yoksa hızlıca boş liste döner.
+        """
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Hiç key yoksa anında çık — gereksiz döngü olmasın
+        has_any = any([
+            self.fal_key, self.hf_token, self.runway_key,
+            self.luma_key, self.kling_key or (self.kling_access_key and self.kling_secret_key),
+            self.stability_key, self.replicate_key,
+        ])
+        if not has_any:
+            print("[AI Videos] Hiç AI video API key'i yok — stok videoya geçiliyor.")
+            return []
+
+        # EV konusuna göre prompt'lar
+        prompts = [
+            f"futuristic electric car driving on highway at sunset, cinematic 4k, no text, {topic}",
+            "EV battery cell technology close up, laboratory blue glow, 4k cinematic, no text",
+            "electric vehicle charging station at night, city lights, 4k, no text",
+            "modern EV dashboard display holographic interface technology, no text",
+            "aerial drone view electric car on winding mountain road golden hour, no text",
+            "electric motor engine technology heat visualization blue glow, no text",
+        ]
+
+        clips = []
+        for i in range(min(count, len(prompts))):
+            if len(clips) >= count:
+                break
+            out = os.path.join(output_dir, f"ai_clip_{i}.mp4")
+            prompt = prompts[i]
+
+            # 1. fal.ai — Kling v2 veya Minimax video (en hızlı)
+            if self.fal_key and not os.path.exists(out):
+                result = self._generate_fal_video(prompt, out, duration)
+                if result:
+                    clips.append(result)
+                    print(f"[AI Videos] ✅ fal.ai klip {i+1} hazır")
+                    continue
+
+            # 2. HuggingFace — Text-to-video (ücretsiz)
+            if self.hf_token and not os.path.exists(out):
+                result = self._generate_hf_video(prompt, out, duration)
+                if result:
+                    clips.append(result)
+                    print(f"[AI Videos] ✅ HuggingFace klip {i+1} hazır")
+                    continue
+
+            # 3. Runway ML — Gen-3 Alpha
+            if self.runway_key and not os.path.exists(out):
+                result = self._generate_runway_video(prompt, out, duration)
+                if result:
+                    clips.append(result)
+                    print(f"[AI Videos] ✅ Runway klip {i+1} hazır")
+                    continue
+
+            # 4. Luma Dream Machine
+            if self.luma_key and not os.path.exists(out):
+                result = self._generate_luma_video(prompt, out, duration)
+                if result:
+                    clips.append(result)
+                    print(f"[AI Videos] ✅ Luma klip {i+1} hazır")
+                    continue
+
+            # 5. Kling AI (tek key format)
+            kling_k = self.kling_key or self.kling_access_key
+            if kling_k and not os.path.exists(out):
+                result = self._generate_kling_video_v2(prompt, out, duration, kling_k)
+                if result:
+                    clips.append(result)
+                    print(f"[AI Videos] ✅ Kling klip {i+1} hazır")
+                    continue
+
+            # 6. Stability AI
+            if self.stability_key and not os.path.exists(out):
+                result = self._generate_stability_video(prompt, out, duration)
+                if result:
+                    clips.append(result)
+                    print(f"[AI Videos] ✅ Stability klip {i+1} hazır")
+                    continue
+
+            # 7. Replicate
+            if self.replicate_key and not os.path.exists(out):
+                result = self._generate_replicate_video(prompt, out, duration)
+                if result:
+                    clips.append(result)
+                    print(f"[AI Videos] ✅ Replicate klip {i+1} hazır")
+                    continue
+
+            print(f"[AI Videos] ⚠️ Klip {i+1} üretilemedi — tüm servisler başarısız")
+
+        print(f"[AI Videos] Toplam {len(clips)}/{count} AI klip hazır")
+        return clips
+
+    # ── fal.ai — Kling v2 (en hızlı, en kaliteli) ─────────────────
+    def _generate_fal_video(self, prompt, output_path, duration=5):
+        if not self.fal_key:
+            return None
+        try:
+            import time
+            headers = {
+                "Authorization": f"Key {self.fal_key}",
+                "Content-Type": "application/json",
+            }
+            # fal.ai Kling v2 model — 5 saniye dikey video
+            data = {
+                "prompt": prompt,
+                "duration": str(min(duration, 5)),
+                "aspect_ratio": "9:16",
+            }
+            # İstek gönder
+            r = requests.post(
+                "https://fal.run/fal-ai/kling-video/v2/master/text-to-video",
+                headers=headers, json=data, timeout=30
+            )
+            if r.status_code == 200:
+                resp = r.json()
+                # Direkt response veya queue
+                video_url = (resp.get("video", {}).get("url")
+                             or resp.get("output", {}).get("video_url"))
+                if video_url:
+                    return self._download_video_url(video_url, output_path)
+
+                # Queue sistemi
+                request_id = resp.get("request_id")
+                if request_id:
+                    status_url = f"https://queue.fal.run/fal-ai/kling-video/v2/master/text-to-video/requests/{request_id}"
+                    for _ in range(60):  # max 5 dakika
+                        time.sleep(5)
+                        sr = requests.get(status_url, headers=headers, timeout=15)
+                        if sr.status_code == 200:
+                            sd = sr.json()
+                            status = sd.get("status", "")
+                            if status == "COMPLETED":
+                                vurl = (sd.get("output", {}).get("video", {}).get("url")
+                                        or sd.get("output", {}).get("video_url"))
+                                if vurl:
+                                    return self._download_video_url(vurl, output_path)
+                                break
+                            elif status == "FAILED":
+                                print(f"[fal.ai] Klip üretim başarısız: {sd.get('error')}")
+                                break
+            else:
+                # Kling v2 başarısız → Minimax dene
+                r2 = requests.post(
+                    "https://fal.run/fal-ai/minimax-video/v1/text-to-video",
+                    headers=headers,
+                    json={"prompt": prompt, "duration": 6},
+                    timeout=30
+                )
+                if r2.status_code == 200:
+                    resp2 = r2.json()
+                    vurl = (resp2.get("video_url")
+                            or resp2.get("output", {}).get("video_url"))
+                    if vurl:
+                        return self._download_video_url(vurl, output_path)
+        except Exception as e:
+            print(f"[fal.ai] Hata: {e}")
+        return None
+
+    # ── HuggingFace — Ücretsiz text-to-video ─────────────────────
+    def _generate_hf_video(self, prompt, output_path, duration=5):
+        if not self.hf_token:
+            return None
+        try:
+            import time
+            headers = {"Authorization": f"Bearer {self.hf_token}"}
+            # Zeroscope veya daha küçük model — ücretsiz tier'da çalışır
+            models_to_try = [
+                "ali-vilab/text-to-video-ms-1.7b",
+                "damo-vilab/text-to-video-ms-1.7b",
+            ]
+            for model in models_to_try:
+                try:
+                    r = requests.post(
+                        f"https://api-inference.huggingface.co/models/{model}",
+                        headers=headers,
+                        json={"inputs": prompt,
+                              "parameters": {"num_frames": duration * 8,
+                                             "num_inference_steps": 25}},
+                        timeout=120,
+                    )
+                    if r.status_code == 200:
+                        content_type = r.headers.get("content-type", "")
+                        if "video" in content_type or len(r.content) > 10000:
+                            os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+                            with open(output_path, "wb") as f:
+                                f.write(r.content)
+                            if os.path.getsize(output_path) > 50000:
+                                return output_path
+                    elif r.status_code == 503:
+                        # Model yükleniyor — bekle
+                        print(f"[HF] {model} yükleniyor, 20s bekleniyor...")
+                        time.sleep(20)
+                except Exception as e:
+                    print(f"[HF] {model} hatası: {e}")
+                    continue
+        except Exception as e:
+            print(f"[HuggingFace] Hata: {e}")
+        return None
+
+    # ── Runway ML — Gen-3 Alpha ────────────────────────────────────
+    def _generate_runway_video(self, prompt, output_path, duration=5):
+        if not self.runway_key:
+            return None
+        try:
+            import time
+            headers = {
+                "Authorization": f"Bearer {self.runway_key}",
+                "Content-Type": "application/json",
+                "X-Runway-Version": "2024-11-06",
+            }
+            data = {
+                "promptText": prompt,
+                "model": "gen3a_turbo",
+                "duration": min(duration, 5),
+                "ratio": "768:1280",  # yaklaşık 9:16
+            }
+            r = requests.post(
+                "https://api.dev.runwayml.com/v1/image_to_video",
+                headers=headers, json=data, timeout=30
+            )
+            if r.status_code in (200, 201):
+                task_id = r.json().get("id")
+                if task_id:
+                    for _ in range(60):
+                        time.sleep(5)
+                        sr = requests.get(
+                            f"https://api.dev.runwayml.com/v1/tasks/{task_id}",
+                            headers=headers, timeout=15
+                        )
+                        if sr.status_code == 200:
+                            sd = sr.json()
+                            status = sd.get("status", "")
+                            if status == "SUCCEEDED":
+                                outputs = sd.get("output", [])
+                                if outputs:
+                                    return self._download_video_url(outputs[0], output_path)
+                                break
+                            elif status == "FAILED":
+                                print(f"[Runway] Başarısız: {sd.get('failure')}")
+                                break
+            else:
+                print(f"[Runway] HTTP {r.status_code}: {r.text[:100]}")
+        except Exception as e:
+            print(f"[Runway] Hata: {e}")
+        return None
+
+    # ── Luma Dream Machine ─────────────────────────────────────────
+    def _generate_luma_video(self, prompt, output_path, duration=5):
+        if not self.luma_key:
+            return None
+        try:
+            import time
+            headers = {
+                "Authorization": f"Bearer {self.luma_key}",
+                "Content-Type": "application/json",
+            }
+            data = {
+                "prompt": prompt,
+                "aspect_ratio": "9:16",
+                "loop": False,
+            }
+            r = requests.post(
+                "https://api.lumalabs.ai/dream-machine/v1/generations",
+                headers=headers, json=data, timeout=30
+            )
+            if r.status_code in (200, 201):
+                gen_id = r.json().get("id")
+                if gen_id:
+                    for _ in range(60):
+                        time.sleep(5)
+                        sr = requests.get(
+                            f"https://api.lumalabs.ai/dream-machine/v1/generations/{gen_id}",
+                            headers=headers, timeout=15
+                        )
+                        if sr.status_code == 200:
+                            sd = sr.json()
+                            state = sd.get("state", "")
+                            if state == "completed":
+                                vurl = sd.get("assets", {}).get("video")
+                                if vurl:
+                                    return self._download_video_url(vurl, output_path)
+                                break
+                            elif state == "failed":
+                                print(f"[Luma] Başarısız: {sd.get('failure_reason')}")
+                                break
+            else:
+                print(f"[Luma] HTTP {r.status_code}")
+        except Exception as e:
+            print(f"[Luma] Hata: {e}")
+        return None
+
+    # ── Kling AI v2 (tek key format) ──────────────────────────────
+    def _generate_kling_video_v2(self, prompt, output_path, duration=5, api_key=None):
+        if not api_key:
+            return None
+        try:
+            import time
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            data = {
+                "prompt": prompt,
+                "duration": str(min(duration, 5)),
+                "aspect_ratio": "9:16",
+                "model_name": "kling-v2",
+            }
+            r = requests.post(
+                "https://api.klingai.com/v1/videos/text2video",
+                headers=headers, json=data, timeout=30
+            )
+            if r.status_code == 200:
+                task_id = r.json().get("data", {}).get("task_id")
+                if task_id:
+                    for _ in range(60):
+                        time.sleep(5)
+                        sr = requests.get(
+                            f"https://api.klingai.com/v1/videos/text2video/{task_id}",
+                            headers=headers, timeout=15
+                        )
+                        if sr.status_code == 200:
+                            sd = sr.json().get("data", {})
+                            if sd.get("task_status") == "succeed":
+                                works = sd.get("task_result", {}).get("videos", [])
+                                if works:
+                                    vurl = works[0].get("url")
+                                    if vurl:
+                                        return self._download_video_url(vurl, output_path)
+                                break
+                            elif sd.get("task_status") == "failed":
+                                break
+        except Exception as e:
+            print(f"[Kling v2] Hata: {e}")
+        return None
+
+    # ── Stability AI ───────────────────────────────────────────────
+    def _generate_stability_video(self, prompt, output_path, duration=5):
+        if not self.stability_key:
+            return None
+        try:
+            import time, base64
+            # Stability image-to-video: önce görüntü üret, sonra videoya çevir
+            # Adım 1: Görüntü üret
+            img_path = output_path.replace(".mp4", "_init.png")
+            img_r = requests.post(
+                "https://api.stability.ai/v2beta/stable-image/generate/core",
+                headers={"Authorization": f"Bearer {self.stability_key}",
+                         "Accept": "image/*"},
+                data={"prompt": prompt,
+                      "output_format": "png",
+                      "aspect_ratio": "9:16"},
+                timeout=30,
+            )
+            if img_r.status_code == 200:
+                with open(img_path, "wb") as f:
+                    f.write(img_r.content)
+
+                # Adım 2: Görüntüyü videoya çevir
+                with open(img_path, "rb") as f:
+                    vid_r = requests.post(
+                        "https://api.stability.ai/v2beta/image-to-video",
+                        headers={"Authorization": f"Bearer {self.stability_key}"},
+                        files={"image": ("image.png", f, "image/png")},
+                        data={"seed": random.randint(0, 999999),
+                              "cfg_scale": 1.8,
+                              "motion_bucket_id": 127},
+                        timeout=30,
+                    )
+
+                if vid_r.status_code == 200:
+                    gen_id = vid_r.json().get("id")
+                    if gen_id:
+                        for _ in range(30):
+                            time.sleep(10)
+                            result_r = requests.get(
+                                f"https://api.stability.ai/v2beta/image-to-video/result/{gen_id}",
+                                headers={"Authorization": f"Bearer {self.stability_key}",
+                                         "Accept": "video/*"},
+                                timeout=30,
+                            )
+                            if result_r.status_code == 200:
+                                with open(output_path, "wb") as f:
+                                    f.write(result_r.content)
+                                if os.path.exists(img_path):
+                                    os.remove(img_path)
+                                if os.path.getsize(output_path) > 50000:
+                                    return output_path
+                                break
+                            elif result_r.status_code == 202:
+                                continue  # Hâlâ işleniyor
+                            else:
+                                break
+        except Exception as e:
+            print(f"[Stability] Hata: {e}")
+        return None
+
+    # ── Replicate ──────────────────────────────────────────────────
+    def _generate_replicate_video(self, prompt, output_path, duration=5):
+        if not self.replicate_key:
+            return None
+        try:
+            import time
+            headers = {
+                "Authorization": f"Token {self.replicate_key}",
+                "Content-Type": "application/json",
+            }
+            data = {
+                "version": "9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351",
+                "input": {
+                    "prompt": prompt,
+                    "num_frames": duration * 6,
+                    "width": 576,
+                    "height": 1024,
+                    "num_inference_steps": 25,
+                }
+            }
+            r = requests.post(
+                "https://api.replicate.com/v1/predictions",
+                headers=headers, json=data, timeout=30
+            )
+            if r.status_code in (200, 201):
+                pred = r.json()
+                pred_id = pred.get("id")
+                if pred_id:
+                    for _ in range(60):
+                        time.sleep(5)
+                        sr = requests.get(
+                            f"https://api.replicate.com/v1/predictions/{pred_id}",
+                            headers=headers, timeout=15
+                        )
+                        if sr.status_code == 200:
+                            sd = sr.json()
+                            status = sd.get("status", "")
+                            if status == "succeeded":
+                                output = sd.get("output")
+                                vurl = output[0] if isinstance(output, list) else output
+                                if vurl:
+                                    return self._download_video_url(vurl, output_path)
+                                break
+                            elif status == "failed":
+                                print(f"[Replicate] Başarısız: {sd.get('error')}")
+                                break
+        except Exception as e:
+            print(f"[Replicate] Hata: {e}")
+        return None
+
+    # ── Yardımcı: Video URL'den indir ─────────────────────────────
+    def _download_video_url(self, url, output_path):
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+            r = requests.get(url, stream=True, timeout=120)
+            if r.status_code == 200:
+                with open(output_path, "wb") as f:
+                    for chunk in r.iter_content(1024 * 1024):
+                        if chunk:
+                            f.write(chunk)
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 50000:
+                    return output_path
+        except Exception as e:
+            print(f"[Download] Hata: {e}")
+        return None
 
     def generate_thumbnail(self, video_path, title, output_path,
                            channel_name="EVCARIX", slogan="No hype. Just numbers."):
