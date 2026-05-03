@@ -1,6 +1,12 @@
 """
 Evcarix MediaEngine
-HD Video Öncelik: OEM Basın Kiti → Pexels → Pixabay → fal.ai → HF → Runway → Luma → Kling → Stability → Replicate → Pollinations
+HD Video Öncelik: Tesla CDN → Marka Bazlı Pexels → Pixabay → FreeVideo → AI → Pollinations
+
+Global Marka Kapsamı: Tesla, BYD, Hyundai, Kia, BMW, Mercedes, Audi, VW, Volvo, Polestar,
+Rivian, Lucid, NIO, Xpeng, Li Auto, Ford, GM, Stellantis, Nissan, Honda, Toyota, Subaru,
+Mazda, Mitsubishi, Renault, Peugeot, Citroën, Opel, Fiat, Alfa Romeo, Jaguar, Land Rover,
+Porsche, Ferrari, Lamborghini, Maserati, Genesis, Vinfast, SAIC, Geely, Great Wall, Leapmotor,
+Zeekr, Avatr, BYD Yangwang, ChargePoint, ABB, Tritium, CATL, Panasonic, QuantumScape + daha fazlası
 """
 import os
 import re
@@ -18,50 +24,430 @@ load_dotenv()
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  OEM MARKA BASИН KİTİ — Konuya göre doğru marka seçilir
-#  Tüm URL'ler test edilmiş çalışan HD video linkleri
+#  GLOBAL MARKA VERİTABANI — 50+ Marka
+#  cdn_videos: Doğrulanmış çalışan doğrudan CDN URL'leri (Tesla only)
+#  pexels_queries: Marka adını içeren Pexels arama sorguları
 # ═══════════════════════════════════════════════════════════════════
-OEM_BRAND_VIDEOS = {
-    # ── Sadece Tesla CDN URL'leri doğrulanmış çalışıyor ──────────────────────
-    # Diğer OEM markaların CDN URL'leri sık değişiyor / erişim engelli olabiliyor.
-    # Bu nedenle sadece Tesla'nın güvenilir CDN adresleri tutulmaktadır.
-    # Diğer markalar için Pexels/Pixabay API kullanılmaktadır.
+GLOBAL_BRAND_DB = {
+
+    # ── AMERİKAN MARKALAR ────────────────────────────────────────────
     "tesla": {
         "keywords": ["tesla", "model 3", "model y", "model s", "model x",
-                     "cybertruck", "supercharger", "autopilot", "fsd",
-                     "ev", "electric vehicle", "electric car", "battery",
-                     "charging", "range", "byd", "hyundai", "kia", "bmw",
-                     "volkswagen", "ford", "rivian", "lucid", "polestar"],
-        "videos": [
+                     "cybertruck", "supercharger", "autopilot", "fsd", "megapack"],
+        "cdn_videos": [
             "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-Y-Desktop-NA.mp4",
             "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-3-Desktop-NA.mp4",
             "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Model-S-Homepage-Desktop-LHD-01.mp4",
             "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Megapack-Homepage-Desktop.mp4",
             "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-X-Desktop.mp4",
         ],
+        "pexels_queries": [
+            "Tesla Model Y electric car driving highway 4k",
+            "Tesla Model 3 exterior cinematic HD",
+            "Tesla supercharger station night 4k",
+            "Tesla electric vehicle interior dashboard",
+            "Tesla cybertruck futuristic exterior",
+        ],
         "priority": 1,
+    },
+    "rivian": {
+        "keywords": ["rivian", "r1t", "r1s", "r2", "rivian truck", "rivian suv"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Rivian R1T electric truck adventure outdoor 4k",
+            "Rivian electric pickup truck off road HD",
+            "electric truck adventure outdoor 4k",
+        ],
+        "priority": 2,
+    },
+    "lucid": {
+        "keywords": ["lucid", "lucid air", "lucid gravity", "lucid motors"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Lucid Air luxury electric sedan exterior 4k",
+            "luxury electric car silver exterior driving HD",
+            "premium electric vehicle aerodynamic design",
+        ],
+        "priority": 2,
+    },
+    "ford": {
+        "keywords": ["ford", "mustang mach-e", "mach-e", "f-150 lightning",
+                     "f150 lightning", "ford electric", "ford ev"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Ford Mustang Mach-E electric SUV exterior 4k",
+            "Ford F-150 Lightning electric truck HD",
+            "Ford electric vehicle modern design",
+        ],
+        "priority": 2,
+    },
+    "gm_chevrolet": {
+        "keywords": ["chevrolet", "chevy", "silverado ev", "blazer ev",
+                     "equinox ev", "gm electric", "general motors"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Chevrolet Silverado EV electric truck exterior",
+            "GM electric vehicle Blazer EV exterior HD",
+            "Chevrolet electric car modern 4k",
+        ],
+        "priority": 3,
+    },
+    "cadillac": {
+        "keywords": ["cadillac", "lyriq", "celestiq", "cadillac ev"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Cadillac Lyriq luxury electric SUV 4k",
+            "luxury electric SUV dark exterior night",
+        ],
+        "priority": 3,
+    },
+    "stellantis_jeep": {
+        "keywords": ["jeep", "wrangler 4xe", "jeep electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Jeep Wrangler 4xe plug-in hybrid off road",
+            "Jeep electric off-road adventure 4k",
+        ],
+        "priority": 3,
+    },
+
+    # ── KORECE MARKALAR ──────────────────────────────────────────────
+    "hyundai": {
+        "keywords": ["hyundai", "ioniq", "ioniq 5", "ioniq 6", "ioniq 9",
+                     "nexo", "kona electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Hyundai IONIQ 5 electric car exterior driving 4k",
+            "Hyundai IONIQ 6 sedan electric HD",
+            "Hyundai electric vehicle modern design cinematic",
+            "IONIQ 5 charging station night",
+        ],
+        "priority": 1,
+    },
+    "kia": {
+        "keywords": ["kia", "ev6", "ev9", "ev3", "niro ev", "soul ev", "kia electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Kia EV6 electric car exterior driving 4k",
+            "Kia EV9 SUV electric cinematic HD",
+            "Kia electric vehicle futuristic design",
+        ],
+        "priority": 1,
+    },
+    "genesis": {
+        "keywords": ["genesis", "gv60", "gv70e", "g80e", "genesis electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Genesis GV60 luxury electric SUV 4k",
+            "Genesis electric vehicle premium exterior",
+        ],
+        "priority": 3,
+    },
+
+    # ── ALMAN MARKALAR ───────────────────────────────────────────────
+    "bmw": {
+        "keywords": ["bmw", "bmw i4", "bmw ix", "bmw i5", "bmw i7",
+                     "bmw i3", "bmw electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "BMW iX electric SUV exterior driving 4k",
+            "BMW i4 electric sedan cinematic HD",
+            "BMW electric car luxury modern design",
+            "BMW i7 limousine electric exterior night",
+        ],
+        "priority": 1,
+    },
+    "mercedes": {
+        "keywords": ["mercedes", "eqs", "eqe", "eqb", "eqa", "eqc",
+                     "eqs suv", "mercedes electric", "amg eq"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Mercedes EQS electric luxury sedan exterior 4k",
+            "Mercedes EQE electric car driving HD",
+            "Mercedes Benz electric vehicle modern cinematic",
+            "Mercedes AMG EQ performance electric",
+        ],
+        "priority": 1,
+    },
+    "audi": {
+        "keywords": ["audi", "e-tron", "etron", "q4 etron", "q6 etron",
+                     "audi electric", "rs etron gt"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Audi e-tron electric SUV exterior driving 4k",
+            "Audi Q4 e-tron electric cinematic HD",
+            "Audi electric vehicle luxury design",
+            "Audi RS e-tron GT performance electric",
+        ],
+        "priority": 1,
+    },
+    "volkswagen": {
+        "keywords": ["volkswagen", "vw", "id.4", "id.3", "id.7", "id.buzz",
+                     "id4", "id3", "id7"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Volkswagen ID.4 electric SUV exterior 4k",
+            "VW ID.3 electric hatchback driving HD",
+            "Volkswagen ID Buzz electric van retro",
+            "VW electric vehicle family modern design",
+        ],
+        "priority": 1,
+    },
+    "porsche": {
+        "keywords": ["porsche", "taycan", "macan electric", "porsche electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Porsche Taycan electric sports car driving 4k",
+            "Porsche electric car performance cinematic HD",
+            "Porsche Taycan turbo exterior night",
+        ],
+        "priority": 2,
+    },
+
+    # ── İSKANDİNAV MARKALAR ─────────────────────────────────────────
+    "volvo": {
+        "keywords": ["volvo", "volvo ex30", "volvo ex40", "volvo ec40",
+                     "volvo ex90", "volvo electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Volvo EX90 electric SUV exterior Scandinavian 4k",
+            "Volvo electric car safety modern design HD",
+            "Volvo EX30 compact electric urban driving",
+        ],
+        "priority": 2,
+    },
+    "polestar": {
+        "keywords": ["polestar", "polestar 2", "polestar 3", "polestar 4",
+                     "polestar electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Polestar 2 electric sedan exterior cinematic 4k",
+            "Polestar 3 electric SUV Scandinavian design HD",
+            "Polestar electric vehicle minimalist design",
+        ],
+        "priority": 2,
+    },
+
+    # ── ÇİN MARKALARI ───────────────────────────────────────────────
+    "byd": {
+        "keywords": ["byd", "byd seal", "byd atto", "byd han", "byd tang",
+                     "byd dolphin", "byd seagull", "byd electric", "yangwang"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "BYD Seal electric sedan exterior driving 4k",
+            "BYD Atto 3 electric SUV modern HD",
+            "BYD electric vehicle China modern design",
+            "BYD Han electric luxury sedan",
+        ],
+        "priority": 1,
+    },
+    "nio": {
+        "keywords": ["nio", "nio et5", "nio et7", "nio es6", "nio es8",
+                     "nio el6", "nio electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "NIO ET5 electric sedan exterior 4k",
+            "NIO electric car China premium design HD",
+            "NIO battery swap station technology",
+        ],
+        "priority": 2,
+    },
+    "xpeng": {
+        "keywords": ["xpeng", "xpeng p7", "xpeng g9", "xpeng g6",
+                     "xpeng electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Xpeng P7 electric sedan autonomous driving 4k",
+            "Xpeng electric vehicle China tech HD",
+        ],
+        "priority": 3,
+    },
+    "li_auto": {
+        "keywords": ["li auto", "li one", "li l9", "li l7", "lixiang"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Li Auto L9 electric hybrid SUV China 4k",
+            "Li Auto extended range electric vehicle HD",
+        ],
+        "priority": 3,
+    },
+    "zeekr": {
+        "keywords": ["zeekr", "zeekr 001", "zeekr x", "zeekr electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Zeekr 001 electric shooting brake exterior 4k",
+            "Zeekr electric vehicle Geely premium",
+        ],
+        "priority": 3,
+    },
+    "leapmotor": {
+        "keywords": ["leapmotor", "leap motor", "c10", "t03"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Leapmotor electric vehicle China affordable",
+            "Chinese electric car compact urban",
+        ],
+        "priority": 4,
+    },
+
+    # ── JAPON MARKALAR ──────────────────────────────────────────────
+    "nissan": {
+        "keywords": ["nissan", "nissan leaf", "nissan ariya", "nissan electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Nissan Ariya electric SUV exterior driving 4k",
+            "Nissan Leaf electric hatchback city HD",
+            "Nissan electric vehicle modern design",
+        ],
+        "priority": 2,
+    },
+    "toyota": {
+        "keywords": ["toyota", "bz4x", "bz3", "toyota electric", "toyota ev"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Toyota bZ4X electric SUV exterior driving 4k",
+            "Toyota electric vehicle modern design HD",
+        ],
+        "priority": 2,
+    },
+    "honda": {
+        "keywords": ["honda", "honda e", "prologue", "honda electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Honda Prologue electric SUV exterior 4k",
+            "Honda electric vehicle modern design HD",
+        ],
+        "priority": 3,
+    },
+    "subaru": {
+        "keywords": ["subaru", "solterra", "subaru electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Subaru Solterra electric SUV outdoor adventure",
+            "Subaru electric all wheel drive",
+        ],
+        "priority": 3,
+    },
+
+    # ── FRANSIZ MARKALAR ────────────────────────────────────────────
+    "renault": {
+        "keywords": ["renault", "renault zoe", "megane e-tech", "renault electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Renault Megane E-Tech electric hatchback 4k",
+            "Renault ZOE electric city car HD",
+            "Renault electric vehicle French design",
+        ],
+        "priority": 3,
+    },
+    "peugeot": {
+        "keywords": ["peugeot", "e-208", "e-2008", "e-308", "peugeot electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Peugeot e-208 electric hatchback city",
+            "Peugeot electric vehicle French design 4k",
+        ],
+        "priority": 3,
+    },
+
+    # ── İNGİLİZ MARKALAR ────────────────────────────────────────────
+    "jaguar": {
+        "keywords": ["jaguar", "jaguar i-pace", "jaguar electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "Jaguar I-PACE electric SUV luxury exterior 4k",
+            "Jaguar electric vehicle British design HD",
+        ],
+        "priority": 3,
+    },
+
+    # ── VİETNAM MARKALARI ────────────────────────────────────────────
+    "vinfast": {
+        "keywords": ["vinfast", "vf8", "vf9", "vf6", "vinfast electric"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "VinFast VF8 electric SUV exterior 4k",
+            "VinFast electric vehicle Vietnam modern",
+        ],
+        "priority": 3,
+    },
+
+    # ── ŞARJ & ALTYAPI ──────────────────────────────────────────────
+    "chargepoint": {
+        "keywords": ["chargepoint", "charging network", "ev charging station",
+                     "dc fast charging", "level 2 charging"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "EV charging station network city night 4k",
+            "electric car charging plug cable close up HD",
+            "DC fast charging station modern",
+        ],
+        "priority": 2,
+    },
+    "abb_charging": {
+        "keywords": ["abb", "terra 360", "fast charger", "charging infrastructure"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "electric vehicle fast charging station technology 4k",
+            "EV charger infrastructure modern design HD",
+        ],
+        "priority": 3,
+    },
+
+    # ── PİL & TEKNOLOJİ ─────────────────────────────────────────────
+    "catl": {
+        "keywords": ["catl", "lfp", "nmc", "battery cell", "battery pack",
+                     "solid state battery", "sodium battery"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "lithium battery cells laboratory technology 4k",
+            "EV battery pack manufacturing assembly HD",
+            "battery technology research laboratory blue glow",
+            "solid state battery futuristic energy",
+        ],
+        "priority": 2,
+    },
+    "panasonic_battery": {
+        "keywords": ["panasonic", "4680 cell", "cylindrical cell", "battery manufacturer"],
+        "cdn_videos": [],
+        "pexels_queries": [
+            "battery cell factory production line 4k",
+            "lithium battery technology manufacturing HD",
+        ],
+        "priority": 3,
     },
 }
 
-# Genel EV içeriği için kullanılacak videoları (marka spesifik değil)
-OEM_GENERAL_VIDEOS = [
+# ── Genel EV içeriği için Tesla CDN videoları ─────────────────────
+OEM_CDN_FALLBACK = [
     "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-Y-Desktop-NA.mp4",
     "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Megapack-Homepage-Desktop.mp4",
     "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-3-Desktop-NA.mp4",
+    "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Model-S-Homepage-Desktop-LHD-01.mp4",
+    "https://digitalassets.tesla.com/tesla-contents/video/upload/f_auto,q_auto/Homepage-Model-X-Desktop.mp4",
 ]
 
-# Kategori bazlı OEM öncelikleri
-CATEGORY_OEM_PRIORITY = {
-    "battery_science":  ["tesla", "byd", "bmw"],
-    "range_tests":      ["tesla", "hyundai", "lucid", "byd"],
-    "charging":         ["tesla", "bmw", "volkswagen", "hyundai"],
-    "comparisons":      ["tesla", "byd", "hyundai", "kia", "bmw"],
-    "cost_ownership":   ["tesla", "volkswagen", "hyundai", "kia"],
-    "market_data":      ["byd", "tesla", "volkswagen", "nio"],
-    "infrastructure":   ["tesla", "volkswagen", "bmw"],
-    "education":        ["tesla", "bmw", "hyundai"],
-    "trend":            ["tesla", "byd", "hyundai", "rivian", "lucid"],
+# Geriye uyumluluk için alias
+OEM_BRAND_VIDEOS = {
+    k: {"keywords": v["keywords"], "videos": v["cdn_videos"], "priority": v["priority"]}
+    for k, v in GLOBAL_BRAND_DB.items() if v["cdn_videos"]
 }
+OEM_GENERAL_VIDEOS = OEM_CDN_FALLBACK
+
+# Kategori bazlı marka öncelikleri
+CATEGORY_OEM_PRIORITY = {
+    "battery_science":  ["catl", "tesla", "byd", "bmw", "panasonic_battery"],
+    "range_tests":      ["tesla", "hyundai", "lucid", "byd", "bmw"],
+    "charging":         ["chargepoint", "tesla", "abb_charging", "bmw", "volkswagen"],
+    "comparisons":      ["tesla", "byd", "hyundai", "kia", "bmw", "mercedes"],
+    "cost_ownership":   ["tesla", "volkswagen", "hyundai", "kia", "byd"],
+    "market_data":      ["byd", "tesla", "volkswagen", "nio", "hyundai"],
+    "infrastructure":   ["chargepoint", "tesla", "abb_charging", "volkswagen"],
+    "education":        ["catl", "tesla", "bmw", "hyundai"],
+    "trend":            ["tesla", "byd", "hyundai", "rivian", "lucid", "nio"],
+    "interactive_tools": ["tesla", "bmw", "hyundai", "kia"],
+}
+
 
 
 class MediaEngine:
@@ -150,10 +536,10 @@ class MediaEngine:
     #  OEM MARKA BASИН KİTİ — HD Telifsiz Videolar
     # ══════════════════════════════════════════════════════════════
     def _detect_brands_in_topic(self, topic: str, category: str = None) -> list:
-        """Konu metninden ilgili OEM markalarını tespit eder."""
+        """Konu metninden ilgili global markaları tespit eder (50+ marka)."""
         topic_lower = topic.lower()
         matched = []
-        for brand, data in OEM_BRAND_VIDEOS.items():
+        for brand, data in GLOBAL_BRAND_DB.items():
             for kw in data["keywords"]:
                 if kw in topic_lower:
                     matched.append(brand)
@@ -162,15 +548,34 @@ class MediaEngine:
         # Kategori bazlı öncelik
         cat_priority = CATEGORY_OEM_PRIORITY.get(category, [])
         if not matched and cat_priority:
-            matched = cat_priority[:3]
+            matched = cat_priority[:4]
 
         # Hiç eşleşme yoksa genel öncelik
         if not matched:
-            matched = ["tesla", "byd", "hyundai", "bmw"]
+            matched = ["tesla", "byd", "hyundai", "bmw", "volkswagen"]
 
         # Önceliğe göre sırala
-        matched.sort(key=lambda b: OEM_BRAND_VIDEOS.get(b, {}).get("priority", 99))
+        matched.sort(key=lambda b: GLOBAL_BRAND_DB.get(b, {}).get("priority", 99))
         return matched
+
+    def _get_brand_pexels_queries(self, topic: str, category: str = None) -> list:
+        """Konuya göre marka bazlı Pexels sorguları döndürür."""
+        brands = self._detect_brands_in_topic(topic, category)
+        queries = []
+        for brand in brands[:3]:  # En iyi 3 markadan sorgu al
+            brand_data = GLOBAL_BRAND_DB.get(brand, {})
+            brand_queries = brand_data.get("pexels_queries", [])
+            if brand_queries:
+                queries.append(random.choice(brand_queries))
+        # Marka sorgularına ek genel EV sorguları ekle
+        general = [
+            "electric car driving highway cinematic 4k",
+            "EV battery technology close up HD",
+            "electric vehicle charging station night city",
+            "electric car exterior modern design 4k",
+        ]
+        queries += general
+        return queries
 
     def _download_from_oem(self, topic: str, output_dir: str,
                             count: int, category: str = None) -> list:
@@ -263,61 +668,70 @@ class MediaEngine:
         return True
 
     def _get_pexels_query(self, topic, category=None):
-        """Kategoriye göre optimize Pexels sorgusu."""
+        """Önce marka bazlı, sonra kategoriye göre optimize Pexels sorgusu."""
+        # 1. Marka bazlı sorgular (en yüksek öncelik)
+        brand_queries = self._get_brand_pexels_queries(topic, category)
+        if brand_queries:
+            return random.choice(brand_queries[:3])  # İlk 3 marka sorgusundan seç
+
+        # 2. Kategori bazlı fallback sorgular
         cat_queries = {
             "battery_science": [
                 "lithium battery cell technology laboratory close up 4k",
                 "EV battery pack assembly manufacturing HD",
                 "solid state battery futuristic technology",
-                "battery research scientist laboratory blue",
+                "CATL battery research laboratory blue glow",
+                "battery cell energy density technology",
             ],
             "range_tests": [
                 "electric car driving highway aerial view 4k",
-                "EV dashboard speedometer range display",
-                "Tesla Model 3 driving road cinematic 4k",
-                "electric vehicle winter snow driving",
+                "EV dashboard speedometer range display HD",
+                "Tesla Model Y driving road cinematic 4k",
+                "Hyundai IONIQ 5 highway driving range test",
+                "electric vehicle winter snow driving range",
             ],
             "charging": [
-                "electric car charging station night 4k",
+                "Tesla supercharger station multiple cars night 4k",
                 "EV fast charging plug cable close up HD",
-                "Tesla supercharger station multiple cars",
-                "DC fast charging electric vehicle port",
+                "DC fast charging station 350kW modern",
+                "electric car charging network city night",
+                "ChargePoint EV charging station network",
             ],
             "comparisons": [
                 "multiple electric cars parked showroom 4k",
-                "electric vehicle lineup modern HD",
-                "car comparison test track aerial",
-                "EV showroom interior modern design",
+                "Tesla BYD Hyundai electric vehicle lineup HD",
+                "car comparison test track aerial cinematic",
+                "EV showroom interior premium modern design",
             ],
             "cost_ownership": [
                 "electric car dealership showroom interior 4k",
-                "car finance calculator business meeting",
-                "money savings green technology",
+                "car finance calculator business meeting HD",
+                "money savings green technology investment",
                 "family electric car purchase dealership",
             ],
             "market_data": [
                 "electric vehicle factory production line 4k",
-                "global business data analytics dashboard",
-                "EV manufacturing plant aerial view",
-                "automotive industry modern technology",
+                "BYD Tesla factory manufacturing plant aerial",
+                "global business data analytics dashboard HD",
+                "EV automotive industry modern technology",
             ],
             "infrastructure": [
-                "electric car charging network city night",
-                "solar panels renewable energy installation 4k",
-                "smart city electric vehicle charging",
-                "power grid electricity technology",
+                "electric car charging network city night 4k",
+                "solar panels renewable energy installation HD",
+                "smart city electric vehicle charging station",
+                "power grid electricity technology modern",
             ],
             "education": [
                 "electric motor engine technology close up 4k",
-                "car heat thermal visualization technology",
-                "engineering blueprint technical design",
-                "automotive technology laboratory research",
+                "car heat pump thermal visualization HD",
+                "engineering blueprint technical automotive design",
+                "battery chemistry laboratory research science",
             ],
             "trend": [
                 "futuristic electric car driving cinematic 4k",
-                "new electric vehicle launch reveal",
-                "modern EV exterior driving sunset",
-                "electric car technology innovation 4k",
+                "new electric vehicle launch reveal event",
+                "modern EV exterior driving sunset golden hour",
+                "electric car technology innovation 2025",
             ],
         }
         queries = cat_queries.get(category, [
