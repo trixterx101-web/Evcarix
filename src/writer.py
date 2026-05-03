@@ -437,7 +437,7 @@ class CreativeWriter:
                 "Return format: SES: [male/female]\nSENARYO: [script]"
             )
             user = f"""
-Write a 60-second YouTube Shorts narration script for Evcarix channel.
+Write a 60-second YouTube Shorts narration script for the "Ev-CAR-ix" channel.
 Topic: {topic}
 Category: {category or 'general'}
 Category guide: {cat_extra}
@@ -448,18 +448,16 @@ Structure (write ALL sections as continuous spoken text):
 - Problem (5-20s): What people believe vs real data
 - Data reveal (20-45s): The actual numbers and what they mean
 - Takeaway (45-55s): One clear conclusion
-- CTA (55-60s): Subscribe to Ev-Car-ix for real EV data, no hype
+- CTA (55-60s): Subscribe to "Ev-CAR-ix" for real EV data, no hype
 
-Tone: Data-driven, punchy, no hype.
-Language: English.
-Channel name: always write "Ev-Car-ix" (not Evcarix).
-First sentence MUST have a specific % or $ or kWh or miles number
-Real brands: Tesla, BYD, Hyundai, Kia, BMW, Mercedes, VW, Rivian, Lucid
-Regions: USA, Europe, China ONLY — NEVER Turkey
-No hype: amazing, incredible, insane, unbelievable
-
-Return ONLY the spoken words. No section labels. No formatting.
-Write between {MIN_WORDS_SHORT} and {MAX_WORDS_SHORT} words total — count carefully.
+IMPORTANT INSTRUCTIONS:
+1. Channel Name: ALWAYS use "Ev-CAR-ix" (spell it exactly like this for pronunciation). NEVER use placeholders like FCR9 or generic names.
+2. Numbers & Units: ALWAYS put a space between numbers and units (e.g., "71 kWh" NOT "71kWh", "190 miles" NOT "190m").
+3. Brand Models: ALWAYS put a space between brand and model (e.g., "BYD M6" NOT "BYDM6").
+4. Tone: Data-driven, punchy, no hype. American English only.
+5. First sentence MUST have a specific % or $ or kWh or miles number.
+6. NO generic adjectives: amazing, incredible, insane, unbelievable.
+7. Regions: USA, Europe, China ONLY — NEVER Turkey.
 
 Return:
 SES: [male or female]
@@ -476,34 +474,17 @@ SENARYO: [script]
                 "American English only. Return: SES: [male/female]\nSENARYO: [script]"
             )
             user = f"""
-Write a full YouTube video narration script for Evcarix channel.
+Write a full YouTube video narration script for the "Ev-CAR-ix" channel.
 Topic: {topic}
 Duration: {target_duration} seconds ({target_duration // 60} minutes)
 Word count: {min_words} to {max_words} words
-(at ~130 words/minute speaking pace this fills {target_duration}s exactly)
 
-CRITICAL: Write the COMPLETE script from start to finish.
-Do NOT write a summary. Do NOT write section headings only.
-Write every single sentence that will be spoken.
-
-Structure (write all sections in full):
-[INTRO - 30s]: Hook question + what we will cover today
-[SECTION 1 - 60s]: Background and common misconceptions
-[SECTION 2 - 60s]: Real-world data and test results
-[SECTION 3 - 60s]: Comparison with alternatives
-[DATA REVEAL - 60s]: The key numbers and what they mean
-[CONCLUSION - 30s]: Main takeaway
-[CTA - 20s]: Subscribe to Evcarix for real EV data, no hype
-
-Channel name pronunciation note: spell it as "Ev-CAR-ix" in the script.
-Tone: Data-driven, no hype, factual, slightly dramatic on data reveals.
-Language: English.
-Category: {category or 'general'}
-Category guide: {cat_extra}
-Regions: USA, Europe, China ONLY — NEVER Turkey
-
-Return ONLY the spoken script text, no section headers, no stage
-directions, no formatting — just the words to be spoken continuously.
+IMPORTANT INSTRUCTIONS:
+1. Channel Name: ALWAYS use "Ev-CAR-ix" (spell it exactly like this for pronunciation). NEVER use placeholders like FCR9.
+2. Numbers & Units: ALWAYS put a space between numbers and units (e.g., "45 kWh").
+3. Brand Models: ALWAYS put a space between brand and model (e.g., "Tesla Model 3").
+4. Structure: Write the COMPLETE script (INTRO, SECTION 1, 2, 3, DATA REVEAL, CONCLUSION, CTA).
+5. No Headings: Return ONLY the spoken text, no section headers.
 
 Return:
 SES: [male or female]
