@@ -178,16 +178,22 @@ class EvcarixOrchestrator:
         thumb_output = f"output/thumb_{ts}.png"
         thumbnail_path = self.editor.generate_thumbnail(title, thumb_output)
 
-        # ── 6. YouTube Yükleme ─────────────────────────────────────
+        # ── 6. YouTube Yükleme ─────────────────────────────────────────
         if self.uploader and os.path.exists(final_video_path):
             print("\n[6/6] YouTube'a yükleniyor...", flush=True)
+            thumb_exists = thumbnail_path and os.path.exists(thumbnail_path)
+            if thumb_exists:
+                print(f"      🖼️  Thumbnail hazır: {thumbnail_path}", flush=True)
+            else:
+                print("      ⚠️  Thumbnail dosyası bulunamadı, thumbnail yüklenmeyecek.", flush=True)
             try:
                 video_id = self.uploader.upload_video(
                     file_path=final_video_path,
                     title=title,
                     description=description,
                     tags=tags,
-                    playlist_name="Short Video"
+                    playlist_name="Short Video",
+                    thumbnail_path=thumbnail_path if thumb_exists else None
                 )
                 print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
                 print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
@@ -279,16 +285,22 @@ class EvcarixOrchestrator:
         # Uzun videolarda description içine timestamp eklemek SEO için kritiktir
         # Bu aşama writer.py içinde description üretilirken hallediliyor
 
-        # ── 7. YouTube Yükleme ─────────────────────────────────────
+        # ── 7. YouTube Yükleme ─────────────────────────────────────────
         if self.uploader and os.path.exists(final_video_path):
             print("\n[7/7] YouTube'a yükleniyor (Long-form)...", flush=True)
+            thumb_exists = thumbnail_path and os.path.exists(thumbnail_path)
+            if thumb_exists:
+                print(f"      🖼️  Thumbnail hazır: {thumbnail_path}", flush=True)
+            else:
+                print("      ⚠️  Thumbnail dosyası bulunamadı, thumbnail yüklenmeyecek.", flush=True)
             try:
                 video_id = self.uploader.upload_video(
                     file_path=final_video_path,
                     title=title,
                     description=description,
                     tags=tags,
-                    playlist_name="EV Data Reports"
+                    playlist_name="EV Data Reports",
+                    thumbnail_path=thumbnail_path if thumb_exists else None
                 )
                 print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
                 print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
