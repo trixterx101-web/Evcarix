@@ -77,6 +77,11 @@ jobs:
       - name: Generate content
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          RUNWAY_API_KEY: ${{ secrets.RUNWAY_API_KEY }}
+          LUMA_API_KEY: ${{ secrets.LUMA_API_KEY }}
+          KLING_API_KEY: ${{ secrets.KLING_API_KEY }}
+          STABILITY_API_KEY: ${{ secrets.STABILITY_API_KEY }}
         run: |
           python scripts/generate_content.py ${{ steps.args.outputs.args }}
 
