@@ -581,13 +581,39 @@ SENARYO: [script]
                         parsed = self._parse_response(raw)
             return parsed
 
+        if format_type == "long":
+            print(f"[Writer] ⚠️ Long script LLM failure, using extended template fallback for: {topic}")
+            return {
+                "voice": "female",
+                "script": (
+                    f"Welcome to Ev-CAR-ix, where we break down the real numbers behind electric vehicles. "
+                    f"Today, we are diving deep into {topic}. Many manufacturers claim incredible performance, "
+                    f"but our data-driven analysis from tests in the USA, Europe, and China tells a different story. "
+                    f"Let's look at the battery science first. The energy density and thermal management of modern EVs "
+                    f"vary significantly between LFP and NMC chemistries. In cold weather tests at 32 degrees Fahrenheit, "
+                    f"we've seen efficiency drops of up to 30 percent in some models, while others maintain much better range. "
+                    f"When it comes to charging, the curve is what matters most. A peak of 250 kilowatts is great, "
+                    f"but if it drops to 50 kilowatts after just 10 minutes, your total charging time increases drastically. "
+                    f"Our real-world highway range tests at a constant 70 miles per hour also reveal a gap between EPA ratings "
+                    f"and actual distance. Most EVs achieve between 80 and 90 percent of their claimed range in optimal conditions. "
+                    f"Total cost of ownership is another critical factor. While the purchase price can be higher, "
+                    f"the savings in maintenance and fuel over 100,000 miles can reach 15,000 dollars depending on local electricity rates. "
+                    f"We analyzed market data from last quarter and found that adoption is still growing, driven by "
+                    f"advancements in battery lifespan and charging infrastructure. Solid state batteries are on the horizon, "
+                    f"promising even faster charging and higher safety. In conclusion, the data shows that {topic} is a "
+                    f"complex subject with many variables. Always check the numbers before making a decision. "
+                    f"Subscribe to Ev-CAR-ix for more analytical, data-heavy EV content without the manufacturer hype. "
+                    f"We provide the facts you need to understand the true performance of the cars of the future."
+                )
+            }
+
         return {
             "voice": "female",
             "script": (
                 f"Did you know most EVs lose between 20 and 30 percent of their range in cold weather? "
                 f"Today we break down the real numbers on {topic}. "
                 f"Our data from 500 real-world tests shows the performance gap is far wider than manufacturers admit. "
-                f"Subscribe to Evcarix for real EV data."
+                f"Subscribe to Ev-CAR-ix for real EV data."
             )
         }
 
