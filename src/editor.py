@@ -367,6 +367,9 @@ class AutoEditor:
             
             return gen.create(title=title, stat=stat, category=category, 
                               output_path=output_path, bg_image_path=bg_image_path)
+        except Exception as e:
+            print(f"[Editor] Premium thumbnail hatası: {e}")
+            return None
     def assemble_long_video(self, video_paths, audio_path, script_text,
                             output_filename, bg_music_path=None, category="default"):
         """
