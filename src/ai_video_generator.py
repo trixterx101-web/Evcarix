@@ -1,14 +1,16 @@
 """
 Evcarix AI Video Generator
 Generates topic-relevant AI videos using multiple providers.
-Fallback chain: Kling → Runway → Luma → Stability → HuggingFace → Upsampler → Wan 2.2 (all free)
+Fallback chain: fal.ai → Kling → Runway → Luma → Hailuo → Stability → Wan2.2 → HuggingFace (free)
 
 Environment variables (add to GitHub Secrets):
+  FAL_KEY             — fal.ai LTX-Video (https://fal.ai)  — free credits
   KLING_API_KEY       — Kling AI (https://klingai.com)
   RUNWAY_API_KEY      — Runway ML (https://runwayml.com)
   LUMA_API_KEY        — Luma Dream Machine (https://lumalabs.ai)
+  HAILUO_API_KEY      — Hailuo / MiniMax Video-01 (https://hailuoai.video) — free tier
   STABILITY_API_KEY   — Stability AI (https://stability.ai)
-  (HuggingFace, Upsampler, Wan 2.2: free, no key needed)
+  HF_TOKEN            — HuggingFace (Wan 2.1 & Wan 2.2 via Nebius) — free
 """
 
 import os
@@ -113,6 +115,7 @@ class AIVideoGenerator:
         self.kling_key     = os.environ.get("KLING_API_KEY", "")
         self.runway_key    = os.environ.get("RUNWAY_API_KEY", "")
         self.luma_key      = os.environ.get("LUMA_API_KEY", "")
+        self.hailuo_key    = os.environ.get("HAILUO_API_KEY", "")
         self.stability_key = os.environ.get("STABILITY_API_KEY", "")
         self.fal_key       = os.environ.get("FAL_KEY", "")
 
@@ -165,11 +168,14 @@ class AIVideoGenerator:
             chain.append(("Runway ML",           self._runway))
         if self.luma_key:
             chain.append(("Luma Dream",          self._luma))
+        if self.hailuo_key:
+            chain.append(("Hailuo MiniMax",      self._hailuo))
         if self.stability_key:
             chain.append(("Stability AI",        self._stability))
-        # Always available fallbacks
+        # Always available fallbacks (ücretsiz)
         chain.append(("HuggingFace Gradio",  self._huggingface_gradio))
-        chain.append(("HuggingFace Router",  self._huggingface_router))
+        chain.append(("Wan 2.2 HF Router",   self._wan22))
+        chain.append(("Wan 2.1 HF Router",   self._huggingface_router))
         return chain
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -636,6 +642,156 @@ class AIVideoGenerator:
                     print(f"[HF Router] {r.status_code}: {r.text[:100]}")
             except Exception as e:
                 print(f"[HF Router] {e}")
+            time.sleep(5)
+        return clips
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ── Provider: Hailuo / MiniMax Video-01 ──────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    def _hailuo(self, prompt: str, count: int,
+                duration: int, aspect: str) -> list[str]:
+        """
+        Hailuo AI (MiniMax Video-01) text-to-video.
+        Free tier: ~200 credits/day on signup.
+        Sign up: https://hailuoai.video  → API → copy key → GitHub Secret HAILUO_API_KEY
+        Docs: https://www.minimaxi.chat/document/video-generation
+        """
+        clips  = []
+        BASE   = "https://api.minimaxi.chat/v1"
+        headers = {
+            "Authorization": f"Bearer {self.hailuo_key}",
+            "Content-Type":  "application/json",
+        }
+
+        for i in range(count):
+            try:
+                # ── Submit ──
+                r = requests.post(
+                    f"{BASE}/video_generation",
+                    headers=headers,
+                    json={
+                        "model":   "video-01",
+                        "prompt":  prompt,
+                        "prompt_optimizer": True,
+                    },
+                    timeout=TIMEOUT,
+                )
+                if r.status_code not in (200, 201):
+                    print(f"[Hailuo] Submit hata: {r.status_code} {r.text[:120]}")
+                    break
+
+                task_id = r.json().get("task_id", "")
+                if not task_id:
+                    print("[Hailuo] task_id alınamadı.")
+                    break
+
+                # ── Poll ──
+                deadline = time.time() + MAX_WAIT
+                while time.time() < deadline:
+                    p = requests.get(
+                        f"{BASE}/query/video_generation",
+                        headers=headers,
+                        params={"task_id": task_id},
+                        timeout=TIMEOUT,
+                    )
+                    if p.status_code != 200:
+                        time.sleep(POLL_EVERY)
+                        continue
+                    pdata  = p.json()
+                    status = pdata.get("status", "")
+                    if status == "Success":
+                        url = (pdata.get("file_id") and
+                               self._hailuo_download_url(pdata["file_id"],
+                                                         headers, BASE))
+                        if not url:
+                            # try direct url field
+                            url = pdata.get("video_url", "")
+                        if url:
+                            path = self._download_video(url, f"hailuo_{i}")
+                            if path:
+                                clips.append(path)
+                                print(f"[Hailuo] ✅ Video {i+1} hazır: {path}")
+                        break
+                    elif status in ("Fail", "Failed", "error"):
+                        print(f"[Hailuo] Task başarısız: {task_id}")
+                        break
+                    print(f"[Hailuo] Bekleniyor... status={status}")
+                    time.sleep(POLL_EVERY)
+
+            except Exception as e:
+                print(f"[Hailuo] {e}")
+                break
+            time.sleep(3)
+        return clips
+
+    def _hailuo_download_url(self, file_id: str,
+                              headers: dict, base: str) -> str:
+        """Retrieve CDN download URL from a Hailuo file_id."""
+        try:
+            r = requests.get(
+                f"{base}/files/retrieve",
+                headers=headers,
+                params={"file_id": file_id},
+                timeout=TIMEOUT,
+            )
+            if r.status_code == 200:
+                return r.json().get("file", {}).get("download_url", "")
+        except Exception as e:
+            print(f"[Hailuo] file retrieve hata: {e}")
+        return ""
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ── Provider: Wan 2.2 via HuggingFace Nebius Router (FREE) ───────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    def _wan22(self, prompt: str, count: int,
+               duration: int, aspect: str) -> list[str]:
+        """
+        Wan 2.2 T2V-14B via HuggingFace Inference Providers (Nebius).
+        Requires HF_TOKEN (free account). Significantly better than Wan 2.1.
+        Model: Wan-AI/Wan2.2-T2V-14B
+        """
+        hf_token = os.environ.get("HF_TOKEN", "")
+        if not hf_token:
+            print("[Wan2.2] HF_TOKEN yok, atlanıyor.")
+            return []
+
+        clips    = []
+        endpoint = "https://router.huggingface.co/nebius/v1/video/generate"
+        headers  = {
+            "Authorization": f"Bearer {hf_token}",
+            "Content-Type":  "application/json",
+        }
+
+        for i in range(count):
+            try:
+                r = requests.post(
+                    endpoint,
+                    headers=headers,
+                    json={
+                        "model":      "Wan-AI/Wan2.2-T2V-14B",
+                        "prompt":     prompt,
+                        "num_frames": 81,
+                        "fps":        16,
+                        "resolution": "480p",
+                        "seed":       int(time.time()) + i,
+                    },
+                    timeout=180,
+                )
+                if r.status_code == 200:
+                    ct = r.headers.get("content-type", "")
+                    if "video" in ct or "octet-stream" in ct:
+                        path = ASSETS_DIR / f"wan22_{i}_{int(time.time())}.mp4"
+                        with open(path, "wb") as f:
+                            f.write(r.content)
+                        if path.stat().st_size > 50_000:
+                            print(f"[Wan2.2] ✅ {path.name}")
+                            clips.append(str(path))
+                        else:
+                            path.unlink(missing_ok=True)
+                else:
+                    print(f"[Wan2.2] {r.status_code}: {r.text[:120]}")
+            except Exception as e:
+                print(f"[Wan2.2] {e}")
             time.sleep(5)
         return clips
 

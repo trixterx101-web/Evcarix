@@ -104,6 +104,7 @@ jobs:
           STABILITY_API_KEY:         ${{ secrets.STABILITY_API_KEY }}
           HF_TOKEN:                  ${{ secrets.HF_TOKEN }}
           FAL_KEY:                   ${{ secrets.FAL_KEY }}
+          HAILUO_API_KEY:            ${{ secrets.HAILUO_API_KEY }}
           # Mode: trend (YouTube'tan ilham) veya auto (sistem konusu)
           # cron 07:00 UTC -> trend, cron 13:00 UTC -> auto, cron 08:00 UTC Sunday -> long video
           # FIX: Pazar cron'u (0 8 * * 0) için VIDEO_TYPE=long, UPLOAD_SLOT=SUNDAY_LONG
