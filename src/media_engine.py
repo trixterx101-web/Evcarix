@@ -1023,7 +1023,20 @@ class MediaEngine:
         except Exception as e:
             print(f"[MediaEngine] OEM Scraper hata (atlandı): {e}")
 
-        # ── ADIM 2: OEM Static — Tesla CDN (doğrulanmış URL'ler) ─────────────────
+        # ── ADIM 2: YouTube Creative Commons (Telif Problemi Olmayan Kaynak) ──
+        if len(all_paths) < count:
+            print(f"[MediaEngine] YouTube Creative Commons aranıyor: {query}...")
+            try:
+                # Get more variety by using a slightly broader query for YT CC
+                yt_query = query.split(":")[0] if ":" in query else query
+                yt_clips = self._download_from_youtube_cc(yt_query, output_dir, max(2, count - len(all_paths)))
+                yt_fresh = self._filter_used_clips(yt_clips)
+                all_paths += [p for p in yt_fresh if p not in all_paths]
+                print(f"[MediaEngine] YouTube CC: {len(yt_fresh)} klip eklendi.")
+            except Exception as e:
+                print(f"[MediaEngine] YouTube CC hatası: {e}")
+
+        # ── ADIM 3: OEM Static — Tesla CDN (doğrulanmış URL'ler) ─────────────────
         if len(all_paths) < count:
             needed = min(count - len(all_paths), 3)
             oem_static = self._download_from_oem(query, output_dir, needed, category)
@@ -1049,17 +1062,6 @@ class MediaEngine:
             pix_fresh = self._filter_used_clips(pix)
             all_paths += [p for p in pix_fresh if p not in all_paths]
             print(f"[MediaEngine] Pixabay HD: {len(pix_fresh)} taze klip")
-
-        # ── ADIM 4.5: YouTube Creative Commons (Telif Problemi Olmayan Kaynak) ──
-        if len(all_paths) < count:
-            print(f"[MediaEngine] YouTube Creative Commons aranıyor: {query}...")
-            try:
-                yt_clips = self._download_from_youtube_cc(query, output_dir, count - len(all_paths))
-                yt_fresh = self._filter_used_clips(yt_clips)
-                all_paths += [p for p in yt_fresh if p not in all_paths]
-                print(f"[MediaEngine] YouTube CC: {len(yt_fresh)} klip eklendi.")
-            except Exception as e:
-                print(f"[MediaEngine] YouTube CC hatası: {e}")
 
         # ── ADIM 5: FreeVideoSources — key gerektirmeyen kaynaklar ───────────────
         if len(all_paths) < count:
@@ -1690,7 +1692,7 @@ class MediaEngine:
         search_query = f'"{query}" "creative commons"'
         cmd_search = [
             "yt-dlp", "--get-id", "--max-downloads", str(count + 3),
-            "--match-filter", "license='Creative Commons Attribution license (reuse allowed)'",
+            "--match-filter", "license ~= '(?i)Creative Commons'",
             f"ytsearch{count+5}:{search_query}"
         ]
         
