@@ -1,14 +1,13 @@
 """
 Evcarix AI Video Generator
 Generates topic-relevant AI videos using multiple providers.
-Fallback chain: fal.ai → Kling → Runway → Luma → Hailuo → Stability → Wan2.2 → HuggingFace (free)
+Fallback chain: fal.ai → Kling → Runway → Luma → Stability → Wan2.2 → HuggingFace (free)
 
 Environment variables (add to GitHub Secrets):
   FAL_KEY             — fal.ai LTX-Video (https://fal.ai)  — free credits
   KLING_API_KEY       — Kling AI (https://klingai.com)
   RUNWAY_API_KEY      — Runway ML (https://runwayml.com)
   LUMA_API_KEY        — Luma Dream Machine (https://lumalabs.ai)
-  HAILUO_API_KEY      — Hailuo / MiniMax Video-01 (https://hailuoai.video) — free tier
   STABILITY_API_KEY   — Stability AI (https://stability.ai)
   HF_TOKEN            — HuggingFace (Wan 2.1 & Wan 2.2 via Nebius) — free
 """
@@ -115,7 +114,6 @@ class AIVideoGenerator:
         self.kling_key     = os.environ.get("KLING_API_KEY", "")
         self.runway_key    = os.environ.get("RUNWAY_API_KEY", "")
         self.luma_key      = os.environ.get("LUMA_API_KEY", "")
-        self.hailuo_key    = os.environ.get("HAILUO_API_KEY", "")
         self.stability_key = os.environ.get("STABILITY_API_KEY", "")
         self.fal_key       = os.environ.get("FAL_KEY", "")
 
@@ -168,8 +166,6 @@ class AIVideoGenerator:
             chain.append(("Runway ML",           self._runway))
         if self.luma_key:
             chain.append(("Luma Dream",          self._luma))
-        if self.hailuo_key:
-            chain.append(("Hailuo MiniMax",      self._hailuo))
         if self.stability_key:
             chain.append(("Stability AI",        self._stability))
         # Always available fallbacks (ücretsiz)
