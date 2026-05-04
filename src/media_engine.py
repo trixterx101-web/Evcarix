@@ -1006,35 +1006,35 @@ class MediaEngine:
         os.makedirs(output_dir, exist_ok=True)
         all_paths = []
 
-        # ── ADIM 1: OEM Scraper — 20+ marka press/newsroom ───────────────────────
+        # ── ADIM 1: YouTube Creative Commons (EN YÜKSEK ÖNCELİK - HD KALİTE) ──
+        print(f"[MediaEngine] YouTube Creative Commons aranıyor: {query}...")
         try:
-            from src.oem_scraper import OEMScraper
-            oem_scraper = OEMScraper()
-            _vtype = "short" if orientation == "portrait" else "long"
-            oem_scraped = oem_scraper.get_clips(
-                topic=query,
-                category_id=category or "",
-                count=min(count, 3),
-                video_type=_vtype,
-            )
-            oem_scraped_fresh = self._filter_used_clips(oem_scraped)
-            all_paths += oem_scraped_fresh
-            print(f"[MediaEngine] OEM Scraper (press/newsroom): {len(oem_scraped_fresh)} taze klip")
+            # Get more variety by using a slightly broader query for YT CC
+            yt_query = query.split(":")[0] if ":" in query else query
+            yt_clips = self._download_from_youtube_cc(yt_query, output_dir, count)
+            yt_fresh = self._filter_used_clips(yt_clips)
+            all_paths += [p for p in yt_fresh if p not in all_paths]
+            print(f"[MediaEngine] YouTube CC: {len(yt_fresh)} klip eklendi.")
         except Exception as e:
-            print(f"[MediaEngine] OEM Scraper hata (atlandı): {e}")
+            print(f"[MediaEngine] YouTube CC hatası: {e}")
 
-        # ── ADIM 2: YouTube Creative Commons (Telif Problemi Olmayan Kaynak) ──
+        # ── ADIM 2: OEM Scraper — 20+ marka press/newsroom ───────────────────────
         if len(all_paths) < count:
-            print(f"[MediaEngine] YouTube Creative Commons aranıyor: {query}...")
             try:
-                # Get more variety by using a slightly broader query for YT CC
-                yt_query = query.split(":")[0] if ":" in query else query
-                yt_clips = self._download_from_youtube_cc(yt_query, output_dir, max(2, count - len(all_paths)))
-                yt_fresh = self._filter_used_clips(yt_clips)
-                all_paths += [p for p in yt_fresh if p not in all_paths]
-                print(f"[MediaEngine] YouTube CC: {len(yt_fresh)} klip eklendi.")
+                from src.oem_scraper import OEMScraper
+                oem_scraper = OEMScraper()
+                _vtype = "short" if orientation == "portrait" else "long"
+                oem_scraped = oem_scraper.get_clips(
+                    topic=query,
+                    category_id=category or "",
+                    count=min(count - len(all_paths), 3),
+                    video_type=_vtype,
+                )
+                oem_scraped_fresh = self._filter_used_clips(oem_scraped)
+                all_paths += oem_scraped_fresh
+                print(f"[MediaEngine] OEM Scraper (press/newsroom): {len(oem_scraped_fresh)} taze klip")
             except Exception as e:
-                print(f"[MediaEngine] YouTube CC hatası: {e}")
+                print(f"[MediaEngine] OEM Scraper hata (atlandı): {e}")
 
         # ── ADIM 3: OEM Static — Tesla CDN (doğrulanmış URL'ler) ─────────────────
         if len(all_paths) < count:
@@ -1688,38 +1688,48 @@ class MediaEngine:
         import subprocess
         paths = []
         
-        # Search for CC videos using yt-dlp
-        # Simplify query for better search results
+        # Search strategy: Try specific query, then fallback to broader one
         search_words = query.split()
-        simple_query = " ".join(search_words[:3]) if len(search_words) > 3 else query
-        search_query = f'"{simple_query}" "creative commons"'
-        cmd_search = [
-            "yt-dlp", "--get-id", "--max-downloads", str(count + 3),
-            "--match-filter", "license ~= '(?i)Creative Commons'",
-            f"ytsearch{count+5}:{search_query}"
+        queries_to_try = [
+            f"{query} review b-roll",                  # Çok spesifik
+            " ".join(search_words[:3]) + " review",    # Orta (Marka + Model)
+            " ".join(search_words[:2]) + " cinematic", # Genel (Marka)
         ]
         
-        try:
-            result = subprocess.run(cmd_search, capture_output=True, text=True, timeout=60)
-            video_ids = [vid.strip() for vid in result.stdout.strip().split('\n') if vid.strip()]
+        for search_query in queries_to_try:
+            if len(paths) >= count: break
             
-            for vid in video_ids[:count]:
-                out_path = os.path.join(output_dir, f"yt_cc_{vid}.mp4")
-                if os.path.exists(out_path):
-                    paths.append(out_path)
-                    continue
+            print(f"[MediaEngine] [YT-CC] Deneniyor: {search_query}")
+            cmd_search = [
+                "yt-dlp", "--get-id", "--max-downloads", str(count + 2),
+                "--match-filter", "license ~= '(?i)Creative Commons' | license ~= '(?i)cc-by'",
+                f"ytsearch{count+3}:{search_query}"
+            ]
+            
+            try:
+                result = subprocess.run(cmd_search, capture_output=True, text=True, timeout=30)
+                video_ids = [vid.strip() for vid in result.stdout.strip().split('\n') if vid.strip()]
                 
-                # Download 10 seconds from the middle
-                cmd_dl = [
-                    "yt-dlp", "-f", "bestvideo[height<=1080][ext=mp4]",
-                    "--download-sections", "*15-25",
-                    "--force-overwrites",
-                    "-o", out_path,
-                    f"https://www.youtube.com/watch?v={vid}"
-                ]
-                subprocess.run(cmd_dl, capture_output=True, timeout=90)
-                if os.path.exists(out_path) and os.path.getsize(out_path) > 100000:
-                    paths.append(out_path)
+                for vid in video_ids:
+                    if len(paths) >= count: break
+                    out_path = os.path.join(output_dir, f"yt_cc_{vid}.mp4")
+                    if os.path.exists(out_path):
+                        paths.append(out_path)
+                        continue
+                    
+                    # Download 10-12 seconds from a safe high-quality range
+                    cmd_dl = [
+                        "yt-dlp", "-f", "bestvideo[height<=1080][ext=mp4]",
+                        "--download-sections", "*20-32",
+                        "--force-overwrites",
+                        "-o", out_path,
+                        f"https://www.youtube.com/watch?v={vid}"
+                    ]
+                    subprocess.run(cmd_dl, capture_output=True, timeout=60)
+                    if os.path.exists(out_path) and os.path.getsize(out_path) > 150000:
+                        paths.append(out_path)
+            except Exception:
+                continue
         except Exception as e:
             print(f"[MediaEngine] YouTube CC indirme hatası: {e}")
             
