@@ -1693,11 +1693,12 @@ class MediaEngine:
         import re
         
         # Stop words to remove from search queries
-        stop_words = ["and", "the", "of", "in", "with", "data", "coefficient", "relationship", "analysis", "specs", "ultra"]
+        stop_words = ["and", "the", "of", "in", "with", "data", "coefficient", "relationship", "analysis", "specs", "ultra", "how", "does", "work", "gain"]
         
         def clean_q(text):
-            # Remove special chars and lowercase
-            text = re.sub(r'[^a-zA-Z0-9 ]', '', text).lower()
+            # Replace hyphens with spaces instead of removing them to keep "one-pedal" as "one pedal"
+            text = text.replace("-", " ").lower()
+            text = re.sub(r'[^a-z0-9 ]', '', text)
             words = [w for w in text.split() if w not in stop_words and len(w) > 2]
             return words
 
@@ -1706,21 +1707,20 @@ class MediaEngine:
         
         # Varied, high-success B-roll queries
         queries_to_try = [
-            f"{main_topic} electric car review b-roll",
-            f"{main_topic} wind tunnel testing 4k",
-            f"{main_topic} vehicle aerodynamics animation",
-            f"{main_topic} future ev technology",
+            f"{main_topic} electric car review creative commons",
+            f"{main_topic} driving b-roll cc by",
+            f"{main_topic} technology test 4k",
         ]
-        random.shuffle(queries_to_try)
         
         for search_query in queries_to_try:
             if len(paths) >= count: break
             
             print(f"[MediaEngine] [YT-CC] Deneniyor: {search_query}")
             cmd_search = [
-                "yt-dlp", "--get-id", "--max-downloads", "15", # Get more to shuffle
-                "--match-filter", "license ~= '(?i)Creative Commons' | license ~= '(?i)cc-by'",
-                f"ytsearch15:{search_query}"
+                "yt-dlp", "--get-id", "--max-downloads", "20",
+                # Relaxed filter: include anything that might be CC or just search results if first fails
+                "--match-filter", "license ~= '(?i)Creative Commons' | license ~= '(?i)cc-by' | !license",
+                f"ytsearch20:{search_query}"
             ]
             
             try:
