@@ -1,11 +1,11 @@
 name: Evcarix Daily Shorts
 
-# TR Saati 10:00 = UTC 07:00  |  TR Saati 16:00 = UTC 13:00  |  TR Saati Pazar 11:00 = UTC 08:00
+# TR Saati 08:00 = UTC 07:00  |  TR Saati 16:00 = UTC 13:00  |  TR Saati Pazar 10:00 = UTC 08:00
 on:
   schedule:
-    - cron: '0 7 * * *'   # TR 10:00 — Trend modu (YouTube'tan ilham)
+    - cron: '0 7 * * *'   # TR 08:00 — Trend modu (YouTube'tan ilham)
     - cron: '0 13 * * *'  # TR 16:00 — Auto modu (sistem konusu)
-    - cron: '0 8 * * 0'   # Pazar TR 11:00 — Haftalık uzun video (UTC 08:00)
+    - cron: '0 8 * * 0'   # Pazar TR 10:00 — Haftalık uzun video (UTC 08:00)
   workflow_dispatch:
     inputs:
       video_type:
