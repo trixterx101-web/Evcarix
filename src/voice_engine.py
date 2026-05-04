@@ -16,16 +16,20 @@ class VoiceEngine:
         Metni ses dosyasına dönüştürür ve kelime zamanlamalarını döner.
         edge-tts >= 6.1.9 ile uyumlu.
         """
-        # Normalize brand name pronunciation before TTS
-        pronunciation_map = {
-            "Evcarix":  "Ev-Car-ix",
-            "EVCARIX":  "Ev-Car-ix",
-            "evcarix":  "Ev-Car-ix",
-            "Everix":   "Ev-Car-ix",
-            "Evcaris":  "Ev-Car-ix",
+        # Genişletilmiş telaffuz haritası (Case-insensitive ve farklı varyasyonlar)
+        import re
+        patterns = {
+            r"(?i)Evcarix": "Ev-Car-ix",
+            r"(?i)Everix": "Ev-Car-ix",
+            r"(?i)Ev-CAR-ix": "Ev-Car-ix",
+            r"(?i)Evcaris": "Ev-Car-ix",
+            r"(?i)Ev-Car-ix": "Ev-Car-ix",
         }
-        for wrong, correct in pronunciation_map.items():
-            text = text.replace(wrong, correct)
+        for pattern, replacement in patterns.items():
+            text = re.sub(pattern, replacement, text)
+        
+        # Videonun sonunda sesin aniden kesilmemesi için 0.5 saniyelik sessizlik tamponu
+        text += " . . ."
         
         voice = self.voices.get(voice_type, self.default_voice)
         print(f"[VoiceEngine] Ses kullanılıyor: {voice}")

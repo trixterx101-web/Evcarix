@@ -158,21 +158,9 @@ class AutoEditor:
         import random
         audio = AudioFileClip(audio_path)
         
-        # Video süresi 25-50 saniye random aralığında
-        min_duration = 25
-        max_duration = 50
-        target_duration = random.uniform(min_duration, max_duration)
-        
-        # Audio süresini kullan, loop yapma (metin tekrarını önlemek için)
-        # Video süresini audio süresine eşitle
-        target_duration = min(target_duration, audio.duration)
-        
-        # Audio çok uzunsa kırp
-        if audio.duration > target_duration:
-            audio = audio.subclip(0, target_duration)
-        
-        # Log actual vs target so we can debug future repetitions
-        print(f"[Editor] Audio: {audio.duration:.1f}s / Target: {target_duration:.1f}s")
+        # Video süresini tam olarak audio süresine eşitle (Kesilmeyi önlemek için kritik)
+        target_duration = audio.duration
+        print(f"[Editor] Audio: {audio.duration:.2f}s | Target synced to audio.")
 
         clips = []
         for path in (video_paths or []):
@@ -273,6 +261,11 @@ class AutoEditor:
             if os.path.exists(hook_img_path):
                 from moviepy.editor import ImageClip
                 hook_duration = 4.0
+                
+                # ADJUST: Subtract hook duration from base video to keep total duration == audio duration
+                if base_video.duration > hook_duration:
+                    base_video = base_video.subclip(0, base_video.duration - hook_duration)
+                
                 hook_clip = ImageClip(hook_img_path).set_duration(hook_duration).resize((1080, 1920))
                 
                 # Dynamic Zoom Effect (Ken Burns)
@@ -281,7 +274,7 @@ class AutoEditor:
                 
                 # FIX: Ensure clips are compatible before concatenation
                 base_video = concatenate_videoclips([hook_clip, base_video], method="chain")
-                print(f"[Editor] [Hook] 4s Dynamic Hook prepended: {hook_img_path}")
+                print(f"[Editor] [Hook] 4s Dynamic Hook prepended. Total duration: {base_video.duration:.1f}s")
         except Exception as e:
             print(f"[Editor] [Hook] Failed to create hook: {e}")
 
