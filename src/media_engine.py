@@ -1689,11 +1689,17 @@ class MediaEngine:
         paths = []
         
         # Search strategy: Try specific query, then fallback to broader one
+        import random
         search_words = query.split()
+        
+        # Keyword variations to get different types of shots
+        suffixes = ["review b-roll", "driving POV", "interior details", "4k cinematic", "features test"]
+        random.shuffle(suffixes)
+        
         queries_to_try = [
-            f"{query} review b-roll",                  # Çok spesifik
-            " ".join(search_words[:3]) + " review",    # Orta (Marka + Model)
-            " ".join(search_words[:2]) + " cinematic", # Genel (Marka)
+            f"{query} {suffixes[0]}",
+            " ".join(search_words[:3]) + f" {suffixes[1]}",
+            " ".join(search_words[:2]) + f" {suffixes[2]}",
         ]
         
         for search_query in queries_to_try:
@@ -1701,26 +1707,36 @@ class MediaEngine:
             
             print(f"[MediaEngine] [YT-CC] Deneniyor: {search_query}")
             cmd_search = [
-                "yt-dlp", "--get-id", "--max-downloads", str(count + 2),
+                "yt-dlp", "--get-id", "--max-downloads", "15", # Get more to shuffle
                 "--match-filter", "license ~= '(?i)Creative Commons' | license ~= '(?i)cc-by'",
-                f"ytsearch{count+3}:{search_query}"
+                f"ytsearch15:{search_query}"
             ]
             
             try:
                 result = subprocess.run(cmd_search, capture_output=True, text=True, timeout=30)
-                video_ids = [vid.strip() for vid in result.stdout.strip().split('\n') if vid.strip()]
+                all_vids = [vid.strip() for vid in result.stdout.strip().split('\n') if vid.strip()]
+                random.shuffle(all_vids) # SHUFFLE to avoid always picking the first result
                 
-                for vid in video_ids:
+                for vid in all_vids:
                     if len(paths) >= count: break
+                    
+                    # Check if we already used this video ID recently
+                    if self._is_video_id_used(vid):
+                        continue
+                        
                     out_path = os.path.join(output_dir, f"yt_cc_{vid}.mp4")
                     if os.path.exists(out_path):
                         paths.append(out_path)
                         continue
                     
-                    # Download 10-12 seconds from a safe high-quality range
+                    # RANDOM START TIME: Pick a random 12s segment from the first 5 minutes
+                    # This dramatically increases variety even if the same video is found
+                    start_points = ["30-42", "60-72", "90-102", "150-162", "210-222"]
+                    chosen_segment = random.choice(start_points)
+                    
                     cmd_dl = [
                         "yt-dlp", "-f", "bestvideo[height<=1080][ext=mp4]",
-                        "--download-sections", "*20-32",
+                        "--download-sections", f"*{chosen_segment}",
                         "--force-overwrites",
                         "-o", out_path,
                         f"https://www.youtube.com/watch?v={vid}"
@@ -1728,9 +1744,46 @@ class MediaEngine:
                     subprocess.run(cmd_dl, capture_output=True, timeout=60)
                     if os.path.exists(out_path) and os.path.getsize(out_path) > 150000:
                         paths.append(out_path)
+                        self._mark_video_id_used(vid) # Mark as used
             except Exception:
                 continue
         except Exception as e:
             print(f"[MediaEngine] YouTube CC indirme hatası: {e}")
             
         return paths
+    def _is_video_id_used(self, video_id: str) -> bool:
+        """Video ID'nin daha önce kullanılıp kullanılmadığını kontrol eder."""
+        try:
+            history_file = "media_id_history.json"
+            if not os.path.exists(history_file):
+                return False
+            with open(history_file, "r") as f:
+                history = json.load(f)
+            return video_id in history
+        except Exception:
+            return False
+
+    def _mark_video_id_used(self, video_id: str):
+        """Kullanılan Video ID'yi geçmişe kaydeder."""
+        try:
+            history_file = "media_id_history.json"
+            history = []
+            if os.path.exists(history_file):
+                with open(history_file, "r") as f:
+                    history = json.load(f)
+            if video_id not in history:
+                history.append(video_id)
+                # Son 500 videoyu tut (hafıza yönetimi)
+                history = history[-500:]
+                with open(history_file, "w") as f:
+                    json.dump(history, f)
+        except Exception:
+            pass
+            
+    def _filter_used_clips(self, paths):
+        """Eski klipleri filtrele (mevcut mantık)."""
+        if not hasattr(self, '_used_clips'):
+            self._used_clips = set()
+        fresh = [p for p in paths if p not in self._used_clips]
+        self._used_clips.update(fresh)
+        return fresh
