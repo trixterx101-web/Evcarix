@@ -1688,19 +1688,30 @@ class MediaEngine:
         import subprocess
         paths = []
         
-        # Search strategy: Try specific query, then fallback to broader one
+        # Search strategy: Clean query and try layered simplification
         import random
-        search_words = query.split()
+        import re
         
-        # Keyword variations to get different types of shots
-        suffixes = ["review b-roll", "driving POV", "interior details", "4k cinematic", "features test"]
-        random.shuffle(suffixes)
+        # Stop words to remove from search queries
+        stop_words = ["and", "the", "of", "in", "with", "data", "coefficient", "relationship", "analysis", "specs", "ultra"]
         
+        def clean_q(text):
+            # Remove special chars and lowercase
+            text = re.sub(r'[^a-zA-Z0-9 ]', '', text).lower()
+            words = [w for w in text.split() if w not in stop_words and len(w) > 2]
+            return words
+
+        clean_words = clean_q(query)
+        main_topic = " ".join(clean_words[:2]) if clean_words else "electric car"
+        
+        # Varied, high-success B-roll queries
         queries_to_try = [
-            f"{query} {suffixes[0]}",
-            " ".join(search_words[:3]) + f" {suffixes[1]}",
-            " ".join(search_words[:2]) + f" {suffixes[2]}",
+            f"{main_topic} electric car review b-roll",
+            f"{main_topic} wind tunnel testing 4k",
+            f"{main_topic} vehicle aerodynamics animation",
+            f"{main_topic} future ev technology",
         ]
+        random.shuffle(queries_to_try)
         
         for search_query in queries_to_try:
             if len(paths) >= count: break
