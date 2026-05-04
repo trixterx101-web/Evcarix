@@ -35,21 +35,20 @@ class VoiceEngine:
 
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
-        # Önce audio dosyasını kaydet
-        await communicate.save(output_path)
-
-        # Sonra ayrı bir communicate instance ile word boundary al
-        communicate2 = edge_tts.Communicate(text, voice, rate=rate)
-        async for chunk in communicate2.stream():
-            if chunk["type"] == "WordBoundary":
-                # FIX: offset/duration artık int (100-nanosecond ticks)
-                start_sec = chunk["offset"] / 10_000_000
-                dur_sec = chunk["duration"] / 10_000_000
-                subs.append({
-                    "text": chunk["text"],
-                    "start": start_sec,
-                    "duration": dur_sec,
-                })
+        # Stream and save simultaneously to ensure word boundaries are captured
+        with open(output_path, "wb") as f:
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    f.write(chunk["data"])
+                elif chunk["type"] == "WordBoundary":
+                    # FIX: offset/duration are in 100-nanosecond units
+                    start_sec = chunk["offset"] / 10_000_000
+                    dur_sec = chunk["duration"] / 10_000_000
+                    subs.append({
+                        "text": chunk["text"],
+                        "start": start_sec,
+                        "duration": dur_sec,
+                    })
 
         if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
             raise RuntimeError(f"[VoiceEngine] Ses dosyası oluşturulamadı: {output_path}")

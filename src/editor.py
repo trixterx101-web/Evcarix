@@ -279,7 +279,8 @@ class AutoEditor:
                 hook_clip = hook_clip.resize(lambda t: 1.0 + 0.1 * (t / hook_duration))
                 hook_clip = hook_clip.set_fps(30).set_position('center')
                 
-                base_video = concatenate_videoclips([hook_clip, base_video], method="compose")
+                # FIX: Ensure clips are compatible before concatenation
+                base_video = concatenate_videoclips([hook_clip, base_video], method="chain")
                 print(f"[Editor] [Hook] 4s Dynamic Hook prepended: {hook_img_path}")
         except Exception as e:
             print(f"[Editor] [Hook] Failed to create hook: {e}")

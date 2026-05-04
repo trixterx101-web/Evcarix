@@ -243,32 +243,32 @@ class EvcarixBrain:
 
                     self._save_history(triggered_plan)
 
-                # SEO metadata ekle
-                import datetime as _dt
-                best_hours = [6, 7, 8, 14, 15, 16, 19, 20]
-                now_h = _dt.datetime.utcnow().hour
-                next_best = min(best_hours, key=lambda h: (h - now_h) % 24)
-                triggered_plan["seo_metadata"] = {
-                    "suggested_upload_time_utc": f"{next_best:02d}:00",
-                    "first_24h_actions": [
-                        "Pin a question comment immediately after upload",
-                        "Reply to ALL comments within first 2 hours",
-                        "Share to r/electricvehicles and r/teslamotors",
-                        "Post on Twitter/X with top 3 hashtags",
-                        "Add to EV Data playlist within 10 min of upload",
-                    ],
-                    "a_b_test_titles": triggered_plan.get("all_titles", []),
-                    "target_ctr": "12-18%",
-                    "target_retention": "70%+",
-                    "shorts_optimization": {
-                        "hook_in_first_3s": True,
-                        "loop_friendly_ending": True,
-                        "vertical_9_16": True,
-                        "recommended_length_sec": 38,
+                    # SEO metadata ekle
+                    import datetime as _dt
+                    best_hours = [6, 7, 8, 14, 15, 16, 19, 20]
+                    now_h = _dt.datetime.utcnow().hour
+                    next_best = min(best_hours, key=lambda h: (h - now_h) % 24)
+                    triggered_plan["seo_metadata"] = {
+                        "suggested_upload_time_utc": f"{next_best:02d}:00",
+                        "first_24h_actions": [
+                            "Pin a question comment immediately after upload",
+                            "Reply to ALL comments within first 2 hours",
+                            "Share to r/electricvehicles and r/teslamotors",
+                            "Post on Twitter/X with top 3 hashtags",
+                            "Add to EV Data playlist within 10 min of upload",
+                        ],
+                        "a_b_test_titles": triggered_plan.get("all_titles", []),
+                        "target_ctr": "12-18%",
+                        "target_retention": "70%+",
+                        "shorts_optimization": {
+                            "hook_in_first_3s": True,
+                            "loop_friendly_ending": True,
+                            "vertical_9_16": True,
+                            "recommended_length_sec": 38,
+                        }
                     }
-                }
-                print(f"[Brain] 📊 Upload önerisi: {next_best:02d}:00 UTC | Hedef CTR: %12-18")
-                return triggered_plan
+                    print(f"[Brain] 📊 Upload önerisi: {next_best:02d}:00 UTC | Hedef CTR: %12-18")
+                    return triggered_plan
             except Exception as e:
                 print(f"[Brain] Trend tetikleyici hatası (normal moda geçiliyor): {e}")
         # ── Trend bulunamazsa normal pipeline devam eder ─────────────

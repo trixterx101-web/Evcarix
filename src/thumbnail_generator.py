@@ -89,7 +89,7 @@ class ThumbnailGenerator:
                 
                 chat_completion = client.chat.completions.create(
                     messages=[{"role": "user", "content": designer_prompt}],
-                    model="llama3-70b-8192",
+                    model="llama-3.3-70b-versatile",
                 )
                 ai_designed_prompt = chat_completion.choices[0].message.content.strip()
                 

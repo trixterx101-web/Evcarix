@@ -1689,7 +1689,10 @@ class MediaEngine:
         paths = []
         
         # Search for CC videos using yt-dlp
-        search_query = f'"{query}" "creative commons"'
+        # Simplify query for better search results
+        search_words = query.split()
+        simple_query = " ".join(search_words[:3]) if len(search_words) > 3 else query
+        search_query = f'"{simple_query}" "creative commons"'
         cmd_search = [
             "yt-dlp", "--get-id", "--max-downloads", str(count + 3),
             "--match-filter", "license ~= '(?i)Creative Commons'",

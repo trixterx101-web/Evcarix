@@ -1076,7 +1076,7 @@ Return ONLY this JSON (no markdown, no backticks):
                 print(f"[LLM] Gemini: {e}")
             return None
 
-    def _call_llm_groq(self, system, user, model):
+    def _call_llm_groq(self, system, user, model="llama-3.3-70b-versatile"):
         groq_keys = [k for k in [
             os.getenv("GROQ_API_KEY"),
             os.getenv("GROQ_API_KEY_2"),
@@ -1097,7 +1097,7 @@ Return ONLY this JSON (no markdown, no backticks):
                     )
                     return resp.choices[0].message.content.strip()
                 except Exception as e:
-                    if "429" in str(e) or "rate_limit" in str(e).lower():
+                    if "429" in str(e) or "rate_limit" in str(e).lower() or "decommissioned" in str(e):
                         continue
                     raise
         except Exception as e:
