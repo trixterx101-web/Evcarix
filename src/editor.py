@@ -253,9 +253,41 @@ class AutoEditor:
             print("[Editor] Motion gradient arka plan kullanılıyor...")
             base_video = self._make_motion_background(target_duration)
 
-        base_video = base_video.set_audio(audio)
+        # ── Step 4: Premium Hook System (4 Seconds) ──
+        try:
+            from src.thumbnail_generator import ThumbnailGenerator
+            tg = ThumbnailGenerator()
+            bg_hint = video_paths[0] if video_paths and os.path.exists(video_paths[0]) else None
+            hook_img_path = os.path.join(self.output_dir, f"hook_{output_filename}.jpg")
+            
+            clean_title = output_filename.replace("_", " ").replace(".mp4", "").upper()
+            # --- Manual Hook Override ---
+            manual_hook = "assets/manual_hook.jpg"
+            if os.path.exists(manual_hook):
+                hook_img_path = manual_hook
+                print(f"[Editor] [Hook] Manual hook detected: {manual_hook}")
+            else:
+                tg.create(title=clean_title, category=category, is_short=True, 
+                          output_path=hook_img_path, bg_image_path=bg_hint)
+            
+            if os.path.exists(hook_img_path):
+                from moviepy.editor import ImageClip
+                hook_duration = 4.0
+                hook_clip = ImageClip(hook_img_path).set_duration(hook_duration).resize((1080, 1920))
+                
+                # Dynamic Zoom Effect (Ken Burns)
+                hook_clip = hook_clip.resize(lambda t: 1.0 + 0.1 * (t / hook_duration))
+                hook_clip = hook_clip.set_fps(30).set_position('center')
+                
+                base_video = concatenate_videoclips([hook_clip, base_video], method="compose")
+                print(f"[Editor] [Hook] 4s Dynamic Hook prepended: {hook_img_path}")
+        except Exception as e:
+            print(f"[Editor] [Hook] Failed to create hook: {e}")
 
+        # Set audio AFTER all visual concatenation
+        base_video = base_video.set_audio(audio)
         all_layers = [base_video]
+
         if word_timings:
             subtitle_clips = self._build_subtitle_clips(word_timings, target_duration)
             all_layers.extend(subtitle_clips)
@@ -284,7 +316,7 @@ class AutoEditor:
         )
         audio.close()
         final_video.close()
-        print(f"[Editor] ✅ Video hazır: {output_path}")
+        print(f"[Editor] [OK] Video hazir: {output_path}")
         return output_path
 
     # ─── Premium Thumbnail ─────────────────────────────────────────────────
@@ -319,211 +351,133 @@ class AutoEditor:
         return output_path
 
     def generate_thumbnail(self, title: str, output_path: str,
-                           channel_name="EVCARIX", bg_image_path: str = None) -> str:
+                           category="default", bg_image_path: str = None) -> str:
         """
-        Gelişmiş thumbnail oluşturucu.
-        bg_image_path verilirse arka plana yerleştirir, yoksa koyu lacivert kullanır.
+        Gelişmiş premium thumbnail oluşturucu.
         """
-        from PIL import ImageFilter, ImageEnhance
-        W, H = 1280, 720
-        
-        if bg_image_path and os.path.exists(bg_image_path):
-            try:
-                # Video dosyası mı yoksa resim mi kontrol et
-                ext = Path(bg_image_path).suffix.lower()
-                if ext in ['.mp4', '.mov', '.avi', '.mkv']:
-                    from moviepy.editor import VideoFileClip
-                    with VideoFileClip(bg_image_path) as clip:
-                        # 2. saniyeden veya sürenin %10'undan kare al
-                        t = min(2.0, clip.duration * 0.1)
-                        frame = clip.get_frame(t)
-                        bg = Image.fromarray(frame).convert("RGB")
-                else:
-                    bg = Image.open(bg_image_path).convert("RGB")
-                
-                bg = bg.resize((W, H), Image.Resampling.LANCZOS)
-                # Arka planı hafif karart ve bulanıklaştır (metin okunsun diye)
-                bg = bg.filter(ImageFilter.GaussianBlur(radius=5))
-                enhancer = ImageEnhance.Brightness(bg)
-                bg = enhancer.enhance(0.4) 
-            except Exception as e:
-                print(f"[Thumbnail] Arka plan yükleme hatası ({bg_image_path}): {e}")
-                bg = Image.new("RGB", (W, H), (10, 10, 25))
-        else:
-            # Lacivert-Siyah gradyan benzeri koyu zemin
-            bg = Image.new("RGB", (W, H), (10, 15, 35))
-
-        draw = ImageDraw.Draw(bg)
-        
-        # Ana başlık fontu (Bold ve Büyük)
-        font = self._load_font("bold", 72)
-        
-        # Başlığı satırlara böl
-        words = title.split()
-        lines, cur = [], ""
-        for w in words:
-            test = (cur + " " + w).strip()
-            bbox = draw.textbbox((0, 0), test, font=font)
-            if bbox[2] - bbox[0] > W - 150:
-                if cur: lines.append(cur)
-                cur = w
-            else:
-                cur = test
-        if cur: lines.append(cur)
-
-        # Başlığı dikeyde ortala
-        line_height = font.size + 15
-        total_height = len(lines) * line_height
-        y = (H - total_height) // 2 - 30
-
-        for line in lines:
-            bbox = draw.textbbox((0, 0), line, font=font)
-            x = (W - (bbox[2] - bbox[0])) // 2
+        try:
+            from src.thumbnail_generator import ThumbnailGenerator
+            gen = ThumbnailGenerator()
+            # Extract a likely stat from title if possible, or leave blank
+            stat = ""
+            if "%" in title:
+                import re
+                match = re.search(r'(\d+%)', title)
+                if match: stat = match.group(1)
             
-            # Kalın siyah gölge (shadow/outline)
-            for dx in range(-4, 5):
-                for dy in range(-4, 5):
-                    draw.text((x + dx, y + dy), line, font=font, fill=(0, 0, 0))
-            
-            # Ana metin (Parlak Sarı/Beyaz)
-            draw.text((x, y), line, font=font, fill=(255, 235, 20))
-            y += line_height
-
-        # Alt şerit (Marka Bilgisi)
-        sf = self._load_font("regular", 36)
-        draw.rectangle([(0, H - 70), (W, H)], fill=(0, 0, 0, 180)) # Yarı şeffaf siyah
-        
-        cb = draw.textbbox((0, 0), channel_name, font=sf)
-        draw.text(((W - (cb[2] - cb[0])) // 2, H - 55),
-                  channel_name, font=sf, fill=(0, 255, 127)) # Neon yeşil
-
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        bg.save(output_path, "PNG", quality=95)
-        print(f"[Thumbnail] ✅ Başarıyla oluşturuldu: {output_path}")
-        return output_path
-
+            return gen.create(title=title, stat=stat, category=category, 
+                              output_path=output_path, bg_image_path=bg_image_path)
     def assemble_long_video(self, video_paths, audio_path, script_text,
-                            output_filename, bg_music_path=None):
+                            output_filename, bg_music_path=None, category="default"):
         """
-        Uzun video montajı — ffmpeg subprocess ile (MoviePy yerine).
-        Neden ffmpeg? 30+ adet 1080p klip MoviePy ile 20+ dakika sürer;
-        ffmpeg concat filter ile aynı iş ~2-3 dakikada tamamlanır.
+        FFmpeg kullanarak hızlı uzun video montajı. 25 saniyelik Premium Hook ekler.
         """
         import subprocess
         import tempfile
-        import math
+        import os
+        from moviepy.editor import AudioFileClip, ImageClip
 
         output_path = os.path.join(self.output_dir, output_filename)
         os.makedirs(self.output_dir, exist_ok=True)
-
-        # Geçerli klipleri filtrele
-        valid_paths = [p for p in (video_paths or []) if p and os.path.exists(p)]
-        if not valid_paths:
-            print("[Editor] Klip yok, siyah arka plan + ses ile video oluşturuluyor...")
-            valid_paths = []
-
-        # --- Adım 1: Her klibi ffmpeg ile 1920x1080 / 8s / 30fps'e normalize et ---
         tmp_dir = tempfile.mkdtemp(prefix="evcarix_long_")
+        
+        # ── Step 0: Premium Multi-Image Hook (25 Seconds) ──
+        # Using 5 distinct AI images (5s each) for a dynamic intro.
+        hook_video_path = None
+        try:
+            from src.thumbnail_generator import ThumbnailGenerator
+            tg = ThumbnailGenerator()
+            clean_title = output_filename.replace("_", " ").replace(".mp4", "").upper()
+            bg_hint = video_paths[0] if video_paths and os.path.exists(video_paths[0]) else None
+            
+            print(f"[Editor] [LongHook] 5 adet premium görsel üretiliyor...")
+            hook_clips = []
+            for i in range(5):
+                h_img_path = os.path.join(self.output_dir, f"hook_long_{i}_{output_filename}.jpg")
+                # Vary the prompt slightly for each image
+                variation = f" angle {i+1}" if i > 0 else ""
+                tg.create(title=clean_title + variation, category=category, is_short=False, 
+                          output_path=h_img_path, bg_image_path=bg_hint)
+                
+                if os.path.exists(h_img_path):
+                    h_dur = 5.0
+                    h_clip = ImageClip(h_img_path).set_duration(h_dur).resize((1920, 1080))
+                    # Ken Burns: Zoom in or out alternately
+                    if i % 2 == 0:
+                        h_clip = h_clip.resize(lambda t: 1.0 + 0.08 * (t / h_dur))
+                    else:
+                        h_clip = h_clip.resize(lambda t: 1.08 - 0.08 * (t / h_dur))
+                    h_clip = h_clip.set_fps(30).set_position('center')
+                    hook_clips.append(h_clip)
+            
+            if hook_clips:
+                print(f"[Editor] [LongHook] 25 saniyelik çoklu giriş videosu birleştiriliyor...")
+                hook_out = os.path.join(tmp_dir, "hook_clip.mp4")
+                final_hook_clip = concatenate_videoclips(hook_clips, method="compose")
+                final_hook_clip.write_videofile(hook_out, fps=30, codec="libx264", bitrate="8000k", logger=None)
+                if os.path.exists(hook_out):
+                    hook_video_path = hook_out
+        except Exception as e:
+            print(f"[Editor] [LongHook] Hata: {e}")
+
+        # List valid clips
+        valid_paths = [p for p in (video_paths or []) if p and os.path.exists(p)]
+        # Add Hook to the front if successful
+        final_sources = ([hook_video_path] if hook_video_path else []) + valid_paths
+        
+        # --- Adım 1: Normalize Clips ---
         normalized = []
-        for i, path in enumerate(valid_paths[:30]):  # max 30 klip
+        for i, path in enumerate(final_sources[:40]):
             out_clip = os.path.join(tmp_dir, f"clip_{i:03d}.mp4")
+            # Hook ise 25s, diğerleri max 8s
+            dur_limit = "25" if path == hook_video_path else "8"
+            
             cmd = [
-                "ffmpeg", "-y",
-                "-i", path,
-                "-t", "8",                          # max 8 saniye/klip
-                "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,"
-                       "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
-                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-                "-an",                              # ses yok (ses sonra eklenecek)
-                "-threads", "4",
-                out_clip,
+                "ffmpeg", "-y", "-i", path, "-t", dur_limit,
+                "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-an", "-threads", "4",
+                out_clip
             ]
             try:
-                result = subprocess.run(cmd, capture_output=True, timeout=60)
-                if result.returncode == 0 and os.path.exists(out_clip) and os.path.getsize(out_clip) > 10_000:
+                subprocess.run(cmd, capture_output=True, timeout=60)
+                if os.path.exists(out_clip) and os.path.getsize(out_clip) > 10000:
                     normalized.append(out_clip)
-                    print(f"[Editor] Klip {i+1}/{min(len(valid_paths), 30)} normalize edildi")
-            except subprocess.TimeoutExpired:
-                print(f"[Editor] Klip {i+1} timeout, atlandı")
-            except Exception as e:
-                print(f"[Editor] Klip {i+1} hata: {e}")
+            except Exception: continue
 
         if not normalized:
-            # Hiç klip yoksa siyah video oluştur
-            print("[Editor] Normalize edilen klip yok, siyah video oluşturuluyor...")
-            black_clip = os.path.join(tmp_dir, "black.mp4")
-            subprocess.run([
-                "ffmpeg", "-y",
-                "-f", "lavfi", "-i", "color=c=black:s=1920x1080:r=30",
-                "-t", "10", "-c:v", "libx264", "-preset", "ultrafast",
-                black_clip
-            ], capture_output=True, timeout=30)
-            normalized = [black_clip]
+            return None # Fail gracefully
 
-        # --- Adım 2: ffmpeg concat listesi oluştur ---
+        # --- Adım 2: Concat ---
         concat_list = os.path.join(tmp_dir, "concat.txt")
         with open(concat_list, "w") as f:
-            for clip_path in normalized:
-                f.write(f"file '{clip_path}'\n")
+            for c in normalized: f.write(f"file '{c}'\n")
 
-        # --- Adım 3: Klipler birleştir (sessiz video) ---
         silent_video = os.path.join(tmp_dir, "silent.mp4")
-        cmd_concat = [
-            "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0",
-            "-i", concat_list,
-            "-c", "copy",
-            silent_video,
-        ]
-        result = subprocess.run(cmd_concat, capture_output=True, timeout=120)
-        if result.returncode != 0:
-            print(f"[Editor] Concat hatası: {result.stderr.decode(errors='ignore')[:200]}")
-            # Fallback: copy ile değil encode ile dene
-            subprocess.run([
-                "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-                "-i", concat_list, "-c:v", "libx264", "-preset", "ultrafast",
-                silent_video
-            ], capture_output=True, timeout=120)
+        subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_list, "-c", "copy", silent_video], capture_output=True)
 
-        # --- Adım 4: Ses ekle (audio süresi kadar video kes/döngüle) ---
+        # --- Adım 3: Final Merge with Audio ---
         try:
-            audio_obj = AudioFileClip(audio_path)
-            audio_duration = audio_obj.duration
-            audio_obj.close()
-        except Exception:
-            audio_duration = 210  # fallback
-
-        print(f"[Editor] Audio: {audio_duration:.1f}s / Klip sayısı: {len(normalized)}")
-
-        # Son ffmpeg: video + ses birleştir, audio süresine göre kes
+            with AudioFileClip(audio_path) as audio_obj:
+                audio_duration = audio_obj.duration
+        except: audio_duration = 200
+        
         cmd_final = [
-            "ffmpeg", "-y",
-            "-stream_loop", "-1",    # video gerekirse döngüle
-            "-i", silent_video,
-            "-i", audio_path,
-            "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-t", str(audio_duration),
+            "ffmpeg", "-y", "-stream_loop", "-1", "-i", silent_video, "-i", audio_path,
+            "-map", "0:v:0", "-map", "1:a:0", "-t", str(audio_duration),
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-            "-c:a", "aac", "-b:a", "192k", "-ac", "2",
-            "-threads", "4",
-            "-movflags", "+faststart",
-            output_path,
+            "-c:a", "aac", "-b:a", "192k", "-ac", "2", output_path
         ]
-        print("[Editor] ffmpeg ile final video render ediliyor...")
-        result = subprocess.run(cmd_final, capture_output=True, timeout=300)
-        if result.returncode != 0:
-            err = result.stderr.decode(errors='ignore')[-300:]
-            print(f"[Editor] Final render hatası: {err}")
+        subprocess.run(cmd_final, capture_output=True)
+        # Final render status
+        if os.path.exists(output_path):
+            print(f"[Editor] [OK] Uzun video hazır (+25s Hook): {output_path}")
         else:
-            print(f"[Editor] Long-form video hazir: {output_path}")
+            print(f"[Editor] [Hata] Final video dosyası oluşturulamadı.")
 
-        # Geçici dosyaları temizle
+        # Cleanup
         import shutil
-        try:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
-        except Exception:
-            pass
+        try: shutil.rmtree(tmp_dir, ignore_errors=True)
+        except: pass
 
         return output_path
 

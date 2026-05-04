@@ -54,7 +54,7 @@ class VoiceEngine:
         if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
             raise RuntimeError(f"[VoiceEngine] Ses dosyası oluşturulamadı: {output_path}")
 
-        print(f"[VoiceEngine] ✅ Ses hazır: {output_path} | {len(subs)} kelime zamanlaması")
+        print(f"[VoiceEngine] [OK] Ses hazir: {output_path} | {len(subs)} kelime zamanlamasi")
         return {"audio_path": output_path, "word_timings": subs}
 
     async def list_available_voices(self):

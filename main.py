@@ -275,7 +275,8 @@ class EvcarixOrchestrator:
             video_paths=video_paths,
             audio_path=audio_path,
             script_text=script,
-            output_filename=output_filename
+            output_filename=output_filename,
+            category=plan.get('category', 'general')
         )
         gc.collect()
 

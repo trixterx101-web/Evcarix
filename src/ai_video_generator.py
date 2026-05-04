@@ -18,7 +18,10 @@ import time
 import json
 import hashlib
 import requests
+import jwt
+import replicate
 from pathlib import Path
+from huggingface_hub import InferenceClient
 from datetime import datetime
 
 ASSETS_DIR = Path("assets") / "ai_video"
@@ -111,11 +114,14 @@ class AIVideoGenerator:
 
     def __init__(self):
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-        self.kling_key     = os.environ.get("KLING_API_KEY", "")
+        self.kling_ak      = os.environ.get("KLING_ACCESS_KEY", "")
+        self.kling_sk      = os.environ.get("KLING_SECRET_KEY", "")
+        self.kling_key     = os.environ.get("KLING_API_KEY", "")  # fallback if someone has a direct token
         self.runway_key    = os.environ.get("RUNWAY_API_KEY", "")
         self.luma_key      = os.environ.get("LUMA_API_KEY", "")
         self.stability_key = os.environ.get("STABILITY_API_KEY", "")
         self.fal_key       = os.environ.get("FAL_KEY", "")
+        self.replicate_key = os.environ.get("REPLICATE_API_KEY", "")
 
     # ── Public API ─────────────────────────────────────────────────────────────
     def generate(self, topic: str, category_id: str = "",
@@ -147,20 +153,22 @@ class AIVideoGenerator:
                 )
                 clips.extend(new)
                 if new:
-                    print(f"[AIVideo] ✅ {provider_name}: +{len(new)} klip")
+                    print(f"[AIVideo] [OK] {provider_name}: +{len(new)} klip")
             except Exception as e:
-                print(f"[AIVideo] ⚠️ {provider_name} hata: {e}")
+                print(f"[AIVideo] [Error] {provider_name} hata: {e}")
 
         if not clips:
-            print("[AIVideo] ⚠️ Hiçbir AI provider çalışmadı.")
+            print("[AIVideo] [Error] Hicbir AI provider calismadi.")
         return clips[:count]
 
     # ── Provider chain ─────────────────────────────────────────────────────────
     def _get_provider_chain(self) -> list:
         chain = []
+        if self.replicate_key:
+            chain.append(("Replicate HD",       self._replicate))
         if self.fal_key:
             chain.append(("fal.ai LTX-Video",   self._fal_ltx))
-        if self.kling_key:
+        if self.kling_key or (self.kling_ak and self.kling_sk):
             chain.append(("Kling AI",            self._kling))
         if self.runway_key:
             chain.append(("Runway ML",           self._runway))
@@ -169,6 +177,7 @@ class AIVideoGenerator:
         if self.stability_key:
             chain.append(("Stability AI",        self._stability))
         # Always available fallbacks (ücretsiz)
+        chain.append(("HF InferenceClient",  self._hf_inference_client))
         chain.append(("HuggingFace Gradio",  self._huggingface_gradio))
         chain.append(("Wan 2.2 HF Router",   self._wan22))
         chain.append(("Wan 2.1 HF Router",   self._huggingface_router))
@@ -214,7 +223,7 @@ class AIVideoGenerator:
                     path = self._download_video(video_url, f"fal_{i}")
                     if path:
                         clips.append(path)
-                        print(f"[fal.ai] ✅ Video {i+1} hazır: {path}")
+                        print(f"[fal.ai] [OK] Video {i+1} hazir: {path}")
                 time.sleep(2)
             except Exception as e:
                 print(f"[fal.ai] Hata: {e}")
@@ -224,20 +233,40 @@ class AIVideoGenerator:
     # ══════════════════════════════════════════════════════════════════════════
     # ── Provider: Kling AI ────────────────────────────────────────────────────
     # ══════════════════════════════════════════════════════════════════════════
+    def _generate_kling_token(self) -> str:
+        """Generate JWT token for Kling AI API."""
+        if not self.kling_ak or not self.kling_sk:
+            return self.kling_key # fallback to direct token
+        
+        payload = {
+            "iss": self.kling_ak,
+            "exp": int(time.time()) + 1800, # 30 min
+            "nbf": int(time.time()) - 5,
+        }
+        token = jwt.encode(payload, self.kling_sk, algorithm="HS256")
+        return token
+
     def _kling(self, prompt: str, count: int,
                duration: int, aspect: str) -> list[str]:
         """
-        Kling AI text-to-video API.
-        Docs: https://docs.klingai.com/en/video-generation/text-to-video
+        Kling AI text-to-video API (Global / Singapore).
+        Docs: https://klingai.com/help/api
         """
+        token = self._generate_kling_token()
+        if not token:
+            print("[Kling] No API credentials found.")
+            return []
+
         clips = []
+        base_url = "https://api.klingai.com" # or https://api-singapore.klingai.com
+        
         for i in range(count):
             try:
                 # Submit generation task
                 r = requests.post(
-                    "https://api.klingai.com/v1/videos/text2video",
+                    f"{base_url}/v1/videos/text2video",
                     headers={
-                        "Authorization": f"Bearer {self.kling_key}",
+                        "Authorization": f"Bearer {token}",
                         "Content-Type":  "application/json",
                     },
                     json={
@@ -262,7 +291,7 @@ class AIVideoGenerator:
                     break
 
                 # Poll for completion
-                path = self._kling_poll(task_id, i)
+                path = self._kling_poll(task_id, i, token, base_url)
                 if path:
                     clips.append(path)
                 time.sleep(2)
@@ -272,13 +301,13 @@ class AIVideoGenerator:
                 break
         return clips
 
-    def _kling_poll(self, task_id: str, idx: int) -> str | None:
+    def _kling_poll(self, task_id: str, idx: int, token: str, base_url: str) -> str | None:
         deadline = time.time() + MAX_WAIT
         while time.time() < deadline:
             try:
                 r = requests.get(
-                    f"https://api.klingai.com/v1/videos/text2video/{task_id}",
-                    headers={"Authorization": f"Bearer {self.kling_key}"},
+                    f"{base_url}/v1/videos/text2video/{task_id}",
+                    headers={"Authorization": f"Bearer {token}"},
                     timeout=TIMEOUT,
                 )
                 data   = r.json()
@@ -504,7 +533,7 @@ class AIVideoGenerator:
                     with open(path, "wb") as f:
                         f.write(r.content)
                     if path.stat().st_size > 100_000:
-                        print(f"[Stability] ✅ {path.name}")
+                        print(f"[Stability] [OK] {path.name}")
                         return str(path)
                 elif r.status_code == 202:
                     print("[Stability] Bekleniyor...")
@@ -516,6 +545,104 @@ class AIVideoGenerator:
                 print(f"[Stability] Poll hata: {e}")
                 time.sleep(POLL_EVERY)
         return None
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ── Provider: Replicate (Ultra HD Realistic) ────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    def _replicate(self, prompt: str, count: int,
+                  duration: int, aspect: str) -> list[str]:
+        """
+        Replicate — high quality models like HunyuanVideo.
+        Best for ultra-realistic HD output.
+        """
+        if not self.replicate_key:
+            return []
+        
+        os.environ["REPLICATE_API_TOKEN"] = self.replicate_key
+        clips = []
+        
+        # Use HunyuanVideo (current gold standard for open-weights realism)
+        # specific version slug (latest as of May 2026)
+        model_id = "lucataco/hunyuanvideo:2b1add9b58a0ff73fd7ff82407246c42c603d82234917bc65a4f84b45a154f92"
+        
+        for i in range(count):
+            try:
+                print(f"[Replicate] Generating HD video {i+1}/{count}...")
+                # Run the model
+                output = replicate.run(
+                    model_id,
+                    input={
+                        "prompt": prompt,
+                        "video_size": "720p", 
+                        "num_frames": 81,
+                        "infer_steps": 30,
+                    }
+                )
+                
+                # Output can be a URL string or a list of URLs
+                video_url = None
+                if isinstance(output, str):
+                    video_url = output
+                elif isinstance(output, list) and len(output) > 0:
+                    video_url = output[0]
+                elif hasattr(output, 'url'):
+                    video_url = output.url
+                
+                if video_url:
+                    path = self._download_video(video_url, f"replicate_{i}")
+                    if path:
+                        clips.append(path)
+                        print(f"[Replicate] [OK] Video {i+1} hazir: {path}")
+            except Exception as e:
+                print(f"[Replicate] Hata: {e}")
+                break
+        return clips
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ── Provider: HuggingFace InferenceClient (FREE Tier) ───────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    def _hf_inference_client(self, prompt: str, count: int,
+                              duration: int, aspect: str) -> list[str]:
+        """
+        Uses HuggingFace InferenceClient (Serverless).
+        Best for Wan-AI models.
+        """
+        hf_token = os.environ.get("HF_TOKEN", "")
+        if not hf_token:
+            return []
+
+        client = InferenceClient(api_key=hf_token)
+        clips = []
+        
+        # Try different models in order
+        models = [
+            "Wan-AI/Wan2.1-T2V-14B",
+            "Wan-AI/Wan2.1-T2V-1.3B",
+            "facebook/animatediff-video-v1-5",
+        ]
+
+        for i in range(count):
+            model_id = models[i % len(models)]
+            try:
+                print(f"[HF Client] Model: {model_id}...")
+                video_bytes = client.text_to_video(
+                    prompt,
+                    model=model_id,
+                )
+                
+                path = ASSETS_DIR / f"hf_client_{i}_{int(time.time())}.mp4"
+                with open(path, "wb") as f:
+                    f.write(video_bytes)
+                
+                if path.stat().st_size > 50_000:
+                    print(f"[HF Client] [OK] {path.name}")
+                    clips.append(str(path))
+            except Exception as e:
+                print(f"[HF Client] {model_id} hata: {e}")
+            
+            if len(clips) >= count:
+                break
+        return clips
 
     # ══════════════════════════════════════════════════════════════════════════
     # ── Provider: HuggingFace Gradio API (FREE — always available) ───────────
@@ -632,7 +759,7 @@ class AIVideoGenerator:
                         with open(path, "wb") as f:
                             f.write(r.content)
                         if path.stat().st_size > 50_000:
-                            print(f"[HF Router] ✅ {path.name}")
+                            print(f"[HF Router] [OK] {path.name}")
                             clips.append(str(path))
                 else:
                     print(f"[HF Router] {r.status_code}: {r.text[:100]}")
@@ -706,7 +833,7 @@ class AIVideoGenerator:
                             path = self._download_video(url, f"hailuo_{i}")
                             if path:
                                 clips.append(path)
-                                print(f"[Hailuo] ✅ Video {i+1} hazır: {path}")
+                                print(f"[Hailuo] [OK] Video {i+1} hazir: {path}")
                         break
                     elif status in ("Fail", "Failed", "error"):
                         print(f"[Hailuo] Task başarısız: {task_id}")
@@ -780,7 +907,7 @@ class AIVideoGenerator:
                         with open(path, "wb") as f:
                             f.write(r.content)
                         if path.stat().st_size > 50_000:
-                            print(f"[Wan2.2] ✅ {path.name}")
+                            print(f"[Wan2.2] [OK] {path.name}")
                             clips.append(str(path))
                         else:
                             path.unlink(missing_ok=True)

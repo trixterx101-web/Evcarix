@@ -278,33 +278,39 @@ class OEMScraper:
                            count: int, video_type: str,
                            rel_kws: list[str]) -> list[str]:
         """
-        Fetch press page HTML, extract all .mp4 URLs,
-        filter by orientation + topic relevance, download.
+        Fetch press page HTML, extract all .mp4 URLs.
         """
-        r = self._session.get(url, timeout=TIMEOUT, allow_redirects=True)
-        if r.status_code != 200:
+        try:
+            # Handle SSL issues for specific domains (Samsung SDI etc.)
+            verify_ssl = "samsungsdi.com" not in url
+            r = self._session.get(url, timeout=TIMEOUT, allow_redirects=True, verify=verify_ssl)
+            if r.status_code != 200:
+                return []
+            html = r.text
+        except Exception:
             return []
-        html = r.text
 
-        # Extract mp4 URLs from HTML (href, src, data-src, JSON blobs)
-        raw = re.findall(
-            r'(?:href|src|data-src|data-video|content|url)[=:]\s*'
-            r'["\']?((?:https?://[^\s"\'<>]+|/[^\s"\'<>]+)\.mp4'
-            r'(?:\?[^\s"\'<>]*)?)["\']?',
-            html, re.IGNORECASE
-        )
-        raw += re.findall(r'"(https?://[^"]+\.mp4[^"]*)"', html)
-        raw += re.findall(r"'(https?://[^']+\.mp4[^']*)'", html)
+        # Extract mp4 URLs from HTML
+        patterns = [
+            r'(?:href|src|data-src|data-video|content|url)[=:]\s*["\']?((?:https?://[^\s"\'<>]+|/[^\s"\'<>]+)\.mp4(?:\?[^\s"\'<>]*)?)["\']?',
+            r'"(https?://[^"]+\.mp4[^"]*)"',
+            r"'(https?://[^']+\.mp4[^']*)'",
+        ]
+        raw = []
+        for p in patterns:
+            raw += re.findall(p, html, re.IGNORECASE)
 
         # Make absolute URLs
         mp4_urls = []
         for u in raw:
             u = u.split('"')[0].split("'")[0].strip()
-            if u.startswith("http"):
+            if u.startswith("//"):
+                mp4_urls.append("https:" + u)
+            elif u.startswith("http"):
                 mp4_urls.append(u)
             elif u.startswith("/"):
                 mp4_urls.append(base.rstrip("/") + u)
-        mp4_urls = list(dict.fromkeys(mp4_urls))  # deduplicate
+        mp4_urls = list(dict.fromkeys(mp4_urls))
 
         # Filter out clearly irrelevant URLs
         mp4_urls = [

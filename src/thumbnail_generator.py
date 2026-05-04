@@ -59,33 +59,128 @@ class ThumbnailGenerator:
         stat: str = "",
         category: str = "default",
         output_path: str = "",
+        bg_image_path: str = None,
+        is_short: bool = False
     ) -> str:
         """
-        Generate thumbnail and return saved file path.
-        Args:
-            title:    Main headline shown on thumbnail (max ~50 chars)
-            stat:     Big eye-catching number/stat, e.g. "-45%", "800V", "1M KM"
-            category: Evcarix category id for color palette
-            output_path: Override save path (optional)
+        Generate thumbnail using Gemini-powered Free High-Quality engine (Pollinations/FLUX).
         """
-        img = Image.new("RGB", (W, H), "#000000")
-
-        self._draw_gradient_background(img, category)
-        self._draw_grid_overlay(img)
-        self._draw_glow_accent(img, category)
-        self._draw_left_bar(img, category)
-        self._draw_stat_block(img, stat, category)
-        self._draw_title(img, title)
-        self._draw_data_bar(img)
-        self._draw_brand(img)
-        self._draw_corner_badge(img, category)
-
+        width, height = (1080, 1920) if is_short else (1280, 720)
+        
         if not output_path:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_path = str(OUT_DIR / f"thumbnail_{ts}.jpg")
 
+        # ── Step 1: Groq + Pollinations (Free & Ultra-Premium) ──
+        if os.getenv("GROQ_API_KEY"):
+            try:
+                print(f"[Thumbnail] [Groq] Designing premium prompt for: {title}")
+                from groq import Groq
+                client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+                
+                ratio = "9:16" if is_short else "16:9"
+                designer_prompt = (
+                    f"Write a professional AI image generation prompt for a YouTube {'Short' if is_short else 'long-form'} video thumbnail. "
+                    f"Topic: '{title}'. Style: Futuristic EV technology, vibrant cinematic lighting, 4K. "
+                    f"The aspect ratio is {ratio}. "
+                    f"Ensure the text '{title.upper()}' is part of the 3D design and clearly readable. "
+                    f"Output only the prompt string."
+                )
+                
+                chat_completion = client.chat.completions.create(
+                    messages=[{"role": "user", "content": designer_prompt}],
+                    model="llama3-70b-8192",
+                )
+                ai_designed_prompt = chat_completion.choices[0].message.content.strip()
+                
+                print(f"[Thumbnail] [FreeAI] Generating vibrant FLUX image...")
+                import urllib.parse
+                import requests
+                
+                encoded_prompt = urllib.parse.quote(ai_designed_prompt)
+                image_url = f"https://pollinations.ai/p/{encoded_prompt}?width={width}&height={height}&model=flux&seed={random.randint(1,99999)}"
+                
+                r = requests.get(image_url, timeout=30)
+                if r.status_code == 200:
+                    with open(output_path, "wb") as f:
+                        f.write(r.content)
+                    print(f"[Thumbnail] [FreeAI] Success! Saved -> {output_path}")
+                    return output_path
+            except Exception as e:
+                print(f"[Thumbnail] [FreeAI] Failed: {e}. Trying Replicate...")
+
+        # ── Step 2: Try Replicate (FLUX) ──
+        if os.getenv("REPLICATE_API_KEY"):
+            try:
+                print(f"[Thumbnail] [Replicate] Generating FLUX thumbnail for: {title}")
+                import replicate
+                
+                ai_prompt = (
+                    f"A professional high-impact YouTube {'Short' if is_short else 'video'} thumbnail. "
+                    f"The text '{title.upper()}' is written in bold, modern, futuristic 3D typography. "
+                    f"The background is a vibrant, cinematic {category} themed automotive scene. "
+                    f"Ultra-realistic, 4K, stunning colors."
+                )
+                
+                output = replicate.run(
+                    "black-forest-labs/flux-schnell",
+                    input={
+                        "prompt": ai_prompt,
+                        "aspect_ratio": "9:16" if is_short else "16:9",
+                        "output_format": "jpg",
+                        "output_quality": 95
+                    }
+                )
+                
+                if output:
+                    import requests
+                    url = output[0] if isinstance(output, list) else str(output)
+                    r = requests.get(url, timeout=20)
+                    if r.status_code == 200:
+                        with open(output_path, "wb") as f:
+                            f.write(r.content)
+                        print(f"[Thumbnail] [Replicate] Success! FLUX thumbnail saved: {output_path}")
+                        return output_path
+            except Exception as e:
+                print(f"[Thumbnail] [Replicate] Failed: {e}. Falling back to composite engine.")
+
+        # ── Step 3: Fallback to Composite Professional Engine ──
+        W, H = width, height
+        if bg_image_path and os.path.exists(bg_image_path):
+            ext = Path(bg_image_path).suffix.lower()
+            if ext in ['.mp4', '.mov', '.avi', '.mkv']:
+                from moviepy.editor import VideoFileClip
+                try:
+                    with VideoFileClip(bg_image_path) as clip:
+                        t = min(2.0, clip.duration * 0.1)
+                        frame = clip.get_frame(t)
+                        img = Image.fromarray(frame).convert("RGB")
+                except Exception as e:
+                    print(f"[Thumbnail] Video frame extraction failed: {e}")
+                    img = Image.new("RGB", (W, H), "#000000")
+            else:
+                img = Image.open(bg_image_path).convert("RGB")
+            
+            img = img.resize((W, H), Image.Resampling.LANCZOS)
+            from PIL import ImageEnhance
+            # Better treatment: Blur + Darken + Saturation
+            img = img.filter(ImageFilter.GaussianBlur(radius=3))
+            img = ImageEnhance.Brightness(img).enhance(0.5)
+            img = ImageEnhance.Contrast(img).enhance(1.2)
+            img = ImageEnhance.Color(img).enhance(1.4) # Make it more vibrant
+        else:
+            img = Image.new("RGB", (W, H), "#000000")
+            self._draw_gradient_background(img, category)
+
+        self._draw_grid_overlay(img)
+        self._draw_cyber_overlay(img)
+        self._draw_glow_accent(img, category)
+        self._draw_stat_block(img, stat, category)
+        self._draw_premium_title(img, title)
+        self._draw_brand_premium(img)
+
         img.save(output_path, "JPEG", quality=97, optimize=True)
-        print(f"[Thumbnail] ✅ Saved → {output_path}")
+        print(f"[Thumbnail] [OK] Saved (Composite) -> {output_path}")
         return output_path
 
     # ── Background ─────────────────────────────────────────────────────────────
@@ -104,13 +199,29 @@ class ThumbnailGenerator:
     def _draw_grid_overlay(self, img: Image.Image):
         overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         draw    = ImageDraw.Draw(overlay)
-        color   = (255, 255, 255, 12)
+        color   = (255, 255, 255, 10)
         # vertical lines
-        for x in range(0, W, 80):
+        for x in range(0, W, 60):
             draw.line([(x, 0), (x, H)], fill=color, width=1)
         # horizontal lines
-        for y in range(0, H, 80):
+        for y in range(0, H, 60):
             draw.line([(0, y), (W, y)], fill=color, width=1)
+        img.paste(Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB"))
+
+    def _draw_cyber_overlay(self, img: Image.Image):
+        """Adds a tech/data aesthetic with random scanlines and code-like patterns."""
+        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        draw    = ImageDraw.Draw(overlay)
+        
+        # Scanlines
+        for y in range(0, H, 4):
+            draw.line([(0, y), (W, y)], fill=(255, 255, 255, 5), width=1)
+            
+        # Random small dots/pixels (data rain effect)
+        for _ in range(100):
+            x, y = random.randint(0, W), random.randint(0, H)
+            draw.point((x, y), fill=(255, 255, 255, 40))
+            
         img.paste(Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB"))
 
     def _draw_glow_accent(self, img: Image.Image, category: str):
@@ -182,38 +293,55 @@ class ThumbnailGenerator:
             stroke_fill="#000000",
         )
 
-    def _draw_title(self, img: Image.Image, title: str):
+    def _draw_premium_title(self, img: Image.Image, title: str):
+        """Left-aligned, massive bold title with high impact."""
         draw = ImageDraw.Draw(img)
-        lines = textwrap.wrap(title.upper(), width=22)
-        lines = lines[:3]  # max 3 lines
+        # Clean title: uppercase and limit lines
+        title = title.upper()
+        
+        # Split into keywords for better sizing
+        words = title.split()
+        lines = []
+        current_line = ""
+        for word in words:
+            if len(current_line + " " + word) < 12:
+                current_line = (current_line + " " + word).strip()
+            else:
+                lines.append(current_line)
+                current_line = word
+        lines.append(current_line)
+        lines = lines[:4] # Max 4 lines
 
-        y_start = 320
-        line_gap = 10
-
-        # measure total block height
-        sizes = []
+        y = 120
+        font_size = 95 if len(lines) <= 2 else 80
+        font = self._font(font_size, bold=True)
+        
         for line in lines:
-            sz = 72 if len(line) <= 18 else 58 if len(line) <= 22 else 48
-            sizes.append(sz)
+            if not line: continue
+            # Measure
+            bbox = draw.textbbox((0, 0), line, font=font)
+            # Subtle background glow behind text for readability
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+            
+            # Dark backing for the text line
+            draw.rectangle([50, y - 5, 70 + text_w, y + text_h + 15], fill=(0, 0, 0, 160))
+            
+            # Main text
+            draw.text((60, y), line, font=font, fill="#FFFFFF", anchor="lt")
+            y += font_size + 10
 
-        total_h = sum(sizes) + line_gap * (len(lines) - 1)
-        y = y_start - total_h // 2 + 80   # vertically center in lower half
+        # Sub-title / Hook in Yellow
+        hook_font = self._font(45, bold=True)
+        hook_text = "(2026 DATA REVEALED)"
+        draw.text((60, y + 20), hook_text, font=hook_font, fill="#FFD700", anchor="lt")
 
-        for i, line in enumerate(lines):
-            font = self._font(sizes[i], bold=True)
-            # shadow
-            draw.text((62, y + 4), line, font=font, fill=(0, 0, 0, 180), anchor="lm")
-            # main text
-            draw.text(
-                (60, y),
-                line,
-                font=font,
-                fill="#FFFFFF",
-                anchor="lm",
-                stroke_width=2,
-                stroke_fill="#000000",
-            )
-            y += sizes[i] + line_gap
+    def _draw_brand_premium(self, img: Image.Image):
+        draw = ImageDraw.Draw(img)
+        # Bottom-right minimal brand
+        brand_font = self._font(30, bold=True)
+        draw.text((W - 60, H - 60), BRAND_NAME, font=brand_font, fill=(255, 255, 255, 180), anchor="rd")
+        draw.line([(W - 200, H - 45), (W - 60, H - 45)], fill=(255, 255, 255, 100), width=2)
 
     def _draw_data_bar(self, img: Image.Image):
         """Horizontal data/progress bar — visual credibility element."""

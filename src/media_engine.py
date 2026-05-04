@@ -31,6 +31,38 @@ load_dotenv()
 GLOBAL_BRAND_DB = {
 
     # ── AMERİKAN MARKALAR ────────────────────────────────────────────
+    "nrel": {
+        "keywords": ["nrel", "battery lab", "renewable energy laboratory", "clean energy lab"],
+        "cdn_videos": [
+            "https://www.nrel.gov/news/video/assets/videos/battery-testing.mp4",
+            "https://www.nrel.gov/news/video/assets/videos/wind-energy.mp4",
+            "https://www.nrel.gov/news/video/assets/videos/solar-research.mp4",
+        ],
+        "pexels_queries": ["battery laboratory research 4k", "renewable energy tech"],
+        "priority": 1,
+    },
+    "catl": {
+        "keywords": ["catl", "battery cell", "ev battery manufacturing"],
+        "cdn_videos": [],
+        "pexels_queries": ["battery factory automation 4k", "lithium battery production"],
+        "priority": 2,
+    },
+    "nrel": {
+        "keywords": ["nrel", "battery lab", "renewable energy laboratory", "clean energy lab"],
+        "cdn_videos": [
+            "https://www.nrel.gov/news/video/assets/videos/battery-testing.mp4",
+            "https://www.nrel.gov/news/video/assets/videos/wind-energy.mp4",
+            "https://www.nrel.gov/news/video/assets/videos/solar-research.mp4",
+        ],
+        "pexels_queries": ["battery laboratory research 4k", "renewable energy tech"],
+        "priority": 1,
+    },
+    "catl": {
+        "keywords": ["catl", "battery cell", "ev battery manufacturing"],
+        "cdn_videos": [],
+        "pexels_queries": ["battery factory automation 4k", "lithium battery production"],
+        "priority": 2,
+    },
     "tesla": {
         "keywords": ["tesla", "model 3", "model y", "model s", "model x",
                      "cybertruck", "supercharger", "autopilot", "fsd", "megapack"],
@@ -541,7 +573,7 @@ class MediaEngine:
                 self._used_clips = set()
         else:
             self._used_clips = set()
-        print(f"[MediaEngine] 📋 Daha önce kullanılan klip sayısı: {len(self._used_clips)}")
+        print(f"[MediaEngine] [Log] Daha once kullanilan klip sayisi: {len(self._used_clips)}")
 
     def _save_used_clips(self):
         clip_list = list(self._used_clips)[-500:]
@@ -565,7 +597,7 @@ class MediaEngine:
             else:
                 skipped += 1
         if skipped:
-            print(f"[MediaEngine] 🔄 {skipped} daha önce kullanılan klip atlandı.")
+            print(f"[MediaEngine] [Skip] {skipped} daha once kullanilan klip atlandi.")
         return fresh
 
     def mark_clips_as_used(self, paths: list):
@@ -575,7 +607,7 @@ class MediaEngine:
                 self._used_clips.add(self._get_clip_hash(p))
                 count += 1
         self._save_used_clips()
-        print(f"[MediaEngine] ✅ {count} klip 'kullanıldı' olarak kaydedildi.")
+        print(f"[MediaEngine] [OK] {count} klip 'kullanildi' olarak kaydedildi.")
 
     # ══════════════════════════════════════════════════════════════
     #  OEM MARKA BASИН KİTİ — HD Telifsiz Videolar
@@ -653,7 +685,7 @@ class MediaEngine:
                     if self._get_clip_hash(out) not in self._used_clips:
                         paths.append(out)
                         cdn_success = True
-                        print(f"[OEM] ♻️  Önbellekten: {fname}")
+                        print(f"[OEM] [Cache] Onbellekten: {fname}")
                         continue
 
                 try:
@@ -680,10 +712,10 @@ class MediaEngine:
                         if size > 200_000:  # min 200KB = gerçek video
                             paths.append(out)
                             cdn_success = True
-                            print(f"[OEM] ✅ {fname} ({size//1024//1024}MB)")
+                            print(f"[OEM] [OK] {fname} ({size//1024//1024}MB)")
                         else:
                             os.remove(out)
-                            print(f"[OEM] ⚠️  Çok küçük ({size} byte), atlandı")
+                            print(f"[OEM] [Error] Cok kucuk ({size} byte), atlandi")
                     else:
                         print(f"[OEM] HTTP {r.status_code} / content-type={ct}: {brand}")
                 except Exception as e:
@@ -695,7 +727,7 @@ class MediaEngine:
                 brand_queries = brand_data.get("pexels_queries", [])
                 if brand_queries and self.pexels_api_key:
                     q = random.choice(brand_queries)
-                    print(f"[OEM] {brand.upper()} CDN yok → Pexels fallback: '{q[:60]}'")
+                    print(f"[OEM] {brand.upper()} CDN yok -> Pexels fallback: '{q[:60]}'")
                     try:
                         pex = self._download_from_pexels(
                             q, output_dir, 1, "landscape", category
@@ -705,7 +737,7 @@ class MediaEngine:
                                      and self._get_clip_hash(p) not in self._used_clips]
                         if pex_fresh:
                             paths.extend(pex_fresh[:1])
-                            print(f"[OEM] ✅ {brand.upper()} Pexels'tan 1 klip alındı")
+                            print(f"[OEM] [OK] {brand.upper()} Pexels'tan 1 klip alindi")
                     except Exception as e:
                         print(f"[OEM] {brand} Pexels fallback hata: {e}")
 
@@ -1017,6 +1049,17 @@ class MediaEngine:
             pix_fresh = self._filter_used_clips(pix)
             all_paths += [p for p in pix_fresh if p not in all_paths]
             print(f"[MediaEngine] Pixabay HD: {len(pix_fresh)} taze klip")
+
+        # ── ADIM 4.5: YouTube Creative Commons (Telif Problemi Olmayan Kaynak) ──
+        if len(all_paths) < count:
+            print(f"[MediaEngine] YouTube Creative Commons aranıyor: {query}...")
+            try:
+                yt_clips = self._download_from_youtube_cc(query, output_dir, count - len(all_paths))
+                yt_fresh = self._filter_used_clips(yt_clips)
+                all_paths += [p for p in yt_fresh if p not in all_paths]
+                print(f"[MediaEngine] YouTube CC: {len(yt_fresh)} klip eklendi.")
+            except Exception as e:
+                print(f"[MediaEngine] YouTube CC hatası: {e}")
 
         # ── ADIM 5: FreeVideoSources — key gerektirmeyen kaynaklar ───────────────
         if len(all_paths) < count:
@@ -1636,3 +1679,43 @@ class MediaEngine:
 
     def generate_kling_video(self, prompt, output_path, duration=5):
         return self._generate_kling_video_v2(prompt, output_path, duration)
+    def _download_from_youtube_cc(self, query: str, output_dir: str, count: int) -> list[str]:
+        """
+        YouTube'da Creative Commons (CC BY) lisanslı videoları arar ve indirir.
+        """
+        import subprocess
+        paths = []
+        
+        # Search for CC videos using yt-dlp
+        search_query = f'"{query}" "creative commons"'
+        cmd_search = [
+            "yt-dlp", "--get-id", "--max-downloads", str(count + 3),
+            "--match-filter", "license='Creative Commons Attribution license (reuse allowed)'",
+            f"ytsearch{count+5}:{search_query}"
+        ]
+        
+        try:
+            result = subprocess.run(cmd_search, capture_output=True, text=True, timeout=60)
+            video_ids = [vid.strip() for vid in result.stdout.strip().split('\n') if vid.strip()]
+            
+            for vid in video_ids[:count]:
+                out_path = os.path.join(output_dir, f"yt_cc_{vid}.mp4")
+                if os.path.exists(out_path):
+                    paths.append(out_path)
+                    continue
+                
+                # Download 10 seconds from the middle
+                cmd_dl = [
+                    "yt-dlp", "-f", "bestvideo[height<=1080][ext=mp4]",
+                    "--download-sections", "*15-25",
+                    "--force-overwrites",
+                    "-o", out_path,
+                    f"https://www.youtube.com/watch?v={vid}"
+                ]
+                subprocess.run(cmd_dl, capture_output=True, timeout=90)
+                if os.path.exists(out_path) and os.path.getsize(out_path) > 100000:
+                    paths.append(out_path)
+        except Exception as e:
+            print(f"[MediaEngine] YouTube CC indirme hatası: {e}")
+            
+        return paths
