@@ -1747,8 +1747,6 @@ class MediaEngine:
                         self._mark_video_id_used(vid) # Mark as used
             except Exception:
                 continue
-        except Exception as e:
-            print(f"[MediaEngine] YouTube CC indirme hatası: {e}")
             
         return paths
     def _is_video_id_used(self, video_id: str) -> bool:
