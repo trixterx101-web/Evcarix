@@ -350,9 +350,9 @@ Rules:
 - Do NOT copy their words or structure
 - Data-driven angle: real stats, percentages, kWh numbers
 - Length: 35-45 seconds spoken (80-100 words)
-- Start with: "Welcome to Ev-CAR-ix." then a shocking stat.
-- End with: "Subscribe to Ev-CAR-ix for real EV data."
-- Channel Name: ALWAYS use "Ev-CAR-ix" for pronunciation.
+- Start with: "Welcome to EV car icks." then a shocking stat.
+- End with: "Subscribe to EV car icks for real EV data."
+- Channel Name: ALWAYS use "EV car icks" for pronunciation.
 - English only, USA/Europe/China examples only.
 
 Return ONLY this JSON (no markdown, no backticks):

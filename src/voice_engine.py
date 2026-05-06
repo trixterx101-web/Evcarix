@@ -16,18 +16,30 @@ class VoiceEngine:
         Metni ses dosyasına dönüştürür ve kelime zamanlamalarını döner.
         edge-tts >= 6.1.9 ile uyumlu.
         """
-        # Genişletilmiş telaffuz haritası (Case-insensitive ve farklı varyasyonlar)
         import re
-        patterns = {
-            r"(?i)Evcarix": "Ev-Car-ix",
-            r"(?i)Everix": "Ev-Car-ix",
-            r"(?i)Ev-CAR-ix": "Ev-Car-ix",
-            r"(?i)Evcaris": "Ev-Car-ix",
-            r"(?i)Ev-Car-ix": "Ev-Car-ix",
-        }
-        for pattern, replacement in patterns.items():
+
+        # ── TELAFFUZ DÜZELTİCİ ─────────────────────────────────────────────────
+        # Edge TTS "Evcarix" kelimesini yanlış okuyor.
+        # "EV car icks" → TTS bunu doğal olarak [EV-kar-iks] şeklinde okur.
+        # Tüm varyasyonlar (büyük/küçük harf, tireli, kaçış karakterli) yakalanır.
+        pronunciation_map = [
+            # Evcarix ve tüm varyasyonları → "EV car icks"
+            (r"(?i)\bEv[-\s]?car[-\s]?ix\b", "EV car icks"),
+            (r"(?i)\bEvcarix\b",              "EV car icks"),
+            (r"(?i)\bEVCARIX\b",              "EV car icks"),
+            (r"(?i)\bEvCARix\b",              "EV car icks"),
+            (r"(?i)\bEvCarIx\b",              "EV car icks"),
+            (r"(?i)\bEv-CAR-ix\b",            "EV car icks"),
+            (r"(?i)\bEvcaris\b",              "EV car icks"),
+            (r"(?i)\bEverix\b",               "EV car icks"),
+            # Cümle içi (apostrophe, possessive vb.)
+            (r"(?i)\bEvcarix's\b",            "EV car icks"),
+            (r"(?i)\bEvcarix'te\b",           "EV car icks"),
+            (r"(?i)\bEvcarix'in\b",           "EV car icks"),
+        ]
+        for pattern, replacement in pronunciation_map:
             text = re.sub(pattern, replacement, text)
-        
+
         # Videonun sonunda sesin aniden kesilmemesi için 0.5 saniyelik sessizlik tamponu
         text += " . . ."
         

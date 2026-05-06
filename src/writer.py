@@ -495,7 +495,7 @@ class CreativeWriter:
                 "Return format: SES: [male/female]\nSENARYO: [script]"
             )
             user = f"""
-Write a 60-second YouTube Shorts narration script for the "Ev-CAR-ix" channel.
+Write a 60-second YouTube Shorts narration script for the "EV car icks" channel.
 Topic: {topic}
 Category: {category or 'general'}
 Category guide: {cat_extra}
@@ -506,14 +506,14 @@ Structure (write ALL sections as continuous spoken text):
 - Problem (5-20s): What people believe vs real data
 - Data reveal (20-45s): The actual numbers and what they mean
 - Takeaway (45-55s): One clear conclusion
-- CTA (55-60s): Subscribe to "Ev-CAR-ix" for real EV data, no hype
+- CTA (55-60s): Subscribe to "EV car icks" for real EV data, no hype
 
 IMPORTANT INSTRUCTIONS:
-1. Channel Name: ALWAYS start the script with "Welcome to Ev-CAR-ix." and ALWAYS use "Ev-CAR-ix" for the channel name. Do NOT use any other name or placeholder.
+1. Channel Name: ALWAYS start the script with "Welcome to EV car icks." and ALWAYS use "EV car icks" for the channel name. Do NOT use any other name or placeholder.
 2. Numbers & Units: ALWAYS put a space between numbers and units (e.g., "71 kWh", "190 miles").
 3. Brand Models: ALWAYS put a space between brand and model (e.g., "BYD M6").
 4. Tone: Data-driven, punchy, no hype. American English only.
-5. First sentence MUST be "Welcome to Ev-CAR-ix." followed by a shocking stat.
+5. First sentence MUST be "Welcome to EV car icks." followed by a shocking stat.
 6. NO generic adjectives: amazing, incredible, insane.
 7. Regions: USA, Europe, China ONLY.
 
@@ -533,23 +533,23 @@ SENARYO: [script]
                 "Return: SES: [male/female]\nSENARYO: [script]"
             )
             user = f"""
-Write a COMPLETE, FULL-LENGTH YouTube video narration script for the "Ev-CAR-ix" channel.
+Write a COMPLETE, FULL-LENGTH YouTube video narration script for the "EV car icks" channel.
 Topic: {topic}
 Target duration: {target_duration} seconds (~{target_duration // 60} minutes of spoken audio)
 MANDATORY word count: {min_words} to {max_words} words — DO NOT write fewer than {min_words} words.
 
 IMPORTANT INSTRUCTIONS:
-1. Channel Name: ALWAYS start the script with "Welcome to Ev-CAR-ix." and ALWAYS use "Ev-CAR-ix" for the channel name. Do NOT use any other name or placeholder.
+1. Channel Name: ALWAYS start the script with "Welcome to EV car icks." and ALWAYS use "EV car icks" for the channel name. Do NOT use any other name or placeholder.
 2. Numbers & Units: ALWAYS put a space between numbers and units (e.g., "45 kWh", "190 miles").
 3. Brand Models: ALWAYS put a space between brand and model (e.g., "Tesla Model 3", "BYD Seal").
 4. Structure: Write ALL 7 sections as continuous spoken narration:
-   - Introduction (30s): Start with "Welcome to Ev-CAR-ix." then the topic hook with a specific statistic.
+   - Introduction (30s): Start with "Welcome to EV car icks." then the topic hook with a specific statistic.
    - Context (30s): Why this matters — real-world problem this data solves.
    - Section 1 (40s): First major data point with numbers and comparisons.
    - Section 2 (40s): Second major angle — counterpoint or deeper detail.
    - Section 3 (30s): Third insight — what buyers/owners need to know.
    - Data Reveal (20s): The single most surprising number from the analysis.
-   - Conclusion + CTA (20s): Summary + "Subscribe to Ev-CAR-ix for real EV data."
+   - Conclusion + CTA (20s): Summary + "Subscribe to EV car icks for real EV data."
 5. Use REAL data points: percentages, kilowatt-hours, miles, dollars.
 6. Regions: USA, Europe, China ONLY.
 
@@ -609,7 +609,7 @@ SENARYO: [script]
             return {
                 "voice": "female",
                 "script": (
-                    f"Welcome to Ev-CAR-ix, the channel where we replace manufacturer claims with real-world data. "
+                    f"Welcome to EV car icks, the channel where we replace manufacturer claims with real-world data. "
                     f"Today, we are going deep on {topic}. "
 
                     f"First, the context. Across more than 500 real-world data points collected from drivers in the USA, "
@@ -667,7 +667,7 @@ SENARYO: [script]
                     f"gives you a far more accurate picture of what to expect from any electric vehicle. "
 
                     f"If you want to make better decisions based on real numbers rather than spec-sheet optimism, "
-                    f"subscribe to Ev-CAR-ix. We publish detailed, data-driven EV analysis every week. "
+                    f"subscribe to EV car icks. We publish detailed, data-driven EV analysis every week. "
                     f"No hype. Just numbers. See you in the next video."
                 )
             }
@@ -678,7 +678,7 @@ SENARYO: [script]
                 f"Did you know most EVs lose between 20 and 30 percent of their range in cold weather? "
                 f"Today we break down the real numbers on {topic}. "
                 f"Our data from 500 real-world tests shows the performance gap is far wider than manufacturers admit. "
-                f"Subscribe to Ev-CAR-ix for real EV data."
+                f"Subscribe to EV car icks for real EV data."
             )
         }
 
