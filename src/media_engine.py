@@ -181,53 +181,56 @@ CATEGORY_OEM_PRIORITY = {
     "trend":            ["tesla", "byd", "hyundai", "rivian", "lucid", "polestar"],
 }
 
-# YouTube CC arama terimleri — konuya göre
+# YouTube CC arama terimleri — konuya göre (Genişletilmiş: Tüm araçlar + Batarya)
 YTCC_QUERIES = {
     "battery_science": [
-        "EV battery technology b-roll creative commons",
-        "lithium battery laboratory footage cc",
-        "electric car battery pack b-roll",
-        "battery technology footage creative commons",
+        "EV battery technology manufacturing b-roll",
+        "lithium ion battery production line footage",
+        "battery cell assembly factory cc",
+        "solid state battery research laboratory b-roll",
+        "battery degradation testing footage creative commons",
+        "electric car battery pack interior deep dive cc",
     ],
     "range_tests": [
-        "electric car driving footage creative commons",
-        "EV road test b-roll cc by",
-        "tesla driving highway footage cc",
-        "electric vehicle range test b-roll",
+        "car driving highway footage creative commons",
+        "sports car acceleration b-roll cc",
+        "luxury sedan interior driving footage cc",
+        "electric vehicle winter range test b-roll",
+        "vehicle speedometer 70mph highway driving cc",
     ],
     "charging": [
         "EV charging station footage creative commons",
         "electric car charger b-roll cc",
-        "fast charging electric vehicle footage",
-        "tesla supercharger footage creative commons",
-        "what charge electric car review creative commons",
+        "fast charging technology explanation footage",
+        "charging network infrastructure b-roll",
+        "home EV charger installation footage cc",
     ],
     "comparisons": [
-        "electric car showroom footage cc",
-        "multiple EVs footage creative commons",
-        "electric vehicle exterior b-roll cc",
-        "car comparison footage creative commons",
+        "modern cars side by side b-roll cc",
+        "luxury vehicle comparison footage creative commons",
+        "car dealership showroom b-roll cc",
+        "supercar vs electric car race b-roll cc",
     ],
     "market_data": [
-        "electric car factory footage creative commons",
-        "EV production b-roll cc",
-        "automotive manufacturing footage cc",
-        "electric vehicle market footage",
+        "car factory automation robots b-roll cc",
+        "automotive shipping port global logistics cc",
+        "car sales dealership busy showroom b-roll",
+        "autonomous driving technology test b-roll cc",
     ],
     "education": [
-        "electric motor animation creative commons",
-        "car technology explainer footage cc",
-        "EV technology b-roll creative commons",
-        "automotive engineering footage cc",
+        "automotive engineering engine battery explained cc",
+        "car aerodynamics wind tunnel testing b-roll",
+        "regenerative braking technology visual cc",
+        "electric motor vs ice engine animation cc",
     ],
 }
 YTCC_DEFAULT_QUERIES = [
-    "electric car b-roll footage creative commons",
-    "EV driving footage cc by",
-    "electric vehicle technology footage creative commons",
-    "EV charging footage b-roll cc",
-    "tesla driving b-roll creative commons",
-    "what charge driving b-roll cc by",
+    "modern car driving b-roll footage creative commons",
+    "luxury vehicle exterior driving cc by",
+    "sports car highway speed footage creative commons",
+    "automotive technology innovation b-roll cc",
+    "battery energy storage technology footage",
+    "classic car restoration footage creative commons",
 ]
 
 
@@ -245,6 +248,7 @@ class MediaEngine:
         self.kling_key       = os.getenv("KLING_API_KEY") or os.getenv("KLING_ACCESS_KEY")
         self.stability_key   = os.getenv("STABILITY_API_KEY")
         self.replicate_key   = os.getenv("REPLICATE_API_KEY")
+        self.youtube_api_key = os.getenv("YOUTUBE_API_KEY")
 
         # Geriye dönük uyum için alias'lar
         self.stability_api_key = self.stability_key
@@ -669,6 +673,70 @@ class MediaEngine:
         return paths
 
     # ══════════════════════════════════════════════════════════════
+    #  YÖNTEM 5: YOUTUBE CREATIVE COMMONS
+    # ══════════════════════════════════════════════════════════════
+    def _download_youtube_cc(self, query, output_dir, count, video_type="short"):
+        if not self.youtube_api_key:
+            print("[YouTubeCC] API anahtarı eksik, atlanıyor.")
+            return []
+        
+        paths = []
+        try:
+            print(f"[YouTubeCC] '{query}' aranıyor (CC)...")
+            search_url = "https://www.googleapis.com/youtube/v3/search"
+            params = {
+                "part": "snippet",
+                "q": query,
+                "type": "video",
+                "videoLicense": "creativeCommon",
+                "videoCaption": "any",
+                "maxResults": 15,
+                "key": self.youtube_api_key
+            }
+            r = requests.get(search_url, params=params, timeout=15)
+            items = r.json().get("items", [])
+            random.shuffle(items)
+
+            for item in items:
+                if len(paths) >= count:
+                    break
+                video_id = item["id"]["videoId"]
+                video_url = f"https://www.youtube.com/watch?v={video_id}"
+                
+                # Dosya ismi
+                q_clean = re.sub(r'[^\w]', '_', query)[:20]
+                fname = f"ytcc_{q_clean}_{video_id}.mp4"
+                out_path = os.path.join(output_dir, fname)
+
+                # İndirme (yt-dlp)
+                # Not: YouTube CC videoları genellikle yüksek kalitelidir, 
+                # ancak boyutu sınırlandırmak için 720p/1080p sınırı koyuyoruz
+                format_str = "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best"
+                cmd = [
+                    "yt-dlp",
+                    "-f", format_str,
+                    "--merge-output-format", "mp4",
+                    "-o", out_path,
+                    "--max-filesize", "150M",
+                    "--no-playlist",
+                    video_url
+                ]
+                
+                try:
+                    res = subprocess.run(cmd, capture_output=True, timeout=120)
+                    if res.returncode == 0 and os.path.exists(out_path):
+                        if os.path.getsize(out_path) > 500_000:
+                            paths.append(out_path)
+                            print(f"[YouTubeCC] ✅ İndirildi: {fname}")
+                except Exception as e:
+                    print(f"[YouTubeCC] İndirme hatası ({video_id}): {e}")
+
+        except Exception as e:
+            print(f"[YouTubeCC] Arama hatası: {e}")
+        
+        return paths
+
+    # ══════════════════════════════════════════════════════════════
     #  ANA İNDİRME — TÜM KAYNAKLAR BİRLEŞİK
     # ══════════════════════════════════════════════════════════════
     def download_stock_videos(self, plan, target_clip_count=6):
@@ -688,14 +756,31 @@ class MediaEngine:
         needed      = target_clip_count
         all_clips   = []
 
-        # Stage 1 — Pexels (fast, reliable CC0)
-        print("[MediaEngine] Stage 1: Pexels...")
-        for q in queries[:3]:
+        # Stage 1 — YouTube Creative Commons (En kaliteli ve spesifik içerik)
+        print("[MediaEngine] Stage 1: YouTube CC...")
+        yt_queries = YTCC_QUERIES.get(category_id, YTCC_DEFAULT_QUERIES)
+        random.shuffle(yt_queries)
+        for q in yt_queries[:2]:
             if len(all_clips) >= needed:
                 break
-            new = self._download_from_pexels(q, "assets/temp_videos", needed - len(all_clips), "portrait" if video_type=="short" else "landscape", category_id)
+            new = self._download_youtube_cc(q, "assets/temp_videos", needed - len(all_clips), video_type)
             all_clips.extend(new)
-        print(f"[MediaEngine] Pexels: {len(all_clips)} klip")
+        
+        # Eğer hala eksikse konunun kendisiyle ara
+        if len(all_clips) < needed:
+            new = self._download_youtube_cc(f"{topic_text} footage b-roll cc", "assets/temp_videos", needed - len(all_clips), video_type)
+            all_clips.extend(new)
+        print(f"[MediaEngine] YouTube CC: {len(all_clips)} klip")
+
+        # Stage 2 — Pexels (fast, reliable CC0)
+        if len(all_clips) < needed:
+            print("[MediaEngine] Stage 2: Pexels...")
+            for q in queries[:3]:
+                if len(all_clips) >= needed:
+                    break
+                new = self._download_from_pexels(q, "assets/temp_videos", needed - len(all_clips), "portrait" if video_type=="short" else "landscape", category_id)
+                all_clips.extend(new)
+            print(f"[MediaEngine] Pexels: {len(all_clips)} klip")
 
         # Stage 2 — Pixabay (CC0)
         if len(all_clips) < needed:
