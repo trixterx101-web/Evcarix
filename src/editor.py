@@ -187,15 +187,12 @@ class AutoEditor:
 
         if len(clips) >= 2:
             base_video = concatenate_videoclips(clips, method="compose")
+            # Video süresi her zaman audio süresine tam eşit olmalı
             if base_video.duration < target_duration:
-                from moviepy.video.fx.all import loop as video_loop
-                try:
-                    base_video = video_loop(base_video, duration=target_duration)
-                except (AttributeError, ImportError):
-                    # fallback: manual loop via concatenation
-                    import math
-                    repeats = math.ceil(target_duration / base_video.duration)
-                    base_video = concatenate_videoclips([base_video] * repeats).subclip(0, target_duration)
+                import math
+                repeats = math.ceil(target_duration / base_video.duration)
+                looped = concatenate_videoclips([base_video] * repeats, method="compose")
+                base_video = looped.subclip(0, target_duration)
             else:
                 base_video = base_video.subclip(0, target_duration)
 
@@ -241,6 +238,17 @@ class AutoEditor:
             print("[Editor] Motion gradient arka plan kullanılıyor...")
             base_video = self._make_motion_background(target_duration)
 
+        # Burada base_video kesinlikle target_duration uzunluğunda olmalı
+        if abs(base_video.duration - target_duration) > 0.1:
+            if base_video.duration > target_duration:
+                base_video = base_video.subclip(0, target_duration)
+            else:
+                import math
+                repeats = math.ceil(target_duration / base_video.duration)
+                base_video = concatenate_videoclips(
+                    [base_video] * repeats, method="compose"
+                ).subclip(0, target_duration)
+
         # ── Step 4: Premium Hook System (4 Seconds) ──
         try:
             from src.thumbnail_generator import ThumbnailGenerator
@@ -262,51 +270,61 @@ class AutoEditor:
                 from moviepy.editor import ImageClip
                 hook_duration = 4.0
                 
-                # ADJUST: Subtract hook duration from base video to keep total duration == audio duration
-                if base_video.duration > hook_duration:
-                    base_video = base_video.subclip(0, base_video.duration - hook_duration)
-                
-                hook_clip = ImageClip(hook_img_path).set_duration(hook_duration).resize((1080, 1920))
-                
-                # Dynamic Zoom Effect (Ken Burns)
-                hook_clip = hook_clip.resize(lambda t: 1.0 + 0.1 * (t / hook_duration))
-                hook_clip = hook_clip.set_fps(30).set_position('center')
-                
-                # FIX: Ensure clips are compatible before concatenation
-                base_video = concatenate_videoclips([hook_clip, base_video], method="chain")
-                print(f"[Editor] [Hook] 4s Dynamic Hook prepended. Total duration: {base_video.duration:.1f}s")
+                # Hook'u video başına ekle, TOPLAM süre audio'ya eşit kalmalı
+                remaining = target_duration - hook_duration
+                if remaining > 0 and base_video.duration > 0:
+                    # base_video'yu kalan süreye göre kırp veya döngüye al
+                    if base_video.duration < remaining:
+                        import math
+                        repeats = math.ceil(remaining / base_video.duration)
+                        base_video_body = concatenate_videoclips(
+                            [base_video] * repeats, method="compose"
+                        ).subclip(0, remaining)
+                    else:
+                        base_video_body = base_video.subclip(0, remaining)
+                    base_video = concatenate_videoclips(
+                        [hook_clip, base_video_body], method="compose"
+                    )
+                else:
+                    base_video = hook_clip
+                print(f"[Editor] [Hook] 4s Dynamic Hook eklendi. Toplam süre: {base_video.duration:.1f}s")
         except Exception as e:
             print(f"[Editor] [Hook] Failed to create hook: {e}")
 
-        # Set audio AFTER all visual concatenation
+        # Ses ve video tam senkron (audio kesinlikle base_video süresini yönetir)
         base_video = base_video.set_audio(audio)
+        final_w, final_h = 1080, 1920
         all_layers = [base_video]
 
         if word_timings:
-            subtitle_clips = self._build_subtitle_clips(word_timings, target_duration)
+            # Altyazı klipleri base_video.duration üzerinden, audio süresiyle sınırlı
+            subtitle_clips = self._build_subtitle_clips(
+                word_timings, min(base_video.duration, target_duration)
+            )
             all_layers.extend(subtitle_clips)
         else:
             print("[Editor] Uyarı: word_timings boş, altyazı eklenmedi.")
 
-        final_video = CompositeVideoClip(all_layers, size=(1080, 1920))
+        final_video = CompositeVideoClip(all_layers, size=(final_w, final_h))
 
-        if final_video.w != 1080 or final_video.h != 1920:
-            final_video = final_video.resize((1080, 1920))
+        if final_video.w != final_w or final_video.h != final_h:
+            final_video = final_video.resize((final_w, final_h))
 
         output_path = os.path.join(self.output_dir, output_filename)
         os.makedirs(self.output_dir, exist_ok=True)
 
-        # FIX 6: ffmpeg_params ile ses mono/stereo uyumsuzluğunu önle
+        # HD Kalite export (8000k bitrate)
         final_video.write_videofile(
             output_path,
             fps=30,
             codec="libx264",
             audio_codec="aac",
-            bitrate="4000k",
+            bitrate="8000k",
+            audio_bitrate="192k",
             threads=4,
-            preset="ultrafast",
+            preset="fast",
             logger="bar",
-            ffmpeg_params=["-ac", "2"],   # stereo ses zorla
+            ffmpeg_params=["-ac", "2", "-movflags", "+faststart"],
         )
         audio.close()
         final_video.close()
