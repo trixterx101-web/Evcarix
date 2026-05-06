@@ -394,9 +394,12 @@ class CreativeWriter:
             char_range = "50-62"
             format_rules = (
                 f"SHORTS TITLE RULES (Viral/Suggested Focus):\n"
-                f"1. SHOCKING NUMBER first to stop the scroll\n"
-                f"2. Mention '{primary_kw}' in the first 3 words if possible\n"
-                f"3. Zero filler words (no 'The', 'How to', 'Look at')\n"
+                f"Create 5 unique angles:\n"
+                f"1. THE HOOK: Start with a question or myth-buster.\n"
+                f"2. THE DATA: Start with a percentage or number.\n"
+                f"3. THE TRUTH: Start with 'THE HONEST TRUTH:' or 'BRUTAL:'\n"
+                f"4. THE COMPARISON: '{primary_kw} vs [Competitor]'\n"
+                f"5. THE URGENCY: 'Watch this BEFORE you buy {primary_kw}'\n"
                 f"Example: '23% Battery Loss? {primary_kw} Cold Weather Test ❄️'"
             )
 

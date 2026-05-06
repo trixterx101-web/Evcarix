@@ -818,7 +818,7 @@ class MediaEngine:
                 all_clips.extend(new)
             print(f"[MediaEngine] Pixabay: {len(all_clips)} klip")
 
-        # Stage 3 — Free Footage Engine (Archive.org + NASA + Wikimedia + OEM diverse)
+        # Stage 3 — Free Footage Engine
         if len(all_clips) < needed:
             print("[MediaEngine] Stage 3: Free Footage Engine...")
             try:
@@ -833,6 +833,30 @@ class MediaEngine:
                 print(f"[MediaEngine] FreeFootage: +{len(new)} klip")
             except Exception as e:
                 print(f"[MediaEngine] FreeFootage hata: {e}")
+
+        # ── STAGE 5: FINAL FALLBACK (General High-Quality Car Footage) ──
+        # Eğer hala eksik varsa, spesifik EV aramayı bırakıp genel kaliteli araba görüntüleri al
+        if len(all_clips) < needed:
+            print(f"[MediaEngine] Stage 5: Genel araba fallback ({needed - len(all_clips)} klip eksik)...")
+            car_fallbacks = [
+                "luxury car driving highway 4k",
+                "modern car interior technology",
+                "car factory robot assembly",
+                "supercar cinematic b-roll",
+                "classic car beauty shot",
+                "concept car futuristic 4k"
+            ]
+            random.shuffle(car_fallbacks)
+            for q in car_fallbacks:
+                if len(all_clips) >= needed: break
+                # Pexels generic search
+                new = self._download_from_pexels(q, "assets/temp_videos", 1, "portrait" if video_type=="short" else "landscape")
+                all_clips.extend(new)
+                if len(all_clips) < needed:
+                    # Pixabay generic search
+                    new = self._download_from_pixabay(q, "assets/temp_videos", 1, "portrait" if video_type=="short" else "landscape")
+                    all_clips.extend(new)
+            print(f"[MediaEngine] Genel araba fallback sonrası: {len(all_clips)} klip")
 
         # Stage 4 — AI Video (fal.ai → Kling → Replicate)
         if len(all_clips) < needed:
@@ -852,10 +876,14 @@ class MediaEngine:
 
         if not all_clips:
             print("[MediaEngine] ❌ Hiç klip bulunamadı!")
-        else:
-            print(f"[MediaEngine] ✅ Toplam {len(all_clips)} klip hazır")
+            return []
+            
+        # Final deduplication and shuffle to ensure variety
+        all_clips = list(dict.fromkeys(all_clips))
+        random.shuffle(all_clips)
         
-        return all_clips
+        print(f"[MediaEngine] ✅ Toplam {len(all_clips)} benzersiz klip hazır")
+        return all_clips[:target_clip_count]
 
     # ══════════════════════════════════════════════════════════════
     #  AI VIDEO ÜRETİMİ — 7 Servis Sıralı Fallback
