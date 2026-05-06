@@ -72,7 +72,7 @@ class EvcarixOrchestrator:
 
         # Hedef süre: 25-50 saniye (config'den al)
         target_duration = random.randint(self.config_module.SHORT_VIDEO_DURATION_MIN, self.config_module.SHORT_VIDEO_DURATION_MAX)
-        clip_count = max(4, math.ceil(target_duration / 8))  # Her klip ~8 saniye, min 4 klip
+        clip_count = max(6, math.ceil(target_duration / 4))  # Her klip ~5s olduğu için /4 güvenli
 
         print(f"\n{'='*60}", flush=True)
         print(f"  Evcarix Auto-Studio — {now.strftime('%d %b %Y, %H:%M')}", flush=True)
@@ -223,7 +223,7 @@ class EvcarixOrchestrator:
 
         # Hedef süre: 240-360 saniye (4-6 dakika) - config'den al
         target_duration = random.randint(self.config_module.LONG_VIDEO_DURATION_MIN, self.config_module.LONG_VIDEO_DURATION_MAX)
-        clip_count = math.ceil(target_duration / 8)  # Her klip ~8 saniye
+        clip_count = math.ceil(target_duration / 5)  # Her klip ~5 saniye
         
         print(f"\n{'='*60}", flush=True)
         print(f"  Evcarix Weekly Long Video — {now.strftime('%d %b %Y, %H:%M')}", flush=True)

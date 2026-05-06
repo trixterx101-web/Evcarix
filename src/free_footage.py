@@ -129,6 +129,7 @@ class FreeFootageEngine:
             "lithium battery electric car",
             "electric vehicle road trip",
         ]
+        random.shuffle(queries)
 
         for q in queries:
             if len(clips) >= count:

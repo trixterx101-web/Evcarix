@@ -191,7 +191,16 @@ class AutoEditor:
             if base_video.duration < target_duration:
                 import math
                 repeats = math.ceil(target_duration / base_video.duration)
-                looped = concatenate_videoclips([base_video] * repeats, method="compose")
+                print(f"[Editor] Klip sayısı az ({len(clips)}), {repeats} kez döngüye alınıyor (karıştırılarak).")
+                
+                # Her döngüde farklı sıra olması için shuffle ekleyerek birleştir
+                all_looped_clips = list(clips)
+                for _ in range(repeats - 1):
+                    shuffled = list(clips)
+                    random.shuffle(shuffled)
+                    all_looped_clips.extend(shuffled)
+                
+                looped = concatenate_videoclips(all_looped_clips, method="compose")
                 base_video = looped.subclip(0, target_duration)
             else:
                 base_video = base_video.subclip(0, target_duration)
