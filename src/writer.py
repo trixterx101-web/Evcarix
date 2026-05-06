@@ -34,53 +34,25 @@ TOP_SHORTS_HASHTAGS = [
 
 VIRAL_TITLE_TEMPLATES = {
     "battery_science": [
-        "This EV Battery Lost {pct}% in Just {time}",
-        "LFP vs NMC: The {pct}% Difference After {miles} Miles",
-        "Why EV Owners Are Losing ${cost} Every Year on Battery",
-        "Real Battery Degradation Rate: {pct}% in {miles} Miles",
-        "The Hidden Battery Problem No One Talks About",
+        "EXPOSED: Why {brand} Batteries FAILED After Only {miles} Miles!",
+        "{pct}% Battery Loss? The SHOCKING Truth About {brand}'s LFP Cells",
+        "Don't Buy {brand} Until You See This Battery Degradation Data!",
+        "Real Data: This {brand} Battery Is Dying {pct}% Faster Than Claimed",
+        "The HIDDEN Battery Problem Killing {brand} Resale Value!",
     ],
     "range_tests": [
-        "EV Promises {range} Miles — Gets {real} in Reality",
-        "Real Highway Range: {pct}% Less Than Advertised",
-        "EV at {temp}°F: Only {range} Miles Left",
-        "{miles}-Mile EV Real Test: The Shocking Truth",
-        "Why This EV's {range}-Mile Claim Is Wrong",
+        "{brand} Promised {range} Miles — The REAL Data Is BRUTAL",
+        "SHOCKING: {brand} Range Dropped {pct}% in Cold Weather Test",
+        "Why Your {brand} Gets {real} Miles Instead of {range} (Data)",
+        "{miles} Mile Real-World Test: The Truth {brand} Doesn't Want You to Know",
+        "Stop Believing {brand}'s Range Claims! Real Test Results Inside",
     ],
     "charging": [
-        "800V vs 400V: {min} Minutes Difference — Real Test",
-        "Real DC Fast Charging Cost: ${cost} Per 100 Miles",
-        "Why Charging Speed Drops After {pct}% Battery",
-        "{min}-Minute Charge Claim? We Tested It",
-        "Home vs DC Fast Charging: ${cost}/Year Difference",
-    ],
-    "comparisons": [
-        "Tesla vs BYD: Who Actually Wins on Real Range",
-        "We Tested Both — The Data Doesn't Lie",
-        "Real Data: This EV Beats Tesla by {miles} Miles",
-        "EV Comparison 2025: The Numbers Are Surprising",
-        "{brand1} vs {brand2}: {pct}% Performance Gap",
-    ],
-    "cost_ownership": [
-        "EV True Cost: ${cost} More Than Dealers Say",
-        "{pct}% of EV Owners Overpay by ${cost}",
-        "5-Year EV Cost vs Gas: Real Math, No Hype",
-        "Hidden EV Costs: ${cost} Nobody Warns You About",
-        "Why Your EV Costs ${cost}/Year More Than Expected",
-    ],
-    "market_data": [
-        "EV Sales Dropped {pct}% — Here's the Real Reason",
-        "China EVs Are {pct}% Cheaper: The Truth Behind It",
-        "BYD Beat Tesla with {pct}% Market Share — Real Data",
-        "{pct}% of US Buyers Chose EV Last Quarter",
-        "EV Market 2025: {count}M Units, 1 Clear Winner",
-    ],
-    "education": [
-        "Why Your EV Loses {pct}% Range Below {temp}°F",
-        "EV Regen Braking: Adds {pct}% Range — Tested",
-        "How Heat Pump Saves {pct}% Battery in Winter",
-        "What {kw}kW Really Means for Your Daily Drive",
-        "The Physics Behind {pct}% EV Efficiency Loss",
+        "FAST CHARGING SCAM? {brand} Speed Dropped {pct}% After 15 Mins!",
+        "Real Charging Cost: Why {brand} Is ${cost} More Expensive Than Gas",
+        "800V vs 400V: We Measured the REAL Time Difference (Shocking)",
+        "Is Your {brand} Fast Charger Killing Your Battery? Real Data Study",
+        "The ${cost} Charging Mistake Most {brand} Owners Make Every Week",
     ],
 }
 
@@ -429,9 +401,10 @@ class CreativeWriter:
             )
 
         system = (
-            "You are a YouTube Metadata Master. Your goal is to get videos to #1 in Search and "
-            "into the 'Up Next' suggested feed. You understand that Search = Exact Keywords, "
-            "Suggested = High CTR + Topic SIGNAL. American English only."
+            "You are a Viral YouTube Growth Expert and SEO Strategist. Your titles must STOP THE SCROLL. "
+            "You use psychological triggers: Curiosity Gap, Fear of Missing Out (FOMO), and Authority. "
+            "Search Engine Optimization (SEO) is integrated but secondary to Click-Through Rate (CTR). "
+            "American English only. NO Turkey references."
         )
         user = (
             f"Write 5 high-performing YouTube title variants for Evcarix.\n"
@@ -764,9 +737,10 @@ SENARYO: [script]
             max_tok = 900
         else:
             system = (
-                "You are a YouTube Shorts SEO expert. "
-                "First 125 characters of description show in mobile search results — make them count. "
-                "American English only. Return only the description body text."
+                "You are a YouTube SEO Expert specialized in the 'Search + Browse' algorithm. "
+                "The first 100 characters of the description are the most important for ranking. "
+                "You write descriptions that force people to click and YouTube to suggest the video. "
+                "American English only."
             )
             user = (
                 f"Write a YouTube Shorts description for Evcarix.\n"

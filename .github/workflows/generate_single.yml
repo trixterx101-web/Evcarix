@@ -15,16 +15,28 @@ on:
 
 jobs:
   generate-single:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     permissions:
       contents: write
 
     steps:
+      # ── 0. Prep ──────────────────────────────────────────────────
+      - name: Remove broken submodule config
+        run: |
+          git config --global --add safe.directory '*'
+          if [ -f .gitmodules ]; then
+            git submodule deinit --all -f 2>/dev/null || true
+          fi
+
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: '3.11'
           cache: 'pip'

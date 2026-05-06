@@ -1,11 +1,11 @@
 name: Evcarix Daily Shorts
 
-# TR Saati 08:00 = UTC 07:00  |  TR Saati 16:00 = UTC 13:00  |  TR Saati Pazar 10:00 = UTC 08:00
+# TR Saati 07:00 = UTC 04:00  |  TR Saati 17:00 = UTC 14:00  |  TR Saati Pazar 08:00 = UTC 05:00
 on:
   schedule:
-    - cron: '0 7 * * *'   # TR 08:00 — Trend modu (YouTube'tan ilham)
-    - cron: '0 13 * * *'  # TR 16:00 — Auto modu (sistem konusu)
-    - cron: '0 8 * * 0'   # Pazar TR 10:00 — Haftalık uzun video (UTC 08:00)
+    - cron: '0 7 * * *'   # TR 07:00 — Trend modu (YouTube'tan ilham)
+    - cron: '0 13 * * *'  # TR 17:00 — Auto modu (sistem konusu)
+    - cron: '0 8 * * 0'   # Pazar TR 08:00 — Haftalık uzun video (UTC 08:00)
   workflow_dispatch:
     inputs:
       video_type:
@@ -35,16 +35,29 @@ on:
 
 jobs:
   build-and-upload:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
+      # ── 0. Prep ──────────────────────────────────────────────────
+      - name: Remove broken submodule config
+        run: |
+          git config --global --add safe.directory '*'
+          if [ -f .gitmodules ]; then
+            git submodule deinit --all -f 2>/dev/null || true
+          fi
+
       # ── 1. Repo ──────────────────────────────────────────────────
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+          submodules: false # Wav2Lip is not a proper submodule
 
       # ── 2. Python ────────────────────────────────────────────────
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: '3.10'
 
@@ -65,14 +78,16 @@ jobs:
       # ── 5.1 İçerik geçmişini cache'den yükle ─────────────────────
       #     Run'lar arası konu/başlık tekrarını önlemek için
       - name: Restore Content History Cache
-        uses: actions/cache@v4
+        uses: actions/cache@v4.2.0
         with:
           path: |
             content_history.json
             used_topics.json
-          key: evcarix-content-history-${{ github.ref_name }}
+            used_clips.json
+            assets/oem/oem_cache.json
+          key: evcarix-history-${{ github.run_id }}
           restore-keys: |
-            evcarix-content-history-
+            evcarix-history-
 
       # ── 5.2 İnsan gibi rastgele bekleme (0-5 dakika) ─────────────
       #     YouTube algoritmasına makine gibi görünmemek için
@@ -86,6 +101,8 @@ jobs:
       - name: Run Video Production & Upload
         env:
           GEMINI_API_KEY:            ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2:          ${{ secrets.GEMINI_API_KEY_2 }}
+          GEMINI_API_KEY_3:          ${{ secrets.GEMINI_API_KEY_3 }}
           GROQ_API_KEY:              ${{ secrets.GROQ_API_KEY }}
           GROQ_API_KEY_2:            ${{ secrets.GROQ_API_KEY_2 }}
           GROQ_API_KEY_3:            ${{ secrets.GROQ_API_KEY_3 }}
@@ -106,9 +123,6 @@ jobs:
           FAL_KEY:                   ${{ secrets.FAL_KEY }}
           # Mode: trend (YouTube'tan ilham) veya auto (sistem konusu)
           # cron 07:00 UTC -> trend, cron 13:00 UTC -> auto, cron 08:00 UTC Sunday -> long video
-          # FIX: Pazar cron'u (0 8 * * 0) için VIDEO_TYPE=long, UPLOAD_SLOT=SUNDAY_LONG
-          # Sabah cron'u (0 7 * * *) için CONTENT_MODE=trend
-          # Öğleden sonra cron'u (0 13 * * *) için CONTENT_MODE=auto
           CONTENT_MODE: >-
             ${{ github.event.inputs.content_mode
               || (github.event.schedule == '0 7 * * *' && 'trend')
@@ -132,17 +146,19 @@ jobs:
       # ── 7. İçerik geçmişini cache'e kaydet (başarılı run sonrası) ──
       - name: Save Content History Cache
         if: success()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v4.2.0
         with:
           path: |
             content_history.json
             used_topics.json
-          key: evcarix-content-history-${{ github.ref_name }}
+            used_clips.json
+            assets/oem/oem_cache.json
+          key: evcarix-history-${{ github.run_id }}
 
       # ── 8. Çıktıları artifact olarak sakla ───────────────────────
       - name: Save Output Artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: evcarix-video-${{ github.run_number }}
           path: |

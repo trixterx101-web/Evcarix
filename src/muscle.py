@@ -46,10 +46,8 @@ class EvcarixMuscle:
         
         orientation = "portrait" if config['type'] == "short" else "landscape"
         video_paths = self.media_engine.download_stock_videos(
-            "electric car " + specific_topic.split()[0], 
-            video_clips_dir, 
-            count=10 if config['type'] == "long" else 5, 
-            orientation=orientation
+            plan, 
+            target_clip_count=10 if config['type'] == "long" else 6
         )
         
         # 2. Montaj

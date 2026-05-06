@@ -6,6 +6,7 @@ from src.trend_engine import TrendEngine
 from src.writer import CreativeWriter
 
 CONTENT_HISTORY_FILE = "content_history.json"
+USED_TOPICS_FILE = "used_topics.json"
 HISTORY_LIMIT = 60  # Son 60 konu/başlık tekrar edilmez
 
 
@@ -160,25 +161,38 @@ class EvcarixBrain:
     }
 
     def _pick_topic(self, slot="evening"):
-        """Havuzdan rastgele, tekrar etmeyen, çeşitli kategoriden konu seçer.
-        Returns: (topic, category) tuple."""
-        used_topics = self._get_used_topics()
-        used_lower = [t.lower() for t in used_topics]
+        """Ardışık (sequential) olarak kategori ve konu seçer."""
+        # Mevcut durumu yükle
+        state = {"cat_idx": 0, "topic_idx": 0}
+        if os.path.exists(USED_TOPICS_FILE):
+            try:
+                with open(USED_TOPICS_FILE, "r") as f:
+                    state = json.load(f)
+            except:
+                pass
 
-        # Her kategoriden birer aday seç, tekrar olmayanları filtrele
-        candidates = []
-        for cat, topics in self._TOPIC_POOL.items():
-            fresh = [t for t in topics if t.lower() not in used_lower]
-            if fresh:
-                candidates.append((random.choice(fresh), cat))
+        categories = list(self._TOPIC_POOL.keys())
+        cat_key = categories[state["cat_idx"] % len(categories)]
+        topics = self._TOPIC_POOL[cat_key]
+        
+        topic = topics[state["topic_idx"] % len(topics)]
+        
+        # Bir sonraki için durumu güncelle
+        new_state = {
+            "cat_idx": state["cat_idx"],
+            "topic_idx": state["topic_idx"] + 1
+        }
+        
+        # Eğer bu kategorideki tüm konular bittiyse bir sonraki kategoriye geç
+        if new_state["topic_idx"] >= len(topics):
+            new_state["cat_idx"] += 1
+            new_state["topic_idx"] = 0
+            
+        with open(USED_TOPICS_FILE, "w") as f:
+            json.dump(new_state, f)
 
-        if candidates:
-            return random.choice(candidates)
-
-        # Hepsi kullanılmışsa — en eski konulardan başlayarak tekrar izin ver
-        all_pairs = [(t, c) for c, topics in self._TOPIC_POOL.items() for t in topics]
-        random.shuffle(all_pairs)
-        return all_pairs[0]
+        print(f"[Brain] Sequential Topic: {cat_key} -> {topic}")
+        return topic, cat_key
 
     def _get_metadata_variation(self):
         """Her çalışmada biraz farklı metadata yapısı üretmek için varyasyon seçer."""

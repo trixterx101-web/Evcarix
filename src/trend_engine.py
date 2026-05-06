@@ -66,11 +66,18 @@ class TrendEngine:
         ]
 
         # Gemini
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY") if GEMINI_AVAILABLE else None
+        self.gemini_api_keys = []
+        if GEMINI_AVAILABLE:
+            for i in range(1, 4):
+                key = os.getenv(f"GEMINI_API_KEY_{i}") if i > 1 else os.getenv("GEMINI_API_KEY")
+                if key:
+                    self.gemini_api_keys.append(key)
+        
         self.gemini_client = None
-        if GEMINI_AVAILABLE and self.gemini_api_key:
+        if GEMINI_AVAILABLE and self.gemini_api_keys:
             try:
-                self.gemini_client = genai.Client(api_key=self.gemini_api_key)
+                # Default to first key for init, will switch in _llm_gemini if needed
+                self.gemini_client = genai.Client(api_key=self.gemini_api_keys[0])
             except Exception as e:
                 print(f"[TrendEngine] Gemini init hatası: {e}")
 
@@ -354,22 +361,29 @@ Return ONLY this JSON (no markdown, no backticks):
         return system, user
 
     def _llm_gemini(self, system: str, user: str) -> dict | None:
-        """Gemini 2.0 Flash ile üret."""
-        if not GEMINI_AVAILABLE or not self.gemini_client:
+        """Gemini 2.0 Flash ile üret — Çoklu key desteği."""
+        if not GEMINI_AVAILABLE or not self.gemini_api_keys:
             return None
-        try:
-            prompt = f"{system}\n\n{user}"
-            resp = self.gemini_client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt
-            )
-            return self._parse_json_safe(resp.text)
-        except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                print(f"[LLM] Gemini kota aşıldı, sonraki LLM'e geçiliyor.")
-            else:
-                print(f"[LLM] Gemini hatası: {e}")
-            return None
+            
+        prompt = f"{system}\n\n{user}"
+        
+        for key in self.gemini_api_keys:
+            try:
+                client = genai.Client(api_key=key)
+                resp = client.models.generate_content(
+                    model='gemini-2.0-flash',
+                    contents=prompt
+                )
+                if resp.text:
+                    return self._parse_json_safe(resp.text)
+            except Exception as e:
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    print(f"[LLM] Gemini kota aşıldı, yedek key deneniyor...")
+                    continue
+                else:
+                    print(f"[LLM] Gemini hatası: {e}")
+                    continue
+        return None
 
     def _llm_groq(self, system: str, user: str, model: str = "llama-3.3-70b-versatile") -> dict | None:
         """Groq ile üret — birden fazla key desteği."""
