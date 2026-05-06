@@ -739,18 +739,37 @@ class MediaEngine:
     # ══════════════════════════════════════════════════════════════
     #  ANA İNDİRME — TÜM KAYNAKLAR BİRLEŞİK
     # ══════════════════════════════════════════════════════════════
-    def download_stock_videos(self, plan, target_clip_count=6):
+    def download_stock_videos(self, plan=None, target_clip_count=6,
+                              query=None, count=None,
+                              orientation=None, category=None):
         """
         Download stock videos using a multi-stage fallback strategy.
-        Sources: Pexels -> Pixabay -> FreeFootageEngine -> AI Video.
+        Supports both:
+          - New style: download_stock_videos(plan=dict, target_clip_count=N)
+          - Legacy:    download_stock_videos(query=str, count=N, orientation=str, category=str)
         """
         from src.free_footage import FreeFootageEngine
         from src.ai_video_generator import AIVideoGenerator
         from src.query_builder import get_queries_for_script
 
+        # ── Geriye dönük uyum: eski parametrelerden plan oluştur ──
+        if plan is None or not isinstance(plan, dict):
+            plan = {
+                "topic":       query or "",
+                "category_id": category or "",
+                "script":      "",
+            }
+        if count is not None:
+            target_clip_count = count
+
         video_type  = os.environ.get("VIDEO_TYPE", "short")
-        topic_text  = plan.get("topic", "")
-        category_id = plan.get("category_id", "")
+        if orientation == "landscape":
+            video_type = "long"
+        elif orientation == "portrait":
+            video_type = "short"
+
+        topic_text  = plan.get("topic", "") or (query or "")
+        category_id = plan.get("category_id", "") or (category or "")
         script_text = plan.get("script", "") or ""
         queries     = get_queries_for_script(script_text, topic_text, category_id)
         needed      = target_clip_count
