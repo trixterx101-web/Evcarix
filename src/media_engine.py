@@ -542,6 +542,10 @@ class MediaEngine:
                                orientation="portrait", category=None):
         if not self.pexels_api_key:
             return []
+        
+        # Ensure temp directory exists
+        os.makedirs(output_dir, exist_ok=True)
+        
         q = self._get_professional_query(query, category)
         headers = {"Authorization": self.pexels_api_key}
         page = random.randint(1, 8)
@@ -600,6 +604,9 @@ class MediaEngine:
                                 orientation="horizontal", category=None):
         if not self.pixabay_api_key:
             return []
+        
+        # Ensure temp directory exists
+        os.makedirs(output_dir, exist_ok=True)
         cat_q = {
             "battery_science":  ["lithium battery cell", "battery technology laboratory", "battery factory"],
             "range_tests":      ["electric car highway driving", "dashboard speedometer", "winter road driving"],
@@ -632,7 +639,7 @@ class MediaEngine:
             if not hits:
                 params["page"] = 1
                 r2 = requests.get("https://pixabay.com/api/videos/",
-                                  params=params, timeout=15)
+                                  params=params, timeout=30)
                 hits = r2.json().get("hits", []) if r2.status_code == 200 else []
             random.shuffle(hits)
             for i, hit in enumerate(hits[:count + 2]):

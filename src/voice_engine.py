@@ -20,22 +20,22 @@ class VoiceEngine:
 
         # ── TELAFFUZ DÜZELTİCİ ─────────────────────────────────────────────────
         # Edge TTS "Evcarix" kelimesini yanlış okuyor.
-        # "EV car icks" → TTS bunu doğal olarak [EV-kar-iks] şeklinde okur.
+        # "EV-care-icks" → TTS bunu doğal olarak [EV-kar-iks] şeklinde okur.
         # Tüm varyasyonlar (büyük/küçük harf, tireli, kaçış karakterli) yakalanır.
         pronunciation_map = [
-            # Evcarix ve tüm varyasyonları → "EV car icks"
-            (r"(?i)\bEv[-\s]?car[-\s]?ix\b", "EV car icks"),
-            (r"(?i)\bEvcarix\b",              "EV car icks"),
-            (r"(?i)\bEVCARIX\b",              "EV car icks"),
-            (r"(?i)\bEvCARix\b",              "EV car icks"),
-            (r"(?i)\bEvCarIx\b",              "EV car icks"),
-            (r"(?i)\bEv-CAR-ix\b",            "EV car icks"),
-            (r"(?i)\bEvcaris\b",              "EV car icks"),
-            (r"(?i)\bEverix\b",               "EV car icks"),
+            # Evcarix ve tüm varyasyonları → "EV-care-icks"
+            (r"(?i)\bEv[-\s]?car[-\s]?ix\b", "EV-care-icks"),
+            (r"(?i)\bEvcarix\b",              "EV-care-icks"),
+            (r"(?i)\bEVCARIX\b",              "EV-care-icks"),
+            (r"(?i)\bEvCARix\b",              "EV-care-icks"),
+            (r"(?i)\bEvCarIx\b",              "EV-care-icks"),
+            (r"(?i)\bEv-CAR-ix\b",            "EV-care-icks"),
+            (r"(?i)\bEvcaris\b",              "EV-care-icks"),
+            (r"(?i)\bEverix\b",               "EV-care-icks"),
             # Cümle içi (apostrophe, possessive vb.)
-            (r"(?i)\bEvcarix's\b",            "EV car icks"),
-            (r"(?i)\bEvcarix'te\b",           "EV car icks"),
-            (r"(?i)\bEvcarix'in\b",           "EV car icks"),
+            (r"(?i)\bEvcarix's\b",            "EV-care-icks"),
+            (r"(?i)\bEvcarix'te\b",           "EV-care-icks"),
+            (r"(?i)\bEvcarix'in\b",           "EV-care-icks"),
         ]
         for pattern, replacement in pronunciation_map:
             text = re.sub(pattern, replacement, text)

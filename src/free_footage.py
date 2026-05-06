@@ -78,27 +78,7 @@ class FreeFootageEngine:
         clips = []
         print(f"[FreeFootage] Aranıyor: '{topic}' | hedef: {count} klip")
 
-        # Stage A: Internet Archive (biggest free EV library)
-        if len(clips) < count:
-            ia = self._search_internet_archive(
-                topic, count - len(clips), video_type
-            )
-            clips.extend(ia)
-            print(f"[FreeFootage] Archive.org: +{len(ia)} klip")
-
-        # Stage B: NASA / US Government public domain
-        if len(clips) < count:
-            nasa = self._get_nasa_footage(count - len(clips), video_type)
-            clips.extend(nasa)
-            print(f"[FreeFootage] NASA/GOV: +{len(nasa)} klip")
-
-        # Stage C: Wikimedia Commons search
-        if len(clips) < count:
-            wm = self._search_wikimedia(topic, count - len(clips))
-            clips.extend(wm)
-            print(f"[FreeFootage] Wikimedia: +{len(wm)} klip")
-
-        # Stage D: Verified OEM CDN (diverse brands, not just Tesla)
+        # Stage A: Verified OEM CDN (Diverse brands) - Prioritize quality/brand
         if len(clips) < count:
             oem = self._get_oem_diverse(
                 category_id or "default",
@@ -107,6 +87,26 @@ class FreeFootageEngine:
             )
             clips.extend(oem)
             print(f"[FreeFootage] OEM CDN: +{len(oem)} klip")
+
+        # Stage B: Internet Archive
+        if len(clips) < count:
+            ia = self._search_internet_archive(
+                topic, count - len(clips), video_type
+            )
+            clips.extend(ia)
+            print(f"[FreeFootage] Archive.org: +{len(ia)} klip")
+
+        # Stage C: NASA / US Government
+        if len(clips) < count:
+            nasa = self._get_nasa_footage(count - len(clips), video_type)
+            clips.extend(nasa)
+            print(f"[FreeFootage] NASA/GOV: +{len(nasa)} klip")
+
+        # Stage D: Wikimedia Commons
+        if len(clips) < count:
+            wm = self._search_wikimedia(topic, count - len(clips))
+            clips.extend(wm)
+            print(f"[FreeFootage] Wikimedia: +{len(wm)} klip")
 
         print(f"[FreeFootage] ✅ Toplam: {len(clips)} klip")
         return clips[:count]
