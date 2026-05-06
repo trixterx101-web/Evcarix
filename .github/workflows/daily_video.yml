@@ -90,14 +90,6 @@ jobs:
           restore-keys: |
             evcarix-history-
 
-      # ── 5.2 İnsan gibi rastgele bekleme (0-30 saniye) ─────────────
-      #     YouTube algoritmasına makine gibi görünmemek için
-      - name: Human-like Random Delay
-        run: |
-          DELAY=$((RANDOM % 30))
-          echo "Beklenilen süre: $DELAY saniye"
-          sleep $DELAY
-
       # ── 6. Ana workflow ──────────────────────────────────────────
       - name: Run Video Production & Upload
         env:
