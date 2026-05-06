@@ -6,7 +6,7 @@ from src.trend_engine import TrendEngine
 from src.writer import CreativeWriter
 
 CONTENT_HISTORY_FILE = "content_history.json"
-USED_TOPICS_FILE = "used_topics.json"
+SEQUENTIAL_STATE_FILE = "sequential_state.json"
 HISTORY_LIMIT = 60  # Son 60 konu/başlık tekrar edilmez
 
 
@@ -164,10 +164,12 @@ class EvcarixBrain:
         """Ardışık (sequential) olarak kategori ve konu seçer."""
         # Mevcut durumu yükle
         state = {"cat_idx": 0, "topic_idx": 0}
-        if os.path.exists(USED_TOPICS_FILE):
+        if os.path.exists(SEQUENTIAL_STATE_FILE):
             try:
-                with open(USED_TOPICS_FILE, "r") as f:
+                with open(SEQUENTIAL_STATE_FILE, "r") as f:
                     state = json.load(f)
+                    if not isinstance(state, dict):
+                        state = {"cat_idx": 0, "topic_idx": 0}
             except:
                 pass
 
@@ -188,7 +190,7 @@ class EvcarixBrain:
             new_state["cat_idx"] += 1
             new_state["topic_idx"] = 0
             
-        with open(USED_TOPICS_FILE, "w") as f:
+        with open(SEQUENTIAL_STATE_FILE, "w") as f:
             json.dump(new_state, f)
 
         print(f"[Brain] Sequential Topic: {cat_key} -> {topic}")

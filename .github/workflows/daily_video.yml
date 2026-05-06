@@ -83,6 +83,7 @@ jobs:
           path: |
             content_history.json
             used_topics.json
+            sequential_state.json
             used_clips.json
             assets/oem/oem_cache.json
           key: evcarix-history-${{ github.run_id }}
@@ -151,6 +152,7 @@ jobs:
           path: |
             content_history.json
             used_topics.json
+            sequential_state.json
             used_clips.json
             assets/oem/oem_cache.json
           key: evcarix-history-${{ github.run_id }}
