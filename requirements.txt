@@ -17,6 +17,7 @@ opencv-python
 gradio_client
 fal-client>=0.5.0
 yt-dlp
+PyJWT>=2.8.0
 # LLM fallback chain providers
 anthropic
 openai
