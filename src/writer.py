@@ -70,6 +70,7 @@ class CreativeWriter:
         if GEMINI_AVAILABLE and self.gemini_api_keys:
             try:
                 self.gemini_client = genai.Client(api_key=self.gemini_api_keys[0])
+                print(f"[Writer] {len(self.gemini_api_keys)} adet Gemini key yüklendi.")
             except Exception as e:
                 print(f"[Writer] Gemini init hatası: {e}")
 
@@ -127,10 +128,15 @@ class CreativeWriter:
                     json={"model": "gpt-4o-mini", "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}], "max_tokens": max_tokens, "temperature": 0.7},
                     timeout=30,
                 )
-                text = r.json()["choices"][0]["message"]["content"].strip()
-                if text:
-                    print("[LLM] ✅ ChatGPT")
-                    return text
+                r.raise_for_status()
+                data = r.json()
+                if "choices" in data:
+                    text = data["choices"][0]["message"]["content"].strip()
+                    if text:
+                        print("[LLM] ✅ ChatGPT")
+                        return text
+                else:
+                    print(f"[LLM] ChatGPT hatası: {data.get('error', {}).get('message', 'Bilinmeyen hata')}")
             except Exception as e:
                 print(f"[LLM] ChatGPT: {e}")
 
