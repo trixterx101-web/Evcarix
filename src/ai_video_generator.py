@@ -122,6 +122,7 @@ class AIVideoGenerator:
         self.stability_key = os.environ.get("STABILITY_API_KEY", "")
         self.fal_key       = os.environ.get("FAL_KEY", "")
         self.replicate_key = os.environ.get("REPLICATE_API_KEY", "")
+        self.geminigen_key = os.environ.get("GEMINIGEN_API_KEY", "")
 
     # ── Public API ─────────────────────────────────────────────────────────────
     def generate(self, topic: str, category_id: str = "",
@@ -164,6 +165,8 @@ class AIVideoGenerator:
     # ── Provider chain ─────────────────────────────────────────────────────────
     def _get_provider_chain(self) -> list:
         chain = []
+        if self.geminigen_key:
+            chain.append(("GeminiGen AI",      self._geminigen))
         if self.replicate_key:
             chain.append(("Replicate HD",       self._replicate))
         if self.fal_key:
@@ -182,6 +185,90 @@ class AIVideoGenerator:
         chain.append(("Wan 2.2 HF Router",   self._wan22))
         chain.append(("Wan 2.1 HF Router",   self._huggingface_router))
         return chain
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ── Provider: GeminiGen AI (NEW) ──────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    def _geminigen(self, prompt: str, count: int,
+                  duration: int, aspect: str) -> list[str]:
+        """
+        GeminiGen AI (geminigen.ai) - Powerful Google Veo 3.1 Fast Video Gen.
+        Endpoint: https://api.geminigen.ai/uapi/v1/video-gen/veo
+        """
+        clips = []
+        headers = {
+            "x-api-key": self.geminigen_key,
+            "Content-Type": "application/json"
+        }
+        
+        for i in range(count):
+            try:
+                print(f"[GeminiGen] Generating video {i+1}/{count}...")
+                r = requests.post(
+                    "https://api.geminigen.ai/uapi/v1/video-gen/veo",
+                    headers=headers,
+                    json={
+                        "prompt": prompt,
+                        "model": "google/veo-3.1-fast-video-gen",
+                        "aspect_ratio": aspect
+                    },
+                    timeout=TIMEOUT
+                )
+                
+                if r.status_code not in (200, 201):
+                    print(f"[GeminiGen] Submit hata: {r.status_code} {r.text[:100]}")
+                    break
+                    
+                data = r.json()
+                uuid = data.get("uuid")
+                if not uuid:
+                    print(f"[GeminiGen] UUID alınamadı: {data}")
+                    break
+                    
+                path = self._geminigen_poll(uuid, i, headers)
+                if path:
+                    clips.append(path)
+                time.sleep(2)
+            except Exception as e:
+                print(f"[GeminiGen] Hata: {e}")
+                break
+        return clips
+
+    def _geminigen_poll(self, uuid: str, idx: int, headers: dict) -> str | None:
+        deadline = time.time() + MAX_WAIT
+        while time.time() < deadline:
+            try:
+                r = requests.get(
+                    f"https://api.geminigen.ai/uapi/v1/history/{uuid}",
+                    headers=headers,
+                    timeout=TIMEOUT
+                )
+                if r.status_code != 200:
+                    print(f"[GeminiGen] Poll error: {r.status_code}")
+                    time.sleep(POLL_EVERY)
+                    continue
+                    
+                data = r.json()
+                # Status: 1=Processing, 2=Completed, 3=Failed
+                status = data.get("status")
+                
+                if status == 2:
+                    gen_video = data.get("generated_video", [])
+                    if gen_video and len(gen_video) > 0:
+                        url = gen_video[0].get("video_url")
+                        if url:
+                            return self._download_video(url, f"geminigen_{idx}")
+                elif status == 3:
+                    error = data.get("error_message", "Unknown error")
+                    print(f"[GeminiGen] Task failed: {error}")
+                    return None
+                
+                print(f"[GeminiGen] Bekleniyor... status={status}")
+                time.sleep(POLL_EVERY)
+            except Exception as e:
+                print(f"[GeminiGen] Poll exception: {e}")
+                time.sleep(POLL_EVERY)
+        return None
 
     # ══════════════════════════════════════════════════════════════════════════
     # ── Provider: fal.ai LTX-Video (PRIMARY — best free option) ───────────────

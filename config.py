@@ -18,6 +18,7 @@ PIXABAY_API_KEY = os.getenv("PIXABAY_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 KLING_ACCESS_KEY = os.getenv("KLING_ACCESS_KEY")
 KLING_SECRET_KEY = os.getenv("KLING_SECRET_KEY")
+GEMINIGEN_API_KEY = os.getenv("GEMINIGEN_API_KEY")
 
 # ── YouTube Configuration ──────────────────────────────────────────────────────
 YOUTUBE_CLIENT_SECRET_PATH = os.getenv("YOUTUBE_CLIENT_SECRET_PATH", "client_secret.json")
@@ -82,6 +83,7 @@ def validate_config():
         "REPLICATE_API_KEY": REPLICATE_API_KEY,
         "KLING_ACCESS_KEY": KLING_ACCESS_KEY,
         "KLING_SECRET_KEY": KLING_SECRET_KEY,
+        "GEMINIGEN_API_KEY": GEMINIGEN_API_KEY,
     }
 
     missing_optional = [k for k, v in optional_keys.items() if not v]

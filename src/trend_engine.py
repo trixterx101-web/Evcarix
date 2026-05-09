@@ -68,7 +68,7 @@ class TrendEngine:
         # Gemini
         self.gemini_api_keys = []
         if GEMINI_AVAILABLE:
-            for i in range(1, 4):
+            for i in range(1, 11):
                 key = os.getenv(f"GEMINI_API_KEY_{i}") if i > 1 else os.getenv("GEMINI_API_KEY")
                 if key:
                     self.gemini_api_keys.append(key)
