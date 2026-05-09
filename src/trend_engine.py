@@ -877,28 +877,34 @@ Return ONLY this JSON (no markdown, no backticks):
                 self._save_topic_history(title)
                 return title
 
-        if GEMINI_AVAILABLE and self.gemini_client and news_df is not None and not news_df.empty:
-            try:
-                titles = news_df['title'].tolist()
-                random.shuffle(titles)
-                unused = [t for t in titles if not self._is_used_recently(t)]
-                pool = (unused if unused else titles)[:20]
-                prompt = (
-                    "You are a technical EV analyst for 'Evcarix'. "
-                    "Pick the ONE most data-driven, technical headline. "
-                    "Return ONLY the headline text.\n\n"
-                    + "\n".join(f"- {t}" for t in pool)
-                )
-                response = self.gemini_client.models.generate_content(
-                    model='gemini-2.0-flash', contents=prompt
-                )
-                selected = response.text.strip()
-                if any(t.lower() in selected.lower() or selected.lower() in t.lower() for t in pool):
-                    print(f"[TrendEngine] Gemini RSS: {selected}")
-                    self._save_topic_history(selected)
-                    return selected
-            except Exception as e:
-                print(f"[TrendEngine] Gemini error: {e}")
+        if GEMINI_AVAILABLE and self.gemini_api_keys and news_df is not None and not news_df.empty:
+            titles = news_df['title'].tolist()
+            random.shuffle(titles)
+            unused = [t for t in titles if not self._is_used_recently(t)]
+            pool = (unused if unused else titles)[:20]
+            prompt_user = (
+                "Pick the ONE most data-driven, technical headline from the list below. "
+                "Return ONLY the headline text, nothing else.\n\n"
+                + "\n".join(f"- {t}" for t in pool)
+            )
+            system_msg = "You are a technical EV analyst for 'Evcarix'."
+            
+            for key in self.gemini_api_keys:
+                try:
+                    client = genai.Client(api_key=key)
+                    resp = client.models.generate_content(
+                        model='gemini-2.0-flash',
+                        contents=f"{system_msg}\n\n{prompt_user}"
+                    )
+                    selected = resp.text.strip()
+                    if selected and any(t.lower() in selected.lower() or selected.lower() in t.lower() for t in pool):
+                        print(f"[TrendEngine] Gemini RSS: {selected}")
+                        self._save_topic_history(selected)
+                        return selected
+                except Exception as e:
+                    if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                        continue
+                    print(f"[TrendEngine] Gemini error: {e}")
 
         core_topics = [
             "Real-world EV range test vs manufacturer claims",
@@ -1039,220 +1045,38 @@ Return ONLY this JSON (no markdown, no backticks):
             f'"hook":"first sentence","category":"battery_science|range_tests|charging|comparisons|market_data|education"}}'
         )
 
-        # LLM pipeline (CreativeWriter ile aynı sıra)
-        llm_calls = [
-            ("Gemini",      lambda: self._call_llm_gemini(system, user)),
-            ("Groq 70B",    lambda: self._call_llm_groq(system, user, "llama-3.3-70b-versatile")),
-            ("Groq 8B",     lambda: self._call_llm_groq(system, user, "llama-3.1-8b-instant")),
-            ("OpenRouter",  lambda: self._call_llm_openrouter(system, user)),
-            ("Mistral",     lambda: self._call_llm_mistral(system, user)),
-            ("Cohere",      lambda: self._call_llm_cohere(system, user)),
-            ("Together",    lambda: self._call_llm_together(system, user)),
-            ("Perplexity",  lambda: self._call_llm_perplexity(system, user)),
-            ("DeepSeek",    lambda: self._call_llm_deepseek(system, user)),
-            ("HuggingFace", lambda: self._call_llm_huggingface(system, user)),
+        # LLM pipeline (Çoklu key desteği ile)
+        llm_pipeline = [
+            ("Gemini 2.0 Flash",        lambda: self._llm_gemini(system, user)),
+            ("ChatGPT (GPT-4o-mini)",   lambda: self._llm_openai(system, user)),
+            ("Groq Llama3.3-70B",       lambda: self._llm_groq(system, user, "llama-3.3-70b-versatile")),
+            ("Groq Llama3.1-8B",        lambda: self._llm_groq(system, user, "llama-3.1-8b-instant")),
+            ("OpenRouter Mistral-7B",   lambda: self._llm_openrouter(system, user)),
+            ("Mistral Small",           lambda: self._llm_mistral(system, user)),
+            ("Cohere Command-R",        lambda: self._llm_cohere(system, user)),
+            ("Together Llama3.3-70B",   lambda: self._llm_together(system, user)),
+            ("Perplexity Sonar",        lambda: self._llm_perplexity(system, user)),
+            ("DeepSeek Chat",           lambda: self._llm_deepseek(system, user)),
+            ("HuggingFace Mistral-7B",  lambda: self._llm_huggingface(system, user)),
         ]
 
-        for name, fn in llm_calls:
+        for name, fn in llm_pipeline:
             try:
                 print(f"[LLM] {name} deneniyor...")
-                raw = fn()
-                if not raw:
-                    continue
-                cleaned = self._clean_json(raw)
-                import re as _re
-                match = _re.search(r'\{.*\}', cleaned, _re.DOTALL)
-                if match:
-                    result = json.loads(match.group())
-                    if all(k in result for k in ["topic", "title", "script"]):
-                        result["source_video_id"] = video_data.get("video_id", "")
-                        result["source_title"]    = title
-                        result["inspired_by"]     = video_data.get("url", "")
-                        print(f"[LLM] ✅ {name}: {result['title'][:50]}")
-                        return result
+                result = fn()
+                if result and all(k in result for k in ["topic", "title", "script"]):
+                    result["source_video_id"] = video_data.get("video_id", "")
+                    result["source_title"]    = title
+                    result["inspired_by"]     = video_data.get("url", "")
+                    print(f"[LLM] ✅ {name}: {result['title'][:50]}")
+                    return result
             except Exception as e:
                 print(f"[LLM] {name} hata: {e}")
 
         print("[LLM] ❌ Tüm LLM'ler başarısız.")
         return None
 
-    def _call_llm_gemini(self, system, user):
-        if not GEMINI_AVAILABLE or not self.gemini_client:
-            return None
-        try:
-            resp = self.gemini_client.models.generate_content(
-                model='gemini-2.0-flash', contents=f"{system}\n\n{user}")
-            return resp.text
-        except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                print("[LLM] Gemini kota →")
-            else:
-                print(f"[LLM] Gemini: {e}")
-            return None
-
-    def _call_llm_groq(self, system, user, model="llama-3.3-70b-versatile"):
-        groq_keys = [k for k in [
-            os.getenv("GROQ_API_KEY"),
-            os.getenv("GROQ_API_KEY_2"),
-            os.getenv("GROQ_API_KEY_3"),
-        ] if k]
-        if not groq_keys:
-            return None
-        try:
-            from groq import Groq
-            for key in groq_keys:
-                try:
-                    client = Groq(api_key=key)
-                    resp = client.chat.completions.create(
-                        model=model,
-                        messages=[{"role": "system", "content": system},
-                                  {"role": "user", "content": user}],
-                        max_tokens=600, temperature=0.7,
-                    )
-                    return resp.choices[0].message.content.strip()
-                except Exception as e:
-                    if "429" in str(e) or "rate_limit" in str(e).lower() or "decommissioned" in str(e):
-                        continue
-                    raise
-        except Exception as e:
-            print(f"[LLM] Groq ({model}): {e}")
-        return None
-
-    def _call_llm_openrouter(self, system, user):
-        key = os.getenv("OPENROUTER_API_KEY")
-        if not key:
-            return None
-        try:
-            r = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {key}",
-                         "Content-Type": "application/json",
-                         "HTTP-Referer": "https://evcarix.com"},
-                json={"model": "mistralai/mistral-7b-instruct:free",
-                      "messages": [{"role": "system", "content": system},
-                                   {"role": "user", "content": user}],
-                      "max_tokens": 600},
-                timeout=30,
-            )
-            return r.json()["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            print(f"[LLM] OpenRouter: {e}")
-            return None
-
-    def _call_llm_mistral(self, system, user):
-        key = os.getenv("MISTRAL_API_KEY")
-        if not key:
-            return None
-        try:
-            r = requests.post(
-                "https://api.mistral.ai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                json={"model": "mistral-small-latest",
-                      "messages": [{"role": "system", "content": system},
-                                   {"role": "user", "content": user}],
-                      "max_tokens": 600},
-                timeout=30,
-            )
-            return r.json()["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            print(f"[LLM] Mistral: {e}")
-            return None
-
-    def _call_llm_cohere(self, system, user):
-        key = os.getenv("COHERE_API_KEY")
-        if not key:
-            return None
-        try:
-            r = requests.post(
-                "https://api.cohere.com/v1/chat",
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                json={"model": "command-r", "message": user, "preamble": system, "max_tokens": 600},
-                timeout=30,
-            )
-            return r.json().get("text", "").strip()
-        except Exception as e:
-            print(f"[LLM] Cohere: {e}")
-            return None
-
-    def _call_llm_together(self, system, user):
-        key = os.getenv("TOGETHER_API_KEY")
-        if not key:
-            return None
-        try:
-            r = requests.post(
-                "https://api.together.xyz/v1/chat/completions",
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                json={"model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-                      "messages": [{"role": "system", "content": system},
-                                   {"role": "user", "content": user}],
-                      "max_tokens": 600},
-                timeout=30,
-            )
-            return r.json()["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            print(f"[LLM] Together: {e}")
-            return None
-
-    def _call_llm_perplexity(self, system, user):
-        key = os.getenv("PERPLEXITY_API_KEY")
-        if not key:
-            return None
-        try:
-            r = requests.post(
-                "https://api.perplexity.ai/chat/completions",
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                json={"model": "llama-3.1-sonar-small-128k-online",
-                      "messages": [{"role": "system", "content": system},
-                                   {"role": "user", "content": user}],
-                      "max_tokens": 600},
-                timeout=30,
-            )
-            return r.json()["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            print(f"[LLM] Perplexity: {e}")
-            return None
-
-    def _call_llm_deepseek(self, system, user):
-        key = os.getenv("DEEPSEEK_API_KEY")
-        if not key:
-            return None
-        try:
-            r = requests.post(
-                "https://api.deepseek.com/chat/completions",
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                json={"model": "deepseek-chat",
-                      "messages": [{"role": "system", "content": system},
-                                   {"role": "user", "content": user}],
-                      "max_tokens": 600},
-                timeout=30,
-            )
-            return r.json()["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            print(f"[LLM] DeepSeek: {e}")
-            return None
-
-    def _call_llm_huggingface(self, system, user):
-        key = os.getenv("HUGGINGFACE_API_KEY")
-        if not key:
-            return None
-        try:
-            model = "mistralai/Mistral-7B-Instruct-v0.3"
-            prompt_text = f"<s>[INST] {system}\n\n{user} [/INST]"
-            r = requests.post(
-                f"https://api-inference.huggingface.co/models/{model}",
-                headers={"Authorization": f"Bearer {key}"},
-                json={"inputs": prompt_text,
-                      "parameters": {"max_new_tokens": 600,
-                                     "temperature": 0.7,
-                                     "return_full_text": False}},
-                timeout=60,
-            )
-            result = r.json()
-            if isinstance(result, list) and result:
-                return result[0].get("generated_text", "").strip()
-        except Exception as e:
-            print(f"[LLM] HuggingFace: {e}")
-        return None
+    # Redundant methods removed, now using centralized _llm_* methods.
 
     # ── Ana Trend Tetikleyici ───────────────────────────────────────
     def trigger_from_youtube_trend(self, hours_back=48) -> dict | None:
