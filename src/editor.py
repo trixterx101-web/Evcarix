@@ -298,7 +298,7 @@ class AutoEditor:
             print("[Editor] Motion gradient arka plan kullanılıyor...")
             base_video = self._make_motion_background(target_duration)
 
-        # Burada base_video kesinlikle target_duration uzunluğunda olmalı
+        # Süre doğrulama — base_video kesinlikle target_duration uzunluğunda olmalı
         if abs(base_video.duration - target_duration) > 0.1:
             if base_video.duration > target_duration:
                 base_video = base_video.subclip(0, target_duration)
@@ -306,50 +306,9 @@ class AutoEditor:
                 import math
                 repeats = math.ceil(target_duration / base_video.duration)
                 base_video = concatenate_videoclips(
-                    [base_video] * repeats, method="compose"
+                    [base_video] * repeats
                 ).subclip(0, target_duration)
-
-        # ── Step 4: Premium Hook System (4 Seconds) ──
-        try:
-            from src.thumbnail_generator import ThumbnailGenerator
-            tg = ThumbnailGenerator()
-            bg_hint = video_paths[0] if video_paths and os.path.exists(video_paths[0]) else None
-            hook_img_path = os.path.join(self.output_dir, f"hook_{output_filename}.jpg")
-            
-            clean_title = output_filename.replace("_", " ").replace(".mp4", "").upper()
-            # --- Manual Hook Override ---
-            manual_hook = "assets/manual_hook.jpg"
-            if os.path.exists(manual_hook):
-                hook_img_path = manual_hook
-                print(f"[Editor] [Hook] Manual hook detected: {manual_hook}")
-            else:
-                tg.create(title=clean_title, category=category, is_short=True, 
-                          output_path=hook_img_path, bg_image_path=bg_hint)
-            
-            if os.path.exists(hook_img_path):
-                from moviepy.editor import ImageClip
-                hook_duration = 4.0
-                
-                # Hook'u video başına ekle, TOPLAM süre audio'ya eşit kalmalı
-                remaining = target_duration - hook_duration
-                if remaining > 0 and base_video.duration > 0:
-                    # base_video'yu kalan süreye göre kırp veya döngüye al
-                    if base_video.duration < remaining:
-                        import math
-                        repeats = math.ceil(remaining / base_video.duration)
-                        base_video_body = concatenate_videoclips(
-                            [base_video] * repeats, method="compose"
-                        ).subclip(0, remaining)
-                    else:
-                        base_video_body = base_video.subclip(0, remaining)
-                    base_video = concatenate_videoclips(
-                        [hook_clip, base_video_body], method="compose"
-                    )
-                else:
-                    base_video = hook_clip
-                print(f"[Editor] [Hook] 4s Dynamic Hook eklendi. Toplam süre: {base_video.duration:.1f}s")
-        except Exception as e:
-            print(f"[Editor] [Hook] Failed to create hook: {e}")
+        print(f"[Editor] ✅ Short video hazır: {base_video.duration:.1f}s")
 
         # Ses ve video tam senkron (audio kesinlikle base_video süresini yönetir)
         base_video = base_video.set_audio(audio)
@@ -641,8 +600,9 @@ class AutoEditor:
             except Exception as e:
                 print(f"[Editor] Klip hatası ({path}): {e}")
 
-        if len(clips) >= 2:
-            base_video = concatenate_videoclips(clips, method="compose")
+        if len(clips) >= 1:
+            # 1 veya daha fazla klip varsa — döngüye al
+            base_video = concatenate_videoclips(clips)  # method="compose" kaldırıldı — MoviePy bug fix
             if base_video.duration < target_duration:
                 import math
                 repeats = math.ceil(target_duration / base_video.duration)
@@ -651,11 +611,12 @@ class AutoEditor:
                     shuffled = list(clips)
                     random.shuffle(shuffled)
                     looped_clips.extend(shuffled)
-                base_video = concatenate_videoclips(looped_clips, method="compose").subclip(0, target_duration)
+                base_video = concatenate_videoclips(looped_clips).subclip(0, target_duration)
             else:
                 base_video = base_video.subclip(0, target_duration)
+            print(f"[Editor] ✅ {len(clips)} klip kullanılıyor, süre: {base_video.duration:.1f}s")
         else:
-            print("[Editor] Yeterli video klip yok, gradient arka plan kullanılıyor...")
+            print("[Editor] ⚠️ Hiç klip yok, gradient arka plan kullanılıyor...")
             base_video = self._make_motion_background(target_duration, width=1920, height=1080)
 
         # Title card (Pillow ile - ImageMagick bağımlılığını kaldırmak için)
@@ -694,8 +655,9 @@ class AutoEditor:
         base_video = base_video.set_audio(audio)
 
         # Birleştirme: Title (4s) + Base (target) + Outro (4s)
-        # Not: Title ve Outro sessiz olacak, MoviePy bunu halleder.
-        final_video = concatenate_videoclips([title_card, base_video, outro_card], method="compose")
+        # NOT: method="compose" KALDIRILDI — bu MoviePy bug'u nedeniyle
+        # ImageClip + VideoClip karışık sırada ilk frame'i donduruyordu.
+        final_video = concatenate_videoclips([title_card, base_video, outro_card])
 
         # Video export
         output_full_path = os.path.join(self.output_dir, output_path)
