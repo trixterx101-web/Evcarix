@@ -45,16 +45,27 @@ class MediaEngine:
         query_pool = [f"{topic_text} car", "EV driving", "car dashboard", "highway driving", "Tesla winter"]
         random.shuffle(query_pool)
 
-        # Stage 1: Pexels
-        logger.info("[MediaEngine] Stage 1: Pexels...")
-        for q in query_pool[:2]:
-            if len(all_clips) >= needed: break
-            new = self._download_from_pexels(q, OUTPUT_DIR, needed - len(all_clips))
-            all_clips.extend(new)
+        # Stage 1: Free Footage (OEM, Archive, NASA, Wikimedia)
+        try:
+            from src.free_footage import FreeFootageEngine
+            logger.info("[MediaEngine] Stage 1: Free Footage (OEM, Archive...)")
+            ff_engine = FreeFootageEngine()
+            ff_clips = ff_engine.get_clips(topic_text, count=needed, video_type="short")
+            all_clips.extend(ff_clips)
+        except Exception as e:
+            logger.error(f"[MediaEngine] Free Footage hatası: {e}")
 
-        # Stage 2: Pixabay
+        # Stage 2: Pexels
         if len(all_clips) < needed:
-            logger.info("[MediaEngine] Stage 2: Pixabay...")
+            logger.info("[MediaEngine] Stage 2: Pexels...")
+            for q in query_pool[:2]:
+                if len(all_clips) >= needed: break
+                new = self._download_from_pexels(q, OUTPUT_DIR, needed - len(all_clips))
+                all_clips.extend(new)
+
+        # Stage 3: Pixabay
+        if len(all_clips) < needed:
+            logger.info("[MediaEngine] Stage 3: Pixabay...")
             for q in query_pool[:2]:
                 if len(all_clips) >= needed: break
                 new = search_pixabay_videos(q, max_results=needed - len(all_clips))
