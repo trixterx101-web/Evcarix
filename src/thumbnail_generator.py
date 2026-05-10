@@ -52,7 +52,6 @@ class ThumbnailGenerator:
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
         self._font_cache = {}
 
-    # ── Public API ─────────────────────────────────────────────────────────────
     def create(
         self,
         title: str,
@@ -67,9 +66,12 @@ class ThumbnailGenerator:
         """
         width, height = (1080, 1920) if is_short else (1280, 720)
         
+        # Ensure .jpg extension for YouTube compatibility
         if not output_path:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_path = str(OUT_DIR / f"thumbnail_{ts}.jpg")
+        elif output_path.lower().endswith('.png'):
+            output_path = output_path.rsplit('.', 1)[0] + '.jpg'
 
         # ── Step 1: Groq + Pollinations (Free & Ultra-Premium) ──
         if os.getenv("GROQ_API_KEY"):
@@ -81,9 +83,8 @@ class ThumbnailGenerator:
                 ratio = "9:16" if is_short else "16:9"
                 designer_prompt = (
                     f"Write a professional AI image generation prompt for a YouTube {'Short' if is_short else 'long-form'} video thumbnail. "
-                    f"Topic: '{title}'. Style: Futuristic EV technology, vibrant cinematic lighting, 4K. "
-                    f"The aspect ratio is {ratio}. "
-                    f"Ensure the text '{title.upper()}' is part of the 3D design and clearly readable. "
+                    f"Topic: '{title}'. Style: Futuristic EV technology, vibrant cinematic lighting, 4K, realistic. "
+                    f"No text except '{title.upper()}'. "
                     f"Output only the prompt string."
                 )
                 
@@ -104,6 +105,12 @@ class ThumbnailGenerator:
                 if r.status_code == 200:
                     with open(output_path, "wb") as f:
                         f.write(r.content)
+                    
+                    # File size check (YouTube limit: 2MB)
+                    if os.path.getsize(output_path) > 2 * 1024 * 1024:
+                        img = Image.open(output_path)
+                        img.save(output_path, "JPEG", quality=85, optimize=True)
+                    
                     print(f"[Thumbnail] [FreeAI] Success! Saved -> {output_path}")
                     return output_path
             except Exception as e:
@@ -128,7 +135,7 @@ class ThumbnailGenerator:
                         "prompt": ai_prompt,
                         "aspect_ratio": "9:16" if is_short else "16:9",
                         "output_format": "jpg",
-                        "output_quality": 95
+                        "output_quality": 85
                     }
                 )
                 
@@ -163,11 +170,11 @@ class ThumbnailGenerator:
             
             img = img.resize((W, H), Image.Resampling.LANCZOS)
             from PIL import ImageEnhance
-            # Better treatment: Blur + Darken + Saturation
-            img = img.filter(ImageFilter.GaussianBlur(radius=3))
-            img = ImageEnhance.Brightness(img).enhance(0.5)
-            img = ImageEnhance.Contrast(img).enhance(1.2)
-            img = ImageEnhance.Color(img).enhance(1.4) # Make it more vibrant
+            # Treatment: Blur + Darken + High Saturation
+            img = img.filter(ImageFilter.GaussianBlur(radius=2))
+            img = ImageEnhance.Brightness(img).enhance(0.4)
+            img = ImageEnhance.Contrast(img).enhance(1.3)
+            img = ImageEnhance.Color(img).enhance(1.6)
         else:
             img = Image.new("RGB", (W, H), "#000000")
             self._draw_gradient_background(img, category)
@@ -179,7 +186,8 @@ class ThumbnailGenerator:
         self._draw_premium_title(img, title)
         self._draw_brand_premium(img)
 
-        img.save(output_path, "JPEG", quality=97, optimize=True)
+        # Force JPEG and ensure under 2MB
+        img.save(output_path, "JPEG", quality=90, optimize=True)
         print(f"[Thumbnail] [OK] Saved (Composite) -> {output_path}")
         return output_path
 

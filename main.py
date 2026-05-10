@@ -180,7 +180,7 @@ class EvcarixOrchestrator:
 
         # ── 5. Kapak (Thumbnail) ──────────────────────────────────
         print("\n[5/6] Thumbnail oluşturuluyor...", flush=True)
-        thumb_output = f"output/thumb_{ts}.png"
+        thumb_output = f"output/thumb_{ts}.jpg"
         
         # İlk videodan bir kare alarak arka plan yap (daha estetik)
         bg_path = video_paths[0] if video_paths else None
@@ -286,7 +286,7 @@ class EvcarixOrchestrator:
 
         # ── 5. Kapak (Thumbnail) ──────────────────────────────────
         print("\n[5/7] HD Thumbnail oluşturuluyor...", flush=True)
-        thumb_output = f"output/thumb_long_{ts}.png"
+        thumb_output = f"output/thumb_long_{ts}.jpg"
         
         # İlk videodan bir kare alarak arka plan yap
         bg_path = video_paths[0] if video_paths else None
