@@ -279,9 +279,40 @@ class EvcarixOrchestrator:
         )
         gc.collect()
 
-        # ── 5. Kapak (Thumbnail) İptal Edildi ─────────────────────
-        print("\n[5/7] Thumbnail üretimi manuel yükleme için atlandı.", flush=True)
+        # ── 5. Kapak (Thumbnail) — Uzun video için profesyonel üret ─────────
+        print("\n[5/7] Thumbnail üretiliyor (1280x720 professional)...", flush=True)
         thumbnail_path = None
+        try:
+            from src.thumbnail_generator import ThumbnailGenerator
+            import re as _re
+            tg = ThumbnailGenerator()
+            thumb_out = os.path.join("output", f"thumbnail_{ts}.jpg")
+            # Stat'ı başlıktan çıkar
+            _stat = ""
+            for _pat in [r'(\d+%)', r'(\d+V)', r'(\d+KM)', r'(\d+K)', r'(\$\d+[K]?)', r'(\d+YR)']:
+                _m = _re.search(_pat, title.upper())
+                if _m:
+                    _stat = _m.group(1)
+                    break
+            if not _stat and "?" in title:
+                _stat = "FACT?"
+            elif not _stat:
+                _stat = "DATA"
+            thumbnail_path = tg.create(
+                title=title,
+                stat=_stat,
+                category=plan.get('category', 'default'),
+                output_path=thumb_out,
+                is_short=False
+            )
+            if thumbnail_path and os.path.exists(thumbnail_path):
+                print(f"      ✅ Thumbnail hazır: {thumbnail_path}", flush=True)
+            else:
+                thumbnail_path = None
+                print("      ⚠️ Thumbnail üretilemedi, atlanıyor.", flush=True)
+        except Exception as e:
+            print(f"      ⚠️ Thumbnail hatası: {e}", flush=True)
+            thumbnail_path = None
 
         # ── 6. Chapters & SEO ─────────────────────────────────────
         # Uzun videolarda description içine timestamp eklemek SEO için kritiktir
