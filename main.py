@@ -56,16 +56,16 @@ class EvcarixOrchestrator:
         secret_path = os.getenv("YOUTUBE_CLIENT_SECRET_FILE", "client_secret.json")
         if os.path.exists(secret_path):
             try:
-                log("🔑 YouTube Uploader başlatılıyor...")
+                log("[Uploader] YouTube Uploader baslatiliyor...")
                 from src.uploader import YouTubeUploader
                 self.uploader = YouTubeUploader(secret_path)
-                log("✅ YouTube Uploader başarıyla başlatıldı.")
+                log("[Uploader] YouTube Uploader basariyla baslatildi.")
             except Exception as e:
-                log(f"❌ YouTube Uploader başlatılamadı: {e}")
+                log(f"[Uploader] YouTube Uploader baslatilamadi: {e}")
                 if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
                     raise Exception(f"YouTube uploader başlatılamadı: {e}")
         else:
-            log("⚠️ client_secret.json bulunamadı.")
+            log("[Uploader] client_secret.json bulunamadi.")
             if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
                 raise FileNotFoundError("GitHub Actions ortamında client_secret.json eksik!")
 

@@ -8,7 +8,7 @@ import requests
 import pandas as pd
 from datetime import timezone, timedelta
 from dotenv import load_dotenv
-from src.writer import call_gemini, call_openai, call_groq
+from src.writer import call_gemini, call_groq
 
 load_dotenv()
 
