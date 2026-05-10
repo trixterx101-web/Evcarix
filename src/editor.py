@@ -298,19 +298,31 @@ class AutoEditor:
             print("[Editor] Motion gradient arka plan kullanılıyor...")
             base_video = self._make_motion_background(target_duration)
 
-        # Süre doğrulama — base_video kesinlikle target_duration uzunluğunda olmalı
-        if abs(base_video.duration - target_duration) > 0.1:
-            if base_video.duration > target_duration:
-                base_video = base_video.subclip(0, target_duration)
-            else:
-                import math
-                repeats = math.ceil(target_duration / base_video.duration)
-                base_video = concatenate_videoclips(
-                    [base_video] * repeats
-                ).subclip(0, target_duration)
-        print(f"[Editor] ✅ Short video hazır: {base_video.duration:.1f}s")
+        # ── Step 4: 1s Intro Card (As requested: "1. görsel 1 saniye çıksın") ──
+        try:
+            from src.thumbnail_generator import ThumbnailGenerator
+            tg = ThumbnailGenerator()
+            hook_img_path = os.path.join(self.output_dir, f"intro_{output_filename}.jpg")
+            clean_title = output_filename.replace("_", " ").replace(".mp4", "").upper()
+            
+            # 1s sürecek bir intro görseli üret
+            tg.create(title=clean_title, category=category, is_short=True, 
+                      output_path=hook_img_path)
+            
+            if os.path.exists(hook_img_path):
+                from moviepy.editor import ImageClip
+                intro_card = ImageClip(hook_img_path).set_duration(1.0).set_fps(30)
+                # Video metni (audio) hemen başlasın (audio senkronu bozulmasın diye 0'dan başlar)
+                # Ama görüntü 1s sonra footage'a geçer
+                base_video = CompositeVideoClip([
+                    intro_card,
+                    base_video.set_start(1.0)
+                ], size=(1080, 1920)).set_duration(target_duration)
+                print("[Editor] 1s Intro Card eklendi.")
+        except Exception as e:
+            print(f"[Editor] Intro Card hatası: {e}")
 
-        # Ses ve video tam senkron (audio kesinlikle base_video süresini yönetir)
+        # Ses ve video tam senkron
         base_video = base_video.set_audio(audio)
         final_w, final_h = 1080, 1920
         all_layers = [base_video]
@@ -646,18 +658,22 @@ class AutoEditor:
             return np.array(img)
 
         title_frame = make_card(title)
-        title_card = ImageClip(title_frame).set_duration(4).set_fps(30)
+        title_card = ImageClip(title_frame).set_duration(1.0).set_fps(30)
         
         outro_frame = make_card("THANKS FOR WATCHING", "Subscribe for more EV data")
-        outro_card = ImageClip(outro_frame).set_duration(4).set_fps(30)
+        outro_card = ImageClip(outro_frame).set_duration(1.0).set_fps(30)
 
         # Ana video sesini ekle
         base_video = base_video.set_audio(audio)
 
-        # Birleştirme: Title (4s) + Base (target) + Outro (4s)
-        # NOT: method="compose" KALDIRILDI — bu MoviePy bug'u nedeniyle
-        # ImageClip + VideoClip karışık sırada ilk frame'i donduruyordu.
-        final_video = concatenate_videoclips([title_card, base_video, outro_card])
+        # Birleştirme: Title (1s) + Base (target) + Outro (1s)
+        # NOT: concatenate_videoclips yerine CompositeVideoClip kullanıyoruz.
+        # Bu, "çizgi çizgi" (stride/codec) hatalarını ve donmaları engeller.
+        final_video = CompositeVideoClip([
+            title_card,
+            base_video.set_start(1.0),
+            outro_card.set_start(1.0 + base_video.duration)
+        ], size=(1920, 1080))
 
         # Video export
         output_full_path = os.path.join(self.output_dir, output_path)
