@@ -59,436 +59,207 @@ class ThumbnailGenerator:
         category: str = "default",
         output_path: str = "",
         bg_image_path: str = None,
-        is_short: bool = False
+        is_short: bool = False,
+        is_comparison: bool = False
     ) -> str:
         """
-        Generate thumbnail using Gemini-powered Free High-Quality engine (Pollinations/FLUX).
+        v9.0 High-Impact Thumbnail Engine (Matching USER Design Style)
         """
         width, height = (1080, 1920) if is_short else (1280, 720)
         
-        # Ensure .jpg extension for YouTube compatibility
         if not output_path:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_path = str(OUT_DIR / f"thumbnail_{ts}.jpg")
         elif output_path.lower().endswith('.png'):
             output_path = output_path.rsplit('.', 1)[0] + '.jpg'
 
-        # ── Step 1: Groq + Pollinations (Free & Ultra-Premium) ──
-        if os.getenv("GROQ_API_KEY"):
-            try:
-                print(f"[Thumbnail] [Groq] Designing premium prompt for: {title}")
-                from groq import Groq
-                client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-                
-                ratio = "9:16" if is_short else "16:9"
-                designer_prompt = (
-                    f"Write a professional AI image generation prompt for a YouTube {'Short' if is_short else 'long-form'} video thumbnail. "
-                    f"Topic: '{title}'. Style: Futuristic EV technology, vibrant cinematic lighting, 4K, realistic. "
-                    f"No text except '{title.upper()}'. "
-                    f"Output only the prompt string."
-                )
-                
-                chat_completion = client.chat.completions.create(
-                    messages=[{"role": "user", "content": designer_prompt}],
-                    model="llama-3.3-70b-versatile",
-                )
-                ai_designed_prompt = chat_completion.choices[0].message.content.strip()
-                
-                print(f"[Thumbnail] [FreeAI] Generating vibrant FLUX image...")
-                import urllib.parse
-                import requests
-                
-                encoded_prompt = urllib.parse.quote(ai_designed_prompt)
-                image_url = f"https://pollinations.ai/p/{encoded_prompt}?width={width}&height={height}&model=flux&seed={random.randint(1,99999)}"
-                
-                r = requests.get(image_url, timeout=30)
-                if r.status_code == 200:
-                    with open(output_path, "wb") as f:
-                        f.write(r.content)
-                    
-                    # File size check (YouTube limit: 2MB)
-                    if os.path.getsize(output_path) > 2 * 1024 * 1024:
-                        img = Image.open(output_path)
-                        img.save(output_path, "JPEG", quality=85, optimize=True)
-                    
-                    print(f"[Thumbnail] [FreeAI] Success! Saved -> {output_path}")
-                    return output_path
-            except Exception as e:
-                print(f"[Thumbnail] [FreeAI] Failed: {e}. Trying Replicate...")
-
-        # ── Step 2: Try Replicate (FLUX) ──
-        if os.getenv("REPLICATE_API_KEY"):
-            try:
-                print(f"[Thumbnail] [Replicate] Generating FLUX thumbnail for: {title}")
-                import replicate
-                
-                ai_prompt = (
-                    f"A professional high-impact YouTube {'Short' if is_short else 'video'} thumbnail. "
-                    f"The text '{title.upper()}' is written in bold, modern, futuristic 3D typography. "
-                    f"The background is a vibrant, cinematic {category} themed automotive scene. "
-                    f"Ultra-realistic, 4K, stunning colors."
-                )
-                
-                output = replicate.run(
-                    "black-forest-labs/flux-schnell",
-                    input={
-                        "prompt": ai_prompt,
-                        "aspect_ratio": "9:16" if is_short else "16:9",
-                        "output_format": "jpg",
-                        "output_quality": 85
-                    }
-                )
-                
-                if output:
-                    import requests
-                    url = output[0] if isinstance(output, list) else str(output)
-                    r = requests.get(url, timeout=20)
-                    if r.status_code == 200:
-                        with open(output_path, "wb") as f:
-                            f.write(r.content)
-                        print(f"[Thumbnail] [Replicate] Success! FLUX thumbnail saved: {output_path}")
-                        return output_path
-            except Exception as e:
-                print(f"[Thumbnail] [Replicate] Failed: {e}. Falling back to composite engine.")
-
-        # ── Step 3: Fallback to Composite Professional Engine ──
-        W, H = width, height
-        if bg_image_path and os.path.exists(bg_image_path):
-            ext = Path(bg_image_path).suffix.lower()
-            if ext in ['.mp4', '.mov', '.avi', '.mkv']:
-                from moviepy.editor import VideoFileClip
-                try:
-                    with VideoFileClip(bg_image_path) as clip:
-                        t = min(2.0, clip.duration * 0.1)
-                        frame = clip.get_frame(t)
-                        img = Image.fromarray(frame).convert("RGB")
-                except Exception as e:
-                    print(f"[Thumbnail] Video frame extraction failed: {e}")
-                    img = Image.new("RGB", (W, H), "#000000")
-            else:
-                img = Image.open(bg_image_path).convert("RGB")
+        # ── Step 1: AI Visual Core (FLUX via Pollinations) ──
+        try:
+            from groq import Groq
+            client = Groq(api_key=os.getenv("GROQ_API_KEY"))
             
-            img = img.resize((W, H), Image.Resampling.LANCZOS)
-            from PIL import ImageEnhance
-            # Treatment: Blur + Darken + High Saturation
-            img = img.filter(ImageFilter.GaussianBlur(radius=2))
-            img = ImageEnhance.Brightness(img).enhance(0.4)
-            img = ImageEnhance.Contrast(img).enhance(1.3)
-            img = ImageEnhance.Color(img).enhance(1.6)
-        else:
-            img = Image.new("RGB", (W, H), "#000000")
-            self._draw_gradient_background(img, category)
+            # Tasarım talimatlarını içeren gelişmiş prompt
+            style_instruction = (
+                "Professional automotive thumbnail. High contrast, cinematic lighting, ultra-realistic. "
+                "Center-weighted composition. Sharp focus on the vehicle or technical components. "
+                "Clean background, futuristic tech vibe. NO TEXT on the image itself."
+            )
+            if is_comparison:
+                style_instruction = "Side-by-side comparison of two different electric vehicles or technologies. Symmetrical composition, high contrast, clean divide."
 
-        self._draw_grid_overlay(img)
-        self._draw_cyber_overlay(img)
-        self._draw_glow_accent(img, category)
-        self._draw_stat_block(img, stat, category)
-        self._draw_premium_title(img, title)
-        self._draw_brand_premium(img)
+            designer_prompt = (
+                f"Design a high-impact AI image generation prompt for a YouTube thumbnail about: '{title}'. "
+                f"{style_instruction} Focus on {category} theme. Output ONLY the prompt string."
+            )
+            
+            chat = client.chat.completions.create(
+                messages=[{"role": "user", "content": designer_prompt}],
+                model="llama-3.3-70b-versatile",
+            )
+            ai_prompt = chat.choices[0].message.content.strip()
+            
+            import urllib.parse
+            import requests
+            encoded_prompt = urllib.parse.quote(ai_prompt)
+            image_url = f"https://pollinations.ai/p/{encoded_prompt}?width={width}&height={height}&model=flux&seed={random.randint(1,99999)}"
+            
+            r = requests.get(image_url, timeout=30)
+            if r.status_code == 200:
+                with open(output_path, "wb") as f: f.write(r.content)
+                
+                # ── Step 2: Graphic Design Overlays (Adding the 'User Look') ──
+                img = Image.open(output_path).convert("RGB")
+                draw = ImageDraw.Draw(img)
 
-        # Force JPEG and ensure under 2MB
-        img.save(output_path, "JPEG", quality=90, optimize=True)
-        print(f"[Thumbnail] [OK] Saved (Composite) -> {output_path}")
-        return output_path
+                if is_comparison:
+                    self._draw_split_line(img)
+                
+                # Siyah gölge katmanı (Metin okunurluğu için)
+                self._draw_vignette(img)
+                
+                # Ana Başlık (Impact Tarzı)
+                self._draw_mega_title(img, title, is_comparison)
+                
+                # İstatistik Rozeti (Örn: -45% RANGE?!)
+                if stat:
+                    self._draw_high_impact_badge(img, stat)
+                
+                # Grafik/Veri Katmanı
+                if random.random() > 0.5:
+                    self._draw_mini_graph(img)
+                
+                # Marka
+                self._draw_brand_tag(img)
 
-    # ── Background ─────────────────────────────────────────────────────────────
-    def _draw_gradient_background(self, img: Image.Image, category: str):
-        palette = PALETTES.get(category, PALETTES["default"])
-        c1 = self._hex(palette[0])
-        c2 = self._hex(palette[1])
+                img.save(output_path, "JPEG", quality=90, optimize=True)
+                return output_path
+        except Exception as e:
+            print(f"[Thumbnail] AI failed: {e}. Using Composite Engine.")
+            return self._create_composite_fallback(title, stat, category, output_path, is_short)
+
+    def _draw_vignette(self, img: Image.Image):
+        """Adds dark gradients to edges to make text pop."""
+        overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+        w, h = img.size
+        # Bottom-up shadow
+        for y in range(h // 2, h):
+            alpha = int(180 * ((y - h//2) / (h//2)))
+            draw.line([(0, y), (w, y)], fill=(0, 0, 0, alpha))
+        # Top-down shadow
+        for y in range(h // 3):
+            alpha = int(120 * (1 - (y / (h//3))))
+            draw.line([(0, y), (w, y)], fill=(0, 0, 0, alpha))
+        img.paste(Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB"))
+
+    def _draw_split_line(self, img: Image.Image):
         draw = ImageDraw.Draw(img)
-        for y in range(H):
-            t = y / H
-            r = int(c1[0] + (c2[0] - c1[0]) * t)
-            g = int(c1[1] + (c2[1] - c1[1]) * t)
-            b = int(c1[2] + (c2[2] - c1[2]) * t)
-            draw.line([(0, y), (W, y)], fill=(r, g, b))
+        w, h = img.size
+        # Vertical split line with glow
+        draw.line([(w//2, 0), (w//2, h)], fill="#FFD700", width=4)
 
-    def _draw_grid_overlay(self, img: Image.Image):
-        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        draw    = ImageDraw.Draw(overlay)
-        color   = (255, 255, 255, 10)
-        # vertical lines
-        for x in range(0, W, 60):
-            draw.line([(x, 0), (x, H)], fill=color, width=1)
-        # horizontal lines
-        for y in range(0, H, 60):
-            draw.line([(0, y), (W, y)], fill=color, width=1)
-        img.paste(Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB"))
-
-    def _draw_cyber_overlay(self, img: Image.Image):
-        """Adds a tech/data aesthetic with random scanlines and code-like patterns."""
-        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        draw    = ImageDraw.Draw(overlay)
-        
-        # Scanlines
-        for y in range(0, H, 4):
-            draw.line([(0, y), (W, y)], fill=(255, 255, 255, 5), width=1)
-            
-        # Random small dots/pixels (data rain effect)
-        for _ in range(100):
-            x, y = random.randint(0, W), random.randint(0, H)
-            draw.point((x, y), fill=(255, 255, 255, 40))
-            
-        img.paste(Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB"))
-
-    def _draw_glow_accent(self, img: Image.Image, category: str):
-        palette = PALETTES.get(category, PALETTES["default"])
-        accent  = self._hex(palette[2])
-        glow    = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        draw    = ImageDraw.Draw(glow)
-        # large soft ellipse top-right
-        draw.ellipse(
-            [W - 500, -200, W + 200, 400],
-            fill=(accent[0], accent[1], accent[2], 35)
-        )
-        # smaller sharp ellipse bottom-left
-        draw.ellipse(
-            [-100, H - 300, 400, H + 100],
-            fill=(accent[0], accent[1], accent[2], 25)
-        )
-        blurred = glow.filter(ImageFilter.GaussianBlur(radius=80))
-        img.paste(
-            Image.alpha_composite(img.convert("RGBA"), blurred).convert("RGB")
-        )
-
-    # ── Design elements ────────────────────────────────────────────────────────
-    def _draw_left_bar(self, img: Image.Image, category: str):
-        palette = PALETTES.get(category, PALETTES["default"])
-        accent  = self._hex(palette[2])
-        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        draw    = ImageDraw.Draw(overlay)
-        # vertical accent bar on left edge
-        draw.rectangle([0, 0, 8, H], fill=(accent[0], accent[1], accent[2], 255))
-        # subtle left panel background
-        draw.rectangle(
-            [0, 0, 30, H],
-            fill=(accent[0], accent[1], accent[2], 30)
-        )
-        img.paste(Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB"))
-
-    def _draw_stat_block(self, img: Image.Image, stat: str, category: str):
-        if not stat:
-            return
-        palette = PALETTES.get(category, PALETTES["default"])
-        accent  = self._hex(palette[2])
-        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        draw    = ImageDraw.Draw(overlay)
-
-        # stat background pill — right side
-        bx1, by1, bx2, by2 = W - 420, 60, W - 40, 260
-        draw.rounded_rectangle(
-            [bx1, by1, bx2, by2],
-            radius=20,
-            fill=(accent[0], accent[1], accent[2], 35),
-            outline=(accent[0], accent[1], accent[2], 180),
-            width=3,
-        )
-        img.paste(Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB"))
-
-        draw2 = ImageDraw.Draw(img)
-        # stat number
-        stat_font = self._font(160 if len(stat) <= 4 else 110)
-        bx_center = (bx1 + bx2) // 2
-        by_center = (by1 + by2) // 2 - 10
-        draw2.text(
-            (bx_center, by_center),
-            stat,
-            font=stat_font,
-            fill=self._hex_str(palette[2]),
-            anchor="mm",
-            stroke_width=3,
-            stroke_fill="#000000",
-        )
-
-    def _draw_premium_title(self, img: Image.Image, title: str):
-        """Left-aligned, massive bold title with high impact."""
+    def _draw_mega_title(self, img: Image.Image, title: str, is_comparison: bool):
         draw = ImageDraw.Draw(img)
-        # Clean title: uppercase and limit lines
+        w, h = img.size
         title = title.upper()
         
-        # Split into keywords for better sizing
-        words = title.split()
-        lines = []
-        current_line = ""
-        for word in words:
-            if len(current_line + " " + word) < 12:
-                current_line = (current_line + " " + word).strip()
-            else:
-                lines.append(current_line)
-                current_line = word
-        lines.append(current_line)
-        lines = lines[:4] # Max 4 lines
-
-        y = 120
-        font_size = 95 if len(lines) <= 2 else 80
+        # Max impact font
+        font_size = 110 if len(title) < 20 else 85
         font = self._font(font_size, bold=True)
         
+        lines = textwrap.wrap(title, width=15 if is_comparison else 20)
+        y_text = 60
+        
         for line in lines:
-            if not line: continue
-            # Measure
             bbox = draw.textbbox((0, 0), line, font=font)
-            # Subtle background glow behind text for readability
-            text_w = bbox[2] - bbox[0]
-            text_h = bbox[3] - bbox[1]
+            tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
             
-            # Dark backing for the text line
-            draw.rectangle([50, y - 5, 70 + text_w, y + text_h + 15], fill=(0, 0, 0, 160))
-            
-            # Main text
-            draw.text((60, y), line, font=font, fill="#FFFFFF", anchor="lt")
-            y += font_size + 10
+            # Siyah kutu arkası (Highlight)
+            draw.rectangle([50, y_text - 5, 70 + tw, y_text + th + 15], fill=(0, 0, 0, 200))
+            # Beyaz metin
+            draw.text((60, y_text), line, font=font, fill="#FFFFFF")
+            y_text += th + 30
 
-        # Sub-title / Hook in Yellow
-        hook_font = self._font(45, bold=True)
-        hook_text = "(2026 DATA REVEALED)"
-        draw.text((60, y + 20), hook_text, font=hook_font, fill="#FFD700", anchor="lt")
-
-    def _draw_brand_premium(self, img: Image.Image):
+    def _draw_high_impact_badge(self, img: Image.Image, stat: str):
+        """Red or Yellow badge like '-45% RANGE LOST!'"""
         draw = ImageDraw.Draw(img)
-        # Bottom-right minimal brand
-        brand_font = self._font(30, bold=True)
-        draw.text((W - 60, H - 60), BRAND_NAME, font=brand_font, fill=(255, 255, 255, 180), anchor="rd")
-        draw.line([(W - 200, H - 45), (W - 60, H - 45)], fill=(255, 255, 255, 100), width=2)
+        w, h = img.size
+        font = self._font(75, bold=True)
+        
+        bbox = draw.textbbox((0, 0), stat, font=font)
+        tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
+        
+        # Badge rect
+        bx, by = 60, h - 200
+        padding = 30
+        
+        # Glow shadow
+        draw.rectangle([bx-10, by-10, bx+tw+padding*2+10, by+th+padding*2+10], fill=(0, 0, 0, 100))
+        # Main badge (Yellow for data, Red for warning)
+        color = "#FFD700" if "-" not in stat else "#FF3131"
+        draw.rectangle([bx, by, bx+tw+padding*2, by+th+padding*2], fill=color)
+        
+        # Text in black
+        draw.text((bx+padding, by+padding//2), stat, font=font, fill="#000000")
 
-    def _draw_data_bar(self, img: Image.Image):
-        """Horizontal data/progress bar — visual credibility element."""
-        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        draw    = ImageDraw.Draw(overlay)
-
-        bar_y = H - 90
-        # background track
-        draw.rectangle([60, bar_y, W - 60, bar_y + 6],
-                       fill=(255, 255, 255, 25))
-        # filled portion — random 60-90% for visual effect
-        fill_w = int((W - 120) * random.uniform(0.60, 0.90))
-        draw.rectangle([60, bar_y, 60 + fill_w, bar_y + 6],
-                       fill=(255, 255, 255, 140))
-        # glowing dot at progress end
-        dot_x = 60 + fill_w
-        draw.ellipse([dot_x - 7, bar_y - 5, dot_x + 7, bar_y + 11],
-                     fill=(255, 255, 255, 230))
-
+    def _draw_mini_graph(self, img: Image.Image):
+        """Simple trend line graph in bottom right."""
+        w, h = img.size
+        overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+        
+        gx, gy = w - 350, h - 250
+        gw, gh = 300, 150
+        
+        # Grid lines
+        draw.line([(gx, gy+gh), (gx+gw, gy+gh)], fill=(255, 255, 255, 100), width=2) # X axis
+        draw.line([(gx, gy), (gx, gy+gh)], fill=(255, 255, 255, 100), width=2) # Y axis
+        
+        # Random trend line (Red/Green)
+        points = []
+        for i in range(5):
+            points.append((gx + (i * gw // 4), gy + random.randint(10, gh - 10)))
+        
+        draw.line(points, fill="#FF3131", width=5, joint="curve")
         img.paste(Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB"))
 
-    def _draw_brand(self, img: Image.Image):
+    def _draw_brand_tag(self, img: Image.Image):
         draw = ImageDraw.Draw(img)
-        # brand name — bottom left
-        draw.text(
-            (60, H - 55),
-            BRAND_NAME,
-            font=self._font(28, bold=True),
-            fill="#FFFFFF",
-            anchor="lm",
-        )
-        # motto — next to brand
-        draw.text(
-            (200, H - 55),
-            f"— {BRAND_MOTTO}",
-            font=self._font(20),
-            fill=(255, 255, 255, 160),
-            anchor="lm",
-        )
-        # top-left small label
-        draw.text(
-            (60, 38),
-            "EV DATA",
-            font=self._font(18, bold=True),
-            fill=(255, 255, 255, 180),
-            anchor="lm",
-        )
+        w, h = img.size
+        font = self._font(24, bold=True)
+        draw.text((w - 180, h - 50), "EVCARIX DATA", font=font, fill="#FFFFFF")
 
-    def _draw_corner_badge(self, img: Image.Image, category: str):
-        """Small category badge top-right corner."""
-        label_map = {
-            "battery":        "BATTERY",
-            "range":          "RANGE TEST",
-            "charging":       "CHARGING",
-            "ownership":      "COST",
-            "comparison":     "COMPARE",
-            "market":         "MARKET",
-            "infrastructure": "INFRA",
-            "education":      "EXPLAINED",
-            "tools":          "DATA TOOL",
-        }
-        label = label_map.get(category, "EV DATA")
-
-        palette = PALETTES.get(category, PALETTES["default"])
-        accent  = self._hex(palette[2])
-
-        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        draw    = ImageDraw.Draw(overlay)
-        font    = self._font(20, bold=True)
-
-        bbox    = draw.textbbox((0, 0), label, font=font)
-        text_w  = bbox[2] - bbox[0]
-        pad     = 14
-        rx1     = W - text_w - pad * 2 - 50
-        ry1     = 30
-        rx2     = W - 50
-        ry2     = 70
-
-        draw.rounded_rectangle(
-            [rx1, ry1, rx2, ry2],
-            radius=8,
-            fill=(accent[0], accent[1], accent[2], 200),
-        )
-        draw.text(
-            ((rx1 + rx2) // 2, (ry1 + ry2) // 2),
-            label,
-            font=font,
-            fill="#000000",
-            anchor="mm",
-        )
-        img.paste(Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB"))
-
-    # ── Font helper ────────────────────────────────────────────────────────────
     def _font(self, size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
         key = (size, bold)
-        if key in self._font_cache:
-            return self._font_cache[key]
-
-        # Try system fonts in order of preference
-        candidates = []
-        if bold:
-            candidates = [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-                "/System/Library/Fonts/Helvetica.ttc",
-                "C:/Windows/Fonts/arialbd.ttf",
-            ]
-        else:
-            candidates = [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-                "/System/Library/Fonts/Helvetica.ttc",
-                "C:/Windows/Fonts/arial.ttf",
-            ]
-
+        if key in self._font_cache: return self._font_cache[key]
+        
+        candidates = [
+            "C:/Windows/Fonts/impact.ttf",
+            "C:/Windows/Fonts/ariblk.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "C:/Windows/Fonts/arialbd.ttf",
+        ]
+        
         font = None
         for path in candidates:
             if os.path.exists(path):
                 try:
                     font = ImageFont.truetype(path, size)
                     break
-                except Exception:
-                    continue
-
-        if font is None:
-            font = ImageFont.load_default()
-
+                except: continue
+        
+        if not font: font = ImageFont.load_default()
         self._font_cache[key] = font
         return font
 
-    # ── Color helpers ──────────────────────────────────────────────────────────
-    @staticmethod
-    def _hex(h: str) -> tuple:
-        h = h.lstrip("#")
-        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-
-    @staticmethod
-    def _hex_str(h: str) -> str:
-        return h if h.startswith("#") else f"#{h}"
+    def _create_composite_fallback(self, title, stat, category, output_path, is_short):
+        # Legacy composite logic if AI fails
+        w, h = (1080, 1920) if is_short else (1280, 720)
+        img = Image.new("RGB", (w, h), "#0D1B2A")
+        self._draw_mega_title(img, title, False)
+        if stat: self._draw_high_impact_badge(img, stat)
+        img.save(output_path, "JPEG", quality=85)
+        return output_path
 
 
 # ── Standalone test ────────────────────────────────────────────────────────────

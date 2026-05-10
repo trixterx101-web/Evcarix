@@ -425,22 +425,56 @@ class AutoEditor:
     def generate_thumbnail(self, title: str, output_path: str,
                            category="default", bg_image_path: str = None, is_short: bool = False) -> str:
         """
-        Gelişmiş premium thumbnail oluşturucu.
+        v9.0 Premium Thumbnail Wrapper with Automatic Logic Detection.
         """
         try:
             from .thumbnail_generator import ThumbnailGenerator
             gen = ThumbnailGenerator()
-            # Extract a likely stat from title if possible, or leave blank
-            stat = ""
-            if "%" in title:
-                import re
-                match = re.search(r'(\d+%)', title)
-                if match: stat = match.group(1)
             
-            return gen.create(title=title, stat=stat, category=category, 
-                              output_path=output_path, bg_image_path=bg_image_path, is_short=is_short)
+            # ── Automatic Logic Detection ──
+            # 1. Comparison Detection
+            is_comp = False
+            title_lower = title.lower()
+            if any(x in title_lower for x in [" vs ", " versus ", " vs. ", " compared to "]):
+                is_comp = True
+            
+            # 2. Smart Stat Extraction (Percentages, Volts, Range, Money)
+            stat = ""
+            import re
+            # Try to find: 800V, -45%, 1000KM, $30K, etc.
+            stat_patterns = [
+                r'(\d+%)',          # 45%
+                r'(\d+V)',          # 800V
+                r'(\d+KM)',         # 1000KM
+                r'(\d+K)',          # 500K
+                r'(\$\d+[K]?)',     # $30K
+                r'(\d+YR)'          # 5YR
+            ]
+            for p in stat_patterns:
+                m = re.search(p, title.upper())
+                if m:
+                    stat = m.group(1)
+                    break
+            
+            # If still empty, check for '?' or '!' to make it a hook
+            if not stat and "?" in title:
+                stat = "FACT?"
+            elif not stat and "!" in title:
+                stat = "NEW!"
+
+            return gen.create(
+                title=title, 
+                stat=stat, 
+                category=category, 
+                output_path=output_path, 
+                bg_image_path=bg_image_path, 
+                is_short=is_short,
+                is_comparison=is_comp
+            )
         except Exception as e:
-            print(f"[Editor] Premium thumbnail hatası: {e}")
+            print(f"[Editor] High-Impact Thumbnail Error: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     def assemble_long_video(self, video_paths, audio_path, script_text,
                             output_filename, bg_music_path=None, category="default"):
