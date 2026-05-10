@@ -140,20 +140,30 @@ def generate_title(topic: str, **kwargs) -> str:
     prompt = f"Create ONE viral YouTube title for EV channel: {topic}. Max 60 chars. ONLY the title."
     return _llm_chain(prompt, fallback=f"{topic} - EV Power")
 
-def generate_script(topic: str, duration_s: int = 40, **kwargs) -> dict:
+def generate_script(topic: str, duration_s: int = 40, is_long: bool = False, **kwargs) -> dict:
     words = int(duration_s * 2.5)
-    prompt = f"Write a {duration_s}-second YouTube Shorts voiceover (~{words} words) about: {topic}. No hashtags."
+    if is_long:
+        prompt = f"Write a {duration_s}-second deep dive YouTube video script (~{words} words) about: {topic}. Break it down into sections. No hashtags. Professional and informative tone."
+    else:
+        prompt = f"Write a {duration_s}-second YouTube Shorts voiceover (~{words} words) about: {topic}. No hashtags. Viral and punchy tone."
+    
     script = _llm_chain(prompt, fallback=f"Check out the {topic}! Subscribe for more EV data.")
     return {"script": script, "voice": "female"}
 
-def generate_description(topic: str, title: str, tags_list: list, **kwargs) -> str:
+def generate_description(topic: str, title: str, tags_list: list, is_long: bool = False, **kwargs) -> str:
     hashtags = " ".join(f"#{t.replace(' ', '')}" for t in tags_list[:10])
+    if is_long:
+        return f"{title}\n\nIn this video, we dive deep into {topic}.\n\nTimestamps:\n0:00 Intro\n1:30 Deep Analysis\n3:00 Conclusion\n\n{hashtags}"
     return f"{title}\n\n{topic}\n\n{hashtags}"
 
 def generate_tags(topic: str, *args, **kwargs) -> list:
     prompt = f"Generate 10 YouTube tags for: {topic}. Return ONLY JSON list."
     res = call_openrouter(prompt) or '["ev", "tesla"]'
     try:
+        # Regex to find JSON list if LLM adds text
+        match = re.search(r'\[.*\]', res, re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
         return json.loads(res)
     except:
         return ["ev", "electric car"]
@@ -161,10 +171,17 @@ def generate_tags(topic: str, *args, **kwargs) -> list:
 class CreativeWriter:
     def generate_short_content(self, topic: str):
         title = generate_title(topic)
-        script_data = generate_script(topic)
+        script_data = generate_script(topic, duration_s=45)
         tags = generate_tags(topic)
         desc = generate_description(topic, title, tags)
         return {"title": title, "script": script_data["script"], "voice": script_data["voice"], "tags": tags, "description": desc}
+    
+    def generate_long_content(self, topic: str, duration_s: int = 240):
+        title = generate_title(topic)
+        script_data = generate_script(topic, duration_s=duration_s, is_long=True)
+        tags = generate_tags(topic)
+        desc = generate_description(topic, title, tags, is_long=True)
+        return {"title": title, "script": script_data["script"], "voice": "male", "tags": tags, "description": desc}
     
     def generate_title(self, topic, **kwargs): return [generate_title(topic)]
     def generate_script(self, topic, **kwargs): return generate_script(topic, **kwargs)

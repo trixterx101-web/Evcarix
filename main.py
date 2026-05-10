@@ -238,6 +238,7 @@ class EvcarixOrchestrator:
 
         # ── 1. Plan ───────────────────────────────────────────────
         print("\n[1/7] Long-form plan oluşturuluyor...", flush=True)
+        # Brain'e hedef süreyi ve video tipini bildir
         plan = self.brain.create_daily_plan(slot=slot, video_type="long")
         script      = plan['script']
         topic       = plan['topic']
@@ -247,7 +248,7 @@ class EvcarixOrchestrator:
         tags        = plan.get('tags', ["ev", "electric car", "Evcarix"])
 
         print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}", flush=True)
-        print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}", flush=True)
+        print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
 
         # ── 2. Medya Toplama ──────────────────────────────────────
         print(f"\n[2/7] {clip_count} adet stok video indiriliyor (16:9)...", flush=True)
@@ -269,18 +270,17 @@ class EvcarixOrchestrator:
         audio_path = voice_data["audio_path"]
 
         # ── 4. Montaj (Ağır İşlem) ────────────────────────────────
-        print("\n[4/7] Video montajlanıyor (4-6 dakika, 1080p)...", flush=True)
+        print("\n[4/7] Video montajlanıyor (16:9 format)...", flush=True)
         gc.collect() # Bellek temizliği
         output_filename = f"evcarix_weekly_{ts}.mp4"
         
-        # Uzun videolarda subtitle yerine title card ve temiz video tercih edilebilir
-        # Şimdilik standart assemble kullanıyoruz ama 16:9 formatında
-        final_video_path = self.editor.assemble_long_video(
-            video_paths=video_paths,
+        # assemble_weekly_long_video: 16:9 formatında, title/outro kartlı premium montaj
+        final_video_path = self.editor.assemble_weekly_long_video(
+            video_clips=video_paths,
             audio_path=audio_path,
-            script_text=script,
-            output_filename=output_filename,
-            category=plan.get('category', 'general')
+            title=title,
+            target_duration=target_duration,
+            output_path=output_filename
         )
         gc.collect()
 

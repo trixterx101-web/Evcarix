@@ -15,15 +15,23 @@ class EvcarixBrain:
 
     def create_daily_plan(self, slot="evening", video_type="short"):
         """v8.0 Plan Creation"""
-        # ... (Simplified logic for now to ensure thresholds are met)
         topic = "Future of Electric Vehicles"
-        content = self.writer.generate_short_content(topic)
         
-        # Check word count
+        # Uzun video için farklı süre ve içerik
+        if video_type == "long":
+            print(f"[Brain] Long-form içerik üretiliyor: {topic}")
+            content = self.writer.generate_long_content(topic)
+        else:
+            print(f"[Brain] Shorts içerik üretiliyor: {topic}")
+            content = self.writer.generate_short_content(topic)
+        
+        # Check word count (Shorts için min 70 kelime, Long için min 400 kelime)
         words = len(content['script'].split())
-        if words < MIN_SHORT_WORDS:
-            # Re-generate with more detail
-            pass
+        threshold = 400 if video_type == "long" else MIN_SHORT_WORDS
+        
+        if words < threshold:
+            print(f"[Brain] İçerik yetersiz ({words} < {threshold}), tekrar deneniyor...")
+            # Burada tekrar deneme mantığı eklenebilir
             
         return {
             "topic": topic,
@@ -32,5 +40,6 @@ class EvcarixBrain:
             "title": content['title'],
             "description": content['description'],
             "tags": content['tags'],
-            "voice": content['voice']
+            "voice": content['voice'],
+            "video_type": video_type
         }

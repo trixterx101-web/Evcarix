@@ -12,9 +12,10 @@ PIXABAY_API_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
 if not PIXABAY_API_KEY:
     logger.warning("[Pixabay] API key bulunamadı.")
 
-def search_pixabay_videos(query: str, max_results: int = 10) -> list[str]:
+def search_pixabay_videos(query: str, max_results: int = 10, orientation: str = "vertical") -> list[str]:
     """
-    Pixabay video API çağrısı yap, portrait videoları önceliklendir ve indir.
+    Pixabay video API çağrısı yap, belirtilen orientation'a göre videoları indir.
+    orientation: "vertical" (portrait) veya "horizontal" (landscape)
     """
     if not PIXABAY_API_KEY:
         return []
@@ -27,7 +28,7 @@ def search_pixabay_videos(query: str, max_results: int = 10) -> list[str]:
     params = {
         "key": PIXABAY_API_KEY,
         "q": query,
-        "per_page": 30, # Daha fazla çekip filtreleyelim
+        "per_page": 30,
     }
 
     try:
@@ -39,7 +40,6 @@ def search_pixabay_videos(query: str, max_results: int = 10) -> list[str]:
         data = response.json()
         hits = data.get("hits", [])
         
-        # Karıştır ve filtrele
         random.shuffle(hits)
         
         index = 0
@@ -47,30 +47,29 @@ def search_pixabay_videos(query: str, max_results: int = 10) -> list[str]:
             if len(downloaded_files) >= max_results:
                 break
 
-            # Video Filter: Portrait ve HD kontrolü
             videos = hit.get("videos", {})
-            
-            # Pixabay dikey videoları bazen genişlik/yükseklik değerlerinde belirtir
-            # Portrait: height >= 1920 and width >= 1080 (veya tam tersi oran)
-            # Genellikle Pixabay'de dikey videolar için ayrı bir parametre yok, 
-            # ancak metadata içinde genişlik/yükseklik var.
-            
             chosen_video = None
+            
+            # Belirtilen orientation'a uygun video seç
             for size in ["large", "medium", "small"]:
                 v = videos.get(size)
                 if v and v.get("url"):
                     w, h = v.get("width", 0), v.get("height", 0)
-                    # User requested: width >= 1080, height >= 1920 (Vertical/Portrait)
-                    if h >= 1920 and w >= 1080 and h > w:
-                        chosen_video = v
-                        break
+                    if orientation == "vertical":
+                        if h > w: # Portrait
+                            chosen_video = v
+                            break
+                    else:
+                        if w > h: # Landscape
+                            chosen_video = v
+                            break
             
-            # Eğer dikey bulunamazsa, en azından HD olanı al (Editor crop yapabilir ama kullanıcı portrait öncelikli dedi)
+            # Fallback: orientation uygun değilse bile HD olanı al
             if not chosen_video:
                 for size in ["large", "medium"]:
                     v = videos.get(size)
                     if v and v.get("url"):
-                        if v.get("height", 0) >= 1080:
+                        if v.get("height", 0) >= 720:
                             chosen_video = v
                             break
 

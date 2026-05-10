@@ -578,6 +578,8 @@ class AutoEditor:
                     clip = clip.crop(x1=0, y1=y1, x2=w, y2=y1 + new_h)
 
                 clip = clip.resize((1920, 1080))
+                # v8.0 Cinematic Effects
+                clip = self._apply_cinematic_effects(clip)
                 clips.append(clip)
             except Exception as e:
                 print(f"[Editor] Klip hatası ({path}): {e}")
@@ -585,60 +587,58 @@ class AutoEditor:
         if len(clips) >= 2:
             base_video = concatenate_videoclips(clips, method="compose")
             if base_video.duration < target_duration:
-                from moviepy.video.fx.all import loop as video_loop
-                try:
-                    base_video = video_loop(base_video, duration=target_duration)
-                except (AttributeError, ImportError):
-                    import math
-                    repeats = math.ceil(target_duration / base_video.duration)
-                    base_video = concatenate_videoclips([base_video] * repeats).subclip(0, target_duration)
+                import math
+                repeats = math.ceil(target_duration / base_video.duration)
+                looped_clips = []
+                for _ in range(repeats):
+                    shuffled = list(clips)
+                    random.shuffle(shuffled)
+                    looped_clips.extend(shuffled)
+                base_video = concatenate_videoclips(looped_clips, method="compose").subclip(0, target_duration)
             else:
                 base_video = base_video.subclip(0, target_duration)
         else:
-            print("[Editor] Yeterli video klip yok, siyah arka plan kullanılıyor...")
-            base_video = ColorClip(size=(1920, 1080), color=(0, 0, 0)).set_duration(target_duration)
+            print("[Editor] Yeterli video klip yok, gradient arka plan kullanılıyor...")
+            base_video = self._make_motion_background(target_duration, width=1920, height=1080)
 
+        # Title card (Pillow ile - ImageMagick bağımlılığını kaldırmak için)
+        def make_card(text, subtitle="Evcarix Deep Dive"):
+            img = Image.new("RGB", (1920, 1080), (10, 10, 25))
+            draw = ImageDraw.Draw(img)
+            
+            # Draw some techy lines
+            for i in range(0, 1920, 100):
+                draw.line([(i, 0), (i, 1080)], fill=(20, 20, 50), width=1)
+            for i in range(0, 1080, 100):
+                draw.line([(0, i), (1920, i)], fill=(20, 20, 50), width=1)
+            
+            f_main = self._load_font("bold", 100)
+            f_sub = self._load_font("regular", 50)
+            
+            # Main Title
+            bbox = draw.textbbox((0, 0), text.upper(), font=f_main)
+            tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
+            draw.text(((1920-tw)//2, (1080-th)//2 - 50), text.upper(), font=f_main, fill=(255, 255, 255))
+            
+            # Subtitle
+            sbox = draw.textbbox((0, 0), subtitle, font=f_sub)
+            sw, sh = sbox[2]-sbox[0], sbox[3]-sbox[1]
+            draw.text(((1920-sw)//2, (1080-th)//2 + 100), subtitle, font=f_sub, fill=(0, 212, 255))
+            
+            return np.array(img)
+
+        title_frame = make_card(title)
+        title_card = ImageClip(title_frame).set_duration(4).set_fps(30)
+        
+        outro_frame = make_card("THANKS FOR WATCHING", "Subscribe for more EV data")
+        outro_card = ImageClip(outro_frame).set_duration(4).set_fps(30)
+
+        # Ana video sesini ekle
         base_video = base_video.set_audio(audio)
 
-        # Title card (5 saniye)
-        try:
-            title_clip = TextClip(
-                title,
-                fontsize=70,
-                color="white",
-                font="Arial-Bold",
-                align="center",
-                size=(1920, 1080)
-            ).set_position("center").set_duration(5)
-            bg_clip = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
-            title_card = CompositeVideoClip([bg_clip, title_clip])
-        except Exception as e:
-            print(f"[Editor] Title card hatası: {e}, atlanıyor...")
-            title_card = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
-
-        # Outro card (5 saniye)
-        try:
-            outro_text = "Subscribe for more EV data — Evcarix"
-            outro_clip = TextClip(
-                outro_text,
-                fontsize=60,
-                color="white",
-                font="Arial-Bold",
-                align="center",
-                size=(1920, 1080)
-            ).set_position("center").set_duration(5)
-            outro_bg = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
-            outro_card = CompositeVideoClip([outro_bg, outro_clip])
-        except Exception as e:
-            print(f"[Editor] Outro card hatası: {e}, atlanıyor...")
-            outro_card = ColorClip(size=(1920, 1080), color=(20, 20, 40)).set_duration(5)
-
-        # FIX: concatenate_videoclips ile sıralı birleştirme (CompositeVideoClip DEĞİL)
-        # CompositeVideoClip klipler üst üste koyar (overlay); sıralı için concatenate kullanılmalı
-        final_video = concatenate_videoclips(
-            [title_card, base_video, outro_card],
-            method="compose"
-        )
+        # Birleştirme: Title (4s) + Base (target) + Outro (4s)
+        # Not: Title ve Outro sessiz olacak, MoviePy bunu halleder.
+        final_video = concatenate_videoclips([title_card, base_video, outro_card], method="compose")
 
         # Video export
         output_full_path = os.path.join(self.output_dir, output_path)

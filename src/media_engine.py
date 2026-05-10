@@ -39,6 +39,7 @@ class MediaEngine:
         from src.ai_video_engine import generate_video_prompt
         
         topic_text = topic or (plan.get("topic") if plan else "electric vehicle")
+        video_type = plan.get("video_type", "short") if plan else "short"
         needed = target_clip_count
         all_clips = []
         
@@ -48,27 +49,29 @@ class MediaEngine:
         # Stage 1: Free Footage (OEM, Archive, NASA, Wikimedia)
         try:
             from src.free_footage import FreeFootageEngine
-            logger.info("[MediaEngine] Stage 1: Free Footage (OEM, Archive...)")
+            logger.info(f"[MediaEngine] Stage 1: Free Footage ({video_type})")
             ff_engine = FreeFootageEngine()
-            ff_clips = ff_engine.get_clips(topic_text, count=needed, video_type="short")
+            ff_clips = ff_engine.get_clips(topic_text, count=needed, video_type=video_type)
             all_clips.extend(ff_clips)
         except Exception as e:
             logger.error(f"[MediaEngine] Free Footage hatası: {e}")
 
         # Stage 2: Pexels
         if len(all_clips) < needed:
-            logger.info("[MediaEngine] Stage 2: Pexels...")
+            logger.info(f"[MediaEngine] Stage 2: Pexels ({video_type})...")
             for q in query_pool[:2]:
                 if len(all_clips) >= needed: break
-                new = self._download_from_pexels(q, OUTPUT_DIR, needed - len(all_clips))
+                new = self._download_from_pexels(q, OUTPUT_DIR, needed - len(all_clips), video_type=video_type)
                 all_clips.extend(new)
 
         # Stage 3: Pixabay
         if len(all_clips) < needed:
-            logger.info("[MediaEngine] Stage 3: Pixabay...")
+            logger.info(f"[MediaEngine] Stage 3: Pixabay ({video_type})...")
+            # Pixabay engine orientation support check
+            orientation = "horizontal" if video_type == "long" else "vertical"
             for q in query_pool[:2]:
                 if len(all_clips) >= needed: break
-                new = search_pixabay_videos(q, max_results=needed - len(all_clips))
+                new = search_pixabay_videos(q, max_results=needed - len(all_clips), orientation=orientation)
                 all_clips.extend(new)
 
         # Stage 3: AI Fallback
@@ -103,11 +106,12 @@ class MediaEngine:
         
         return unique[:needed]
 
-    def _download_from_pexels(self, query, output_dir, count):
+    def _download_from_pexels(self, query, output_dir, count, video_type="short"):
         if not self.pexels_api_key: return []
         paths = []
+        orientation = "landscape" if video_type == "long" else "portrait"
         try:
-            url = f"https://api.pexels.com/videos/search?query={query}&per_page={count}&orientation=portrait"
+            url = f"https://api.pexels.com/videos/search?query={query}&per_page={count}&orientation={orientation}"
             r = requests.get(url, headers={"Authorization": self.pexels_api_key}, timeout=15)
             vids = r.json().get("videos", [])
             for v in vids:
