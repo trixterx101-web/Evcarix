@@ -178,22 +178,14 @@ class EvcarixOrchestrator:
             category=plan.get('category', 'general')
         )
 
-        # ── 5. Kapak (Thumbnail) ──────────────────────────────────
-        print("\n[5/6] Thumbnail oluşturuluyor...", flush=True)
-        thumb_output = f"output/thumb_{ts}.jpg"
-        
-        # İlk videodan bir kare alarak arka plan yap (daha estetik)
-        bg_path = video_paths[0] if video_paths else None
-        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output, bg_image_path=bg_path, is_short=True)
+        # ── 5. Kapak (Thumbnail) İptal Edildi ─────────────────────
+        print("\n[5/6] Thumbnail üretimi manuel yükleme için atlandı.", flush=True)
+        thumbnail_path = None
 
         # ── 6. YouTube Yükleme ─────────────────────────────────────────
         if self.uploader and os.path.exists(final_video_path):
             print("\n[6/6] YouTube'a yükleniyor...", flush=True)
-            thumb_exists = thumbnail_path and os.path.exists(thumbnail_path)
-            if thumb_exists:
-                print(f"      🖼️  Thumbnail hazır: {thumbnail_path}", flush=True)
-            else:
-                print("      ⚠️  Thumbnail dosyası bulunamadı, thumbnail yüklenmeyecek.", flush=True)
+            print("      ⚠️  Thumbnail manuel eklenecek, atlanıyor.", flush=True)
             try:
                 video_id = self.uploader.upload_video(
                     file_path=final_video_path,
@@ -284,13 +276,9 @@ class EvcarixOrchestrator:
         )
         gc.collect()
 
-        # ── 5. Kapak (Thumbnail) ──────────────────────────────────
-        print("\n[5/7] HD Thumbnail oluşturuluyor...", flush=True)
-        thumb_output = f"output/thumb_long_{ts}.jpg"
-        
-        # İlk videodan bir kare alarak arka plan yap
-        bg_path = video_paths[0] if video_paths else None
-        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output, bg_image_path=bg_path, is_short=False)
+        # ── 5. Kapak (Thumbnail) İptal Edildi ─────────────────────
+        print("\n[5/7] Thumbnail üretimi manuel yükleme için atlandı.", flush=True)
+        thumbnail_path = None
 
         # ── 6. Chapters & SEO ─────────────────────────────────────
         # Uzun videolarda description içine timestamp eklemek SEO için kritiktir
@@ -299,11 +287,7 @@ class EvcarixOrchestrator:
         # ── 7. YouTube Yükleme ─────────────────────────────────────────
         if self.uploader and os.path.exists(final_video_path):
             print("\n[7/7] YouTube'a yükleniyor (Long-form)...", flush=True)
-            thumb_exists = thumbnail_path and os.path.exists(thumbnail_path)
-            if thumb_exists:
-                print(f"      🖼️  Thumbnail hazır: {thumbnail_path}", flush=True)
-            else:
-                print("      ⚠️  Thumbnail dosyası bulunamadı, thumbnail yüklenmeyecek.", flush=True)
+            print("      ⚠️  Thumbnail manuel eklenecek, atlanıyor.", flush=True)
             try:
                 video_id = self.uploader.upload_video(
                     file_path=final_video_path,
