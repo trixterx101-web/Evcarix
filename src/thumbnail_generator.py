@@ -111,8 +111,8 @@ class ThumbnailGenerator:
         if output_path.lower().endswith(".png"):
             output_path = output_path.rsplit(".", 1)[0] + ".jpg"
 
-        # 1. Arka plan görseli al
-        bg = self._get_background(category, width, height, bg_image_path)
+        # 1. Arka plan görseli al (title'ı da geçir — AI prompt için)
+        bg = self._get_background(category, width, height, bg_image_path, title=title)
 
         # 2. Sinematik karartma katmanı
         bg = self._apply_vignette(bg)
@@ -140,18 +140,21 @@ class ThumbnailGenerator:
         logger.info(f"[Thumbnail] ✅ Kaydedildi: {output_path}")
         return output_path
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # BACKGROUND: Pexels → Local file → Gradient fallback
-    # ─────────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────────────
+    # BACKGROUND: Pexels → Gemini Imagen → Pollinations FLUX → Gradient
+    # ─────────────────────────────────────────────────────────────────────────────────
     def _get_background(self, category: str, width: int, height: int,
-                         bg_image_path: str = None) -> Image.Image:
+                         bg_image_path: str = None,
+                         title: str = "") -> Image.Image:
         """
-        Priority:
+        Background priority:
           1. Explicitly provided local file
-          2. Pexels API (real EV/car photo)
-          3. Premium dark gradient fallback
+          2. Pexels API (real EV/car photo, fastest)
+          3. Gemini Imagen 3 (highest quality AI, uses GEMINI_API_KEY)
+          4. Pollinations.ai FLUX (free, no key needed)
+          5. Premium dark gradient (final fallback)
         """
-        # 1. Yerel dosya verilmişse kullan
+        # 1. Yerel dosya
         if bg_image_path and os.path.exists(bg_image_path):
             try:
                 img = Image.open(bg_image_path).convert("RGB")
@@ -159,7 +162,7 @@ class ThumbnailGenerator:
             except Exception as e:
                 logger.warning(f"[Thumbnail] Yerel BG açılamadı: {e}")
 
-        # 2. Pexels'tan gerçek EV fotoğrafı çek
+        # 2. Pexels (gerçek EV fotoğrafı)
         if self._pexels_key:
             queries = CATEGORY_PEXELS_QUERY.get(category, CATEGORY_PEXELS_QUERY["default"])
             random.shuffle(queries)
@@ -168,9 +171,24 @@ class ThumbnailGenerator:
                 if img:
                     logger.info(f"[Thumbnail] ✅ Pexels arka plan: '{q}'")
                     return img
+            logger.warning("[Thumbnail] ⚠️ Pexels uygun fotoğ bulamadı, AI üretimine geçiliyor...")
+        else:
+            logger.warning("[Thumbnail] Pexels key yok, AI üretimine geçiliyor...")
 
-        # 3. Premium gradient fallback
-        logger.warning("[Thumbnail] ⚠️ Pexels başarısız, gradient arka plan kullanılıyor.")
+        # 3. Gemini Imagen 3
+        img = self._generate_ai_background_gemini(title or category, width, height)
+        if img:
+            logger.info("[Thumbnail] ✅ Gemini Imagen 3 arka plan üretildi.")
+            return img
+
+        # 4. Pollinations.ai FLUX (API key gerektirmez)
+        img = self._generate_ai_background_pollinations(title or category, category, width, height)
+        if img:
+            logger.info("[Thumbnail] ✅ Pollinations FLUX arka plan üretildi.")
+            return img
+
+        # 5. Gradient (son çare)
+        logger.warning("[Thumbnail] ⚠️ Tüm AI kaynakları başarısız, gradient arka plan kullanılıyor.")
         return self._make_gradient_bg(width, height, category)
 
     def _fetch_pexels_photo(self, query: str, width: int, height: int) -> Image.Image | None:
@@ -202,6 +220,74 @@ class ThumbnailGenerator:
                     return self._fill_crop(img, width, height)
         except Exception as e:
             logger.warning(f"[Thumbnail] Pexels photo hatası: {e}")
+        return None
+
+    def _generate_ai_background_gemini(self, title: str, width: int, height: int) -> "Image.Image | None":
+        """
+        Gemini Imagen 3 ile AI arka plan üret.
+        Mevcut GEMINI_API_KEY kullanılır — ekstra ücret yok.
+        """
+        gemini_key = (
+            os.getenv("GEMINI_API_KEY")
+            or os.getenv("GEMINI_API_KEY_2")
+            or os.getenv("GEMINI_API_KEY_3")
+        )
+        if not gemini_key:
+            return None
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=gemini_key)
+
+            prompt = (
+                f"Ultra-realistic cinematic automotive photography: {title}. "
+                "A sleek modern electric vehicle on a dramatic road or showroom, "
+                "professional studio lighting, deep shadows, vibrant colors, "
+                "4K quality, wide angle lens, no people, no text, no logos, "
+                "photorealistic, high contrast, magazine cover quality."
+            )
+            imagen_model = genai.ImageGenerationModel("imagen-3.0-generate-002")
+            result = imagen_model.generate_images(
+                prompt=prompt,
+                number_of_images=1,
+                aspect_ratio="16:9",
+                safety_filter_level="block_few",
+                person_generation="dont_allow",
+            )
+            if result.images:
+                img_bytes = result.images[0]._image_bytes
+                img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                return self._fill_crop(img, width, height)
+        except Exception as e:
+            logger.warning(f"[Thumbnail] Gemini Imagen hatası: {e}")
+        return None
+
+    def _generate_ai_background_pollinations(self, title: str, category: str,
+                                              width: int, height: int) -> "Image.Image | None":
+        """
+        Pollinations.ai FLUX model ile ücretsiz AI arka plan üret.
+        API key gerektirmez — her zaman kullanılabilir fallback.
+        """
+        try:
+            import urllib.parse
+            prompt = (
+                f"Professional YouTube thumbnail background, electric vehicle, {title}, "
+                f"{category} theme, cinematic lighting, dramatic colors, ultra-realistic, "
+                "4K quality, no text, no watermark, wide shot, automotive photography, "
+                "dark moody atmosphere, magazine quality"
+            )
+            encoded = urllib.parse.quote(prompt)
+            seed = random.randint(1, 99999)
+            image_url = (
+                f"https://image.pollinations.ai/prompt/{encoded}"
+                f"?width={width}&height={height}&model=flux&seed={seed}&nologo=true"
+            )
+            logger.info("[Thumbnail] Pollinations FLUX üretiyor (45s timeout)...")
+            r = requests.get(image_url, timeout=45)
+            if r.status_code == 200 and len(r.content) > 10000:
+                img = Image.open(io.BytesIO(r.content)).convert("RGB")
+                return self._fill_crop(img, width, height)
+        except Exception as e:
+            logger.warning(f"[Thumbnail] Pollinations hatası: {e}")
         return None
 
     def _fill_crop(self, img: Image.Image, width: int, height: int) -> Image.Image:
