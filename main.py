@@ -14,7 +14,7 @@ load_dotenv()
 def log(msg):
     print(f">>> {msg}", flush=True)
 
-log("Evcarix Orchestrator script is loading...")
+print("=== EVCARIX NEW PIPELINE ACTIVE ===", flush=True)
 
 class EvcarixOrchestrator:
     def __init__(self):
@@ -129,7 +129,8 @@ class EvcarixOrchestrator:
                             title=title,
                             description=description,
                             tags=tags,
-                            playlist_name="Short Video"
+                            playlist_name="Short Video",
+                            thumbnail_path=thumbnail_path if os.path.exists(thumbnail_path) else None
                         )
                         print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
                         print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
@@ -144,11 +145,10 @@ class EvcarixOrchestrator:
 
         # ── 2. Medya Toplama ──────────────────────────────────────
         print("\n[2/6] Stok videolar indiriliyor...", flush=True)
-        video_paths = self.media_engine.download_stock_videos(
-            query=full_topic,
-            count=clip_count,
-            orientation="portrait",
-            category=plan.get('category', 'general')
+        video_paths = await self.media_engine.download_stock_videos(
+            plan=plan,
+            target_clip_count=clip_count,
+            topic=full_topic
         )
 
         # ── 3. Ses Üretimi ────────────────────────────────────────
@@ -179,7 +179,7 @@ class EvcarixOrchestrator:
         
         # İlk videodan bir kare alarak arka plan yap (daha estetik)
         bg_path = video_paths[0] if video_paths else None
-        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output, bg_image_path=bg_path)
+        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output, bg_image_path=bg_path, is_short=True)
 
         # ── 6. YouTube Yükleme ─────────────────────────────────────────
         if self.uploader and os.path.exists(final_video_path):
@@ -246,11 +246,10 @@ class EvcarixOrchestrator:
 
         # ── 2. Medya Toplama ──────────────────────────────────────
         print(f"\n[2/7] {clip_count} adet stok video indiriliyor (16:9)...", flush=True)
-        video_paths = self.media_engine.download_stock_videos(
-            query=full_topic,
-            count=clip_count,
-            orientation="landscape",
-            category=plan.get('category', 'general')
+        video_paths = await self.media_engine.download_stock_videos(
+            plan=plan,
+            target_clip_count=clip_count,
+            topic=full_topic
         )
 
         # ── 3. Ses Üretimi ────────────────────────────────────────
@@ -286,7 +285,7 @@ class EvcarixOrchestrator:
         
         # İlk videodan bir kare alarak arka plan yap
         bg_path = video_paths[0] if video_paths else None
-        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output, bg_image_path=bg_path)
+        thumbnail_path = self.editor.generate_thumbnail(title, thumb_output, bg_image_path=bg_path, is_short=False)
 
         # ── 6. Chapters & SEO ─────────────────────────────────────
         # Uzun videolarda description içine timestamp eklemek SEO için kritiktir
