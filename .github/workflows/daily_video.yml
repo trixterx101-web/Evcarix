@@ -78,10 +78,18 @@ jobs:
             fonts-dejavu-core
 
       # ── 4. Python bağımlılıkları ─────────────────────────────────
+      - name: Clean Build Cache
+        run: |
+          echo "=== CLEAN BUILD START ==="
+          find . -type d -name "__pycache__" -exec rm -rf {} +
+          find . -name "*.pyc" -delete
+          find . -name "*.pyo" -delete
+          pip cache purge || true
+
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip --quiet
-          pip install -r requirements.txt --quiet
+          pip install --no-cache-dir -r requirements.txt --quiet
 
       # ── 5. İnsan gibi rastgele bekleme (0-5 dakika) ─────────────
       #     YouTube algoritmasına makine gibi görünmemek için
