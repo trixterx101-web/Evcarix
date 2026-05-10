@@ -1,4 +1,5 @@
 import os
+import json
 import random
 import re
 import requests
@@ -8,12 +9,13 @@ import logging
 from pathlib import Path
 from .voice_engine import VoiceEngine
 
-print("=== NEW MEDIA ENGINE LOADED ===", flush=True)
 logger = logging.getLogger("MediaEngine")
 
-# v8.0 Configuration
+# v8.5 Configuration
 OUTPUT_DIR = "assets/temp_videos"
 CACHE_DIR = "assets/cache/videos"
+USED_VIDEOS_FILE = "used_videos.json"
+REPETITION_LIMIT = 300 # Son 300 klip hafızada tutulur
 
 class MediaEngine:
     def __init__(self):
@@ -23,6 +25,22 @@ class MediaEngine:
         
         Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
         Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
+        self.used_hashes = self._load_used_hashes()
+
+    def _load_used_hashes(self):
+        if os.path.exists(USED_VIDEOS_FILE):
+            try:
+                with open(USED_VIDEOS_FILE, "r") as f:
+                    return set(json.load(f))
+            except: return set()
+        return set()
+
+    def _save_used_hashes(self, new_hashes):
+        history = list(self.used_hashes.union(new_hashes))
+        if len(history) > REPETITION_LIMIT:
+            history = history[-REPETITION_LIMIT:]
+        with open(USED_VIDEOS_FILE, "w") as f:
+            json.dump(history, f)
 
     def _get_file_hash(self, file_path):
         hasher = hashlib.md5()
@@ -34,7 +52,7 @@ class MediaEngine:
         except: return str(time.time())
 
     async def download_stock_videos(self, plan=None, target_clip_count=6, topic=None):
-        """v8.5 Pipeline: Balanced Acquisition (FF + Pexels + Pixabay + AI)"""
+        """v8.6 Pipeline: Zero-Repetition Acquisition"""
         from src.pixabay_engine import search_pixabay_videos
         from src.ai_video_engine import generate_video_prompt, generate_ai_video
         
@@ -43,100 +61,122 @@ class MediaEngine:
         needed = target_clip_count
         all_clips = []
         
-        # Hedeflenen kaynak dağılımı (Çeşitlilik için)
-        # 1/3 FreeFootage, 1/3 Pexels, 1/3 Pixabay + AI Fallback
-        ff_target = max(1, needed // 3)
-        px_target = max(1, needed // 3)
-        pb_target = needed - (ff_target + px_target)
-        
-        query_pool = [f"{topic_text} car", "EV driving", "car dashboard", "highway driving", "future mobility"]
+        # Daha fazla çeşitlilik için genişletilmiş sorgu havuzu
+        query_pool = [
+            f"{topic_text} 4k", f"{topic_text} technology", "EV driving cinematic", 
+            "future car interior", "electric motor technical", "charging station 4k",
+            "highway driving sunset", "modern automotive design", "digital dashboard car"
+        ]
         random.shuffle(query_pool)
 
-        # Stage 1: Free Footage (OEM, Archive...)
+        # Stage 1-3: Balanced Sources
+        ff_target = max(2, needed // 3)
+        px_target = max(2, needed // 3)
+        
+        # 1. Free Footage
         try:
             from src.free_footage import FreeFootageEngine
-            logger.info(f"[MediaEngine] Stage 1: Free Footage ({video_type}) - Target: {ff_target}")
             ff_engine = FreeFootageEngine()
-            ff_clips = ff_engine.get_clips(topic_text, count=ff_target, video_type=video_type)
+            ff_clips = ff_engine.get_clips(topic_text, count=ff_target * 2, video_type=video_type)
             all_clips.extend(ff_clips)
-        except Exception as e:
-            logger.error(f"[MediaEngine] Free Footage hatası: {e}")
+        except Exception as e: logger.error(f"[MediaEngine] FF hatası: {e}")
 
-        # Stage 2: Pexels
-        needed_px = px_target + (ff_target - len(all_clips))
-        if needed_px > 0:
-            logger.info(f"[MediaEngine] Stage 2: Pexels ({video_type}) - Target: {needed_px}")
-            for q in query_pool:
-                if len(all_clips) >= (ff_target + px_target): break
-                new = self._download_from_pexels(q, OUTPUT_DIR, needed_px, video_type=video_type)
-                all_clips.extend(new)
+        # 2. Pexels
+        for q in query_pool:
+            if len(all_clips) >= (ff_target + px_target) * 2: break
+            new = self._download_from_pexels(q, OUTPUT_DIR, px_target, video_type=video_type)
+            all_clips.extend(new)
 
-        # Stage 3: Pixabay
-        needed_pb = needed - len(all_clips)
-        if needed_pb > 0:
-            logger.info(f"[MediaEngine] Stage 3: Pixabay ({video_type}) - Target: {needed_pb}")
-            orientation = "horizontal" if video_type == "long" else "vertical"
-            for q in query_pool:
-                if len(all_clips) >= needed: break
-                new = search_pixabay_videos(q, max_results=needed_pb, orientation=orientation)
-                all_clips.extend(new)
+        # 3. Pixabay
+        orientation = "horizontal" if video_type == "long" else "vertical"
+        for q in query_pool:
+            if len(all_clips) >= needed * 3: break
+            new = search_pixabay_videos(q, max_results=px_target, orientation=orientation)
+            all_clips.extend(new)
 
-        # Stage 4: AI Video (Özellikle çeşitlilik için 1-2 tane her zaman ekle)
-        if len(all_clips) < needed or random.random() > 0.5:
-            logger.info("[MediaEngine] Stage 4: AI Video Generation...")
-            try:
-                ai_prompt = generate_video_prompt(topic_text)
-                ai_clip = await generate_ai_video(ai_prompt, video_type=video_type)
-                if ai_clip:
-                    all_clips.append(ai_clip)
-            except Exception as e:
-                logger.error(f"[MediaEngine] AI Video hatası: {e}")
+        # 4. AI Video (Her zaman 1 tane yeni üretmeye çalış)
+        try:
+            ai_prompt = generate_video_prompt(topic_text)
+            ai_clip = await generate_ai_video(ai_prompt, video_type=video_type)
+            if ai_clip: all_clips.append(ai_clip)
+        except: pass
 
-        # Stage 5: Cache Fallback (Hala eksik varsa)
-        if len(all_clips) < needed:
-            logger.info("[MediaEngine] Stage 5: Cache Fallback...")
-            cached = [str(f) for f in Path(CACHE_DIR).glob("*.mp4")]
-            if cached:
-                random.shuffle(cached)
-                all_clips.extend(cached[:needed - len(all_clips)])
-
-        # Karıştır (Videonun başı hep aynı kaynaktan olmasın)
-        random.shuffle(all_clips)
+        # --- REPETITION FILTERING ---
+        unique_and_fresh = []
+        current_session_hashes = set()
         
-        # Final Processing & Hashing
-        unique = []
-        hashes = set()
+        # Önce klipleri karıştır ki hep aynıları ilk gelmesin
+        random.shuffle(all_clips)
+
         for c in all_clips:
             if not c or not os.path.exists(c): continue
-            h = self._get_file_hash(c)
-            if h not in hashes:
-                hashes.add(h)
-                unique.append(c)
-                # Ensure in cache
-                cache_dest = os.path.join(CACHE_DIR, os.path.basename(c))
-                if not os.path.exists(cache_dest):
-                    import shutil
-                    try: shutil.copy(c, cache_dest)
-                    except: pass
-        
-        return unique[:needed]
+            f_hash = self._get_file_hash(c)
+            
+            # Eğer bu klip son videolarda kullanıldıysa ATLA
+            if f_hash in self.used_hashes:
+                logger.info(f"[MediaEngine] ♻️ Tekrar eden klip atlandı: {os.path.basename(c)}")
+                continue
+            
+            if f_hash not in current_session_hashes:
+                current_session_hashes.add(f_hash)
+                unique_and_fresh.append(c)
+                if len(unique_and_fresh) >= needed: break
 
-    def _download_from_pexels(self, query, output_dir, count, video_type="short"):
+        # Eğer hala eksik varsa (çok nadir), cache'den HİÇ kullanılmamış olanları çek
+        if len(unique_and_fresh) < needed:
+            logger.info("[MediaEngine] ⚠️ Yetersiz yeni klip, temiz cache taranıyor...")
+            cached_files = list(Path(CACHE_DIR).glob("*.mp4"))
+            random.shuffle(cached_files)
+            for f in cached_files:
+                f_hash = self._get_file_hash(str(f))
+                if f_hash not in self.used_hashes and f_hash not in current_session_hashes:
+                    unique_and_fresh.append(str(f))
+                    current_session_hashes.add(f_hash)
+                    if len(unique_and_fresh) >= needed: break
+
+        # Kullanılanları kaydet
+        self._save_used_hashes(current_session_hashes)
+        
+        # Son bir karıştırma (akış için)
+        random.shuffle(unique_and_fresh)
+        return unique_and_fresh[:needed]
+
+    def _download_from_pexels(self, query, dest_dir, count, video_type="short"):
+        """v8.6: Optimized Pexels acquisition with native API orientation."""
         if not self.pexels_api_key: return []
-        paths = []
+        
         orientation = "landscape" if video_type == "long" else "portrait"
+        url = f"https://api.pexels.com/videos/search?query={query}&per_page={count*2}&orientation={orientation}"
+        headers = {"Authorization": self.pexels_api_key}
+        
         try:
-            url = f"https://api.pexels.com/videos/search?query={query}&per_page={count}&orientation={orientation}"
-            r = requests.get(url, headers={"Authorization": self.pexels_api_key}, timeout=15)
-            vids = r.json().get("videos", [])
-            for v in vids:
-                link = v.get("video_files", [{}])[0].get("link")
-                if link:
-                    out = os.path.join(output_dir, f"pexels_{v['id']}.mp4")
-                    if not os.path.exists(out):
-                        dl = requests.get(link, stream=True, timeout=60)
-                        with open(out, "wb") as f:
-                            for chunk in dl.iter_content(1024*1024): f.write(chunk)
-                    paths.append(out)
-        except: pass
-        return paths
+            r = requests.get(url, headers=headers, timeout=15)
+            if r.status_code != 200: return []
+            
+            data = r.json()
+            paths = []
+            for v in data.get("videos", []):
+                # Birincil tercih HD kalite
+                v_url = None
+                for f in v.get("video_files", []):
+                    if f.get("quality") == "hd":
+                        v_url = f.get("link")
+                        break
+                if not v_url: v_url = v.get("video_files", [{}])[0].get("link")
+                
+                if v_url:
+                    fname = f"pexels_{v.get('id')}.mp4"
+                    fpath = os.path.join(dest_dir, fname)
+                    if not os.path.exists(fpath):
+                        # Chunked download for reliability
+                        dl = requests.get(v_url, stream=True, timeout=60)
+                        with open(fpath, "wb") as f:
+                            for chunk in dl.iter_content(1024*1024): 
+                                if chunk: f.write(chunk)
+                    paths.append(fpath)
+                
+                if len(paths) >= count: break
+            return paths
+        except Exception as e:
+            logger.error(f"[MediaEngine] Pexels hatası: {e}")
+            return []
