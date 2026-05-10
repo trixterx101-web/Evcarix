@@ -6,13 +6,12 @@ import hashlib
 import time
 import logging
 from pathlib import Path
-from src.voice_engine import VoiceEngine
+from .voice_engine import VoiceEngine
 
 print("=== NEW MEDIA ENGINE LOADED ===", flush=True)
 logger = logging.getLogger("MediaEngine")
 
 # v8.0 Configuration
-ENABLE_YOUTUBE_CC = False
 OUTPUT_DIR = "assets/temp_videos"
 CACHE_DIR = "assets/cache/videos"
 
@@ -36,7 +35,7 @@ class MediaEngine:
 
     async def download_stock_videos(self, plan=None, target_clip_count=6, topic=None):
         """v8.0 Pipeline: Pexels -> Pixabay -> AI -> Cache"""
-        from src.pixabay_engine import fetch_pixabay_clips
+        from src.pixabay_engine import search_pixabay_videos
         from src.ai_video_engine import generate_video_prompt
         
         topic_text = topic or (plan.get("topic") if plan else "electric vehicle")
@@ -47,7 +46,7 @@ class MediaEngine:
         random.shuffle(query_pool)
 
         # Stage 1: Pexels
-        print(f"[MediaEngine] Stage 1: Pexels")
+        logger.info("[MediaEngine] Stage 1: Pexels...")
         for q in query_pool[:2]:
             if len(all_clips) >= needed: break
             new = self._download_from_pexels(q, OUTPUT_DIR, needed - len(all_clips))
@@ -55,21 +54,21 @@ class MediaEngine:
 
         # Stage 2: Pixabay
         if len(all_clips) < needed:
-            print(f"[MediaEngine] Stage 2: Pixabay")
+            logger.info("[MediaEngine] Stage 2: Pixabay...")
             for q in query_pool[:2]:
                 if len(all_clips) >= needed: break
-                new = await fetch_pixabay_clips(q, limit=needed - len(all_clips), output_dir=OUTPUT_DIR)
+                new = search_pixabay_videos(q, max_results=needed - len(all_clips))
                 all_clips.extend(new)
 
         # Stage 3: AI Fallback
         if len(all_clips) < needed:
-            print(f"[MediaEngine] Stage 3: AI Fallback")
+            logger.info("[MediaEngine] Stage 3: AI Fallback...")
             prompt = generate_video_prompt(topic_text)
             logger.info(f"[AIVideo] Fallback prompt generated: {prompt[:50]}...")
 
         # Stage 4: Cache
         if len(all_clips) < needed:
-            print(f"[MediaEngine] Stage 4: Cache")
+            logger.info("[MediaEngine] Stage 4: Cache...")
             cached = [str(f) for f in Path(CACHE_DIR).glob("*.mp4")]
             if cached:
                 random.shuffle(cached)

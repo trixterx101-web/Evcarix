@@ -22,6 +22,30 @@ class AutoEditor:
         self.font_bold    = self._load_font("bold",    72)
         self.font_regular = self._load_font("regular", 60)
 
+    def _apply_cinematic_effects(self, clip):
+        """v8.0: Reused Content Protection"""
+        import random
+        from moviepy.video.fx.all import speedx, lum_contrast, colorx
+        
+        # 1. Random Speed Variation (0.95x - 1.1x)
+        spd = random.uniform(0.95, 1.1)
+        clip = speedx(clip, factor=spd)
+        
+        # 2. Random Zoom (Slow zoom in or out)
+        zoom_speed = random.choice([0.02, 0.05, -0.02, -0.05])
+        def zoom_fn(t):
+            return 1.0 + (zoom_speed * t)
+        clip = clip.resize(zoom_fn)
+        
+        # 3. Subtle Color Grading / LUT fallback
+        color_shift = random.uniform(0.9, 1.1)
+        clip = colorx(clip, factor=color_shift)
+        
+        # 4. Lum/Contrast shift
+        clip = lum_contrast(clip, lum=random.randint(-5, 5), contrast=random.uniform(0.0, 0.1))
+        
+        return clip
+
     def _load_font(self, style="bold", size=60):
         bold_paths = [
             "fonts/Roboto-Bold.ttf",
@@ -181,6 +205,10 @@ class AutoEditor:
                     clip = clip.crop(x1=0, y1=y1, x2=w, y2=y1 + new_h)
 
                 clip = clip.resize((1080, 1920))
+                
+                # v8.0 Cinematic Effects
+                clip = self._apply_cinematic_effects(clip)
+                
                 clips.append(clip)
             except Exception as e:
                 print(f"[Editor] Klip hatası ({path}): {e}")
@@ -372,12 +400,12 @@ class AutoEditor:
         return output_path
 
     def generate_thumbnail(self, title: str, output_path: str,
-                           category="default", bg_image_path: str = None) -> str:
+                           category="default", bg_image_path: str = None, is_short: bool = False) -> str:
         """
         Gelişmiş premium thumbnail oluşturucu.
         """
         try:
-            from src.thumbnail_generator import ThumbnailGenerator
+            from .thumbnail_generator import ThumbnailGenerator
             gen = ThumbnailGenerator()
             # Extract a likely stat from title if possible, or leave blank
             stat = ""
@@ -387,7 +415,7 @@ class AutoEditor:
                 if match: stat = match.group(1)
             
             return gen.create(title=title, stat=stat, category=category, 
-                              output_path=output_path, bg_image_path=bg_image_path)
+                              output_path=output_path, bg_image_path=bg_image_path, is_short=is_short)
         except Exception as e:
             print(f"[Editor] Premium thumbnail hatası: {e}")
             return None
@@ -409,7 +437,7 @@ class AutoEditor:
         # Using 5 distinct AI images (5s each) for a dynamic intro.
         hook_video_path = None
         try:
-            from src.thumbnail_generator import ThumbnailGenerator
+            from .thumbnail_generator import ThumbnailGenerator
             tg = ThumbnailGenerator()
             clean_title = output_filename.replace("_", " ").replace(".mp4", "").upper()
             bg_hint = video_paths[0] if video_paths and os.path.exists(video_paths[0]) else None

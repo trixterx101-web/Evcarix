@@ -8,6 +8,8 @@ import requests
 import pandas as pd
 from datetime import timezone, timedelta
 from dotenv import load_dotenv
+from src.writer import call_gemini, call_openai, call_groq
+
 load_dotenv()
 
 try:
@@ -65,7 +67,6 @@ class TrendEngine:
             "fast charging impact battery health",
         ]
 
-        # Gemini
         self.gemini_api_keys = []
         if GEMINI_AVAILABLE:
             for i in range(1, 11):
@@ -76,12 +77,10 @@ class TrendEngine:
         self.gemini_client = None
         if GEMINI_AVAILABLE and self.gemini_api_keys:
             try:
-                # Default to first key for init, will switch in _llm_gemini if needed
                 self.gemini_client = genai.Client(api_key=self.gemini_api_keys[0])
             except Exception as e:
                 print(f"[TrendEngine] Gemini init hatası: {e}")
 
-        # Tüm LLM API key'leri
         self.groq_keys = [k for k in [
             os.getenv("GROQ_API_KEY"),
             os.getenv("GROQ_API_KEY_2"),
@@ -97,19 +96,15 @@ class TrendEngine:
     def _is_relevant(self, title: str) -> bool:
         """Check if video title is relevant to EV data topics."""
         title_lower = title.lower()
-        # Reject if any blocked term found
         for blocked in BLOCKED_TOPICS:
             if blocked in title_lower:
                 return False
-        # Accept if any allowed term found
         for allowed in ALLOWED_TOPICS:
             if allowed in title_lower:
                 return True
-        # Default: reject if no EV data keyword found
         return False
 
     def _pick_from_topic_pool(self) -> str | None:
-        """Randomly pick a topic from data/topics.csv as fallback."""
         try:
             topics_df = pd.read_csv("data/topics.csv")
             pool = topics_df["topic"].tolist()
@@ -119,7 +114,6 @@ class TrendEngine:
             pass
         return None
 
-    # ─── JSON Temizleyici ──────────────────────────────────────────
     def _clean_json(self, text: str) -> str:
         text = re.sub(r'```json\s*', '', text)
         text = re.sub(r'```\s*', '', text)
@@ -136,7 +130,6 @@ class TrendEngine:
             print(f"[TrendEngine] JSON parse hatası: {e}")
             return None
 
-    # ─── Konu Geçmişi ─────────────────────────────────────────────
     def _load_topic_history(self):
         if os.path.exists(TOPIC_HISTORY_FILE):
             try:
@@ -163,7 +156,6 @@ class TrendEngine:
                 return True
         return False
 
-    # ─── RSS Haberleri ─────────────────────────────────────────────
     def get_latest_news(self):
         news_items = []
         for url in self.feeds:
@@ -181,7 +173,6 @@ class TrendEngine:
                 print(f"Feed hatası ({url}): {e}")
         return pd.DataFrame(news_items)
 
-    # ─── YouTube Trending ──────────────────────────────────────────
     def get_youtube_trending(self, region_code="US", max_results=20):
         api_key = os.getenv("YOUTUBE_API_KEY")
         if not api_key:
@@ -246,12 +237,7 @@ class TrendEngine:
             print(f"[TrendEngine] YouTube EV arama hatası: {e}")
             return []
 
-    # ─── YENİ: Son X saatteki EV Short'ları ──────────────────────
     def get_recent_ev_shorts(self, hours_back=6, max_results=15):
-        """
-        YouTube Data API ile son X saatte yayınlanan EV Short videolarını bulur.
-        SADECE başlık + açıklama alır — görüntü/ses ALMAZ — telif riski SIFIR.
-        """
         api_key = os.getenv("YOUTUBE_API_KEY")
         if not api_key:
             print("[TrendEngine] YOUTUBE_API_KEY yok, recent EV shorts atlanıyor.")
@@ -328,9 +314,7 @@ class TrendEngine:
             print(f"[TrendEngine] get_recent_ev_shorts hatası: {e}")
             return []
 
-    # ─── YENİ: Çoklu LLM ile Script Üretimi ──────────────────────
     def _build_script_prompt(self, video_data: dict) -> tuple[str, str]:
-        """System prompt ve user prompt döndürür."""
         title = video_data.get("title", "")
         description = video_data.get("description", "")
         channel = video_data.get("channel", "")
@@ -361,89 +345,28 @@ Return ONLY this JSON (no markdown, no backticks):
         return system, user
 
     def _llm_gemini(self, system: str, user: str) -> dict | None:
-        """Gemini 2.0 Flash ile üret — Çoklu key desteği."""
-        if not GEMINI_AVAILABLE or not self.gemini_api_keys:
-            return None
-            
+        """Gemini 2.0 Flash ile üret — Çoklu key desteği (via llm_engine)."""
         prompt = f"{system}\n\n{user}"
-        
-        for key in self.gemini_api_keys:
-            try:
-                client = genai.Client(api_key=key)
-                resp = client.models.generate_content(
-                    model='gemini-2.0-flash',
-                    contents=prompt
-                )
-                if resp.text:
-                    return self._parse_json_safe(resp.text)
-            except Exception as e:
-                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                    print(f"[LLM] Gemini kota aşıldı, yedek key deneniyor...")
-                    continue
-                else:
-                    print(f"[LLM] Gemini hatası: {e}")
-                    continue
-        return None
-
-    def _llm_groq(self, system: str, user: str, model: str = "llama-3.3-70b-versatile") -> dict | None:
-        """Groq ile üret — birden fazla key desteği."""
-        if not self.groq_keys:
-            return None
-        try:
-            from groq import Groq
-        except ImportError:
-            print("[LLM] groq paketi yok: pip install groq")
-            return None
-
-        for key in self.groq_keys:
-            try:
-                client = Groq(api_key=key)
-                resp = client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": system},
-                        {"role": "user",   "content": user},
-                    ],
-                    max_tokens=600,
-                    temperature=0.7,
-                )
-                raw = resp.choices[0].message.content.strip()
-                result = self._parse_json_safe(raw)
-                if result:
-                    return result
-            except Exception as e:
-                print(f"[LLM] Groq ({model}) hatası: {e}")
-                continue
+        res = call_gemini(prompt)
+        if res:
+            return self._parse_json_safe(res)
         return None
 
     def _llm_openai(self, system: str, user: str) -> dict | None:
-        """ChatGPT (GPT-4o-mini) ile üret."""
-        if not self.openai_key:
-            return None
-        try:
-            headers = {
-                "Authorization": f"Bearer {self.openai_key}",
-                "Content-Type": "application/json",
-            }
-            data = {
-                "model": "gpt-4o-mini",
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user",   "content": user},
-                ],
-                "max_tokens": 600,
-                "temperature": 0.7,
-            }
-            r = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers=headers, json=data, timeout=30
-            )
-            r.raise_for_status()
-            raw = r.json()["choices"][0]["message"]["content"].strip()
-            return self._parse_json_safe(raw)
-        except Exception as e:
-            print(f"[LLM] OpenAI hatası: {e}")
-            return None
+        """ChatGPT ile üret (via llm_engine)."""
+        prompt = f"{system}\n\n{user}"
+        res = call_openai(prompt)
+        if res:
+            return self._parse_json_safe(res)
+        return None
+
+    def _llm_groq(self, system: str, user: str, model: str) -> dict | None:
+        """Groq ile üret (via llm_engine)."""
+        prompt = f"{system}\n\n{user}"
+        res = call_groq(prompt, model=model)
+        if res:
+            return self._parse_json_safe(res)
+        return None
 
     def _llm_openrouter(self, system: str, user: str) -> dict | None:
         """

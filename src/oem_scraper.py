@@ -476,6 +476,7 @@ class OEMScraper:
             return str(path)
 
         # 3 Retries with different User-Agents
+        r = None
         for i in range(3):
             try:
                 r = self._session.get(url, timeout=30, stream=True, headers=self._get_headers())
@@ -488,6 +489,7 @@ class OEMScraper:
         else:
             return None
 
+        try:
             ct = r.headers.get("content-type", "")
             if "video" not in ct and "octet-stream" not in ct:
                 return None

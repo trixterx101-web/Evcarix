@@ -150,14 +150,8 @@ class YouTubeUploader:
                 
                 # Upload thumbnail if specified
                 if thumbnail_path and video_id and os.path.exists(thumbnail_path):
-                    try:
-                        self.youtube.thumbnails().set(
-                            videoId=video_id,
-                            media_body=MediaFileUpload(thumbnail_path)
-                        ).execute()
-                        print(f"[Uploader] ✅ Thumbnail yüklendi: {thumbnail_path}")
-                    except Exception as e:
-                        print(f"[Uploader] ⚠️ Thumbnail hatası (devam ediliyor): {e}")
+                    # Use set_thumbnail for reliable retries (important for long videos)
+                    self.set_thumbnail(video_id, thumbnail_path)
                 
                 return video_id
             except (HttpError, ResumableUploadError) as e:

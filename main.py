@@ -9,6 +9,11 @@ from dotenv import load_dotenv
 # ABSOLUTE TOP LEVEL PRINT - Hiçbir kütüphane yüklenmeden önce
 print(">>> [SYSTEM] Python interpreter started main.py", flush=True)
 
+# Add project root to sys.path for robust imports
+project_root = os.path.dirname(os.path.abspath(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 load_dotenv()
 
 def log(msg):
