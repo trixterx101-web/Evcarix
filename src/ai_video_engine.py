@@ -1,35 +1,46 @@
-"""
-src/ai_video_engine.py — Evcarix Auto-Studio
-==========================================
-AI Video prompt generation and fallback management.
-"""
-
-import logging
+import os
 import random
+import requests
+import logging
+from pathlib import Path
 
 logger = logging.getLogger("AIVideoEngine")
 
 AI_PROMPT_TEMPLATES = [
-    "Cinematic {topic} driving in Norway winter, vertical 9:16, snow road, realistic EV dashboard, dramatic lighting, 8k",
-    "Close up of {topic} battery charging, futuristic neon lights, electricity flowing, technical data overlay, vertical",
-    "Futuristic EV city driving at night, cyberpunk aesthetic, rain on windshield, {topic} headlights, vertical 4k",
-    "POV driving of {topic} on a scenic mountain road, autumn colors, crisp 8k, smooth gimbal motion, vertical",
-    "Macro shot of electric motor spinning, copper coils, high tech machinery, {topic} engineering, vertical cinematic",
+    "Cinematic {topic} futuristic EV, neon lights, 4k, digital art",
+    "Close up {topic} battery tech, glowing circuits, cyberpunk",
+    "Futuristic electric car city driving, rainy night, synthwave",
+    "Minimalist {topic} interior, clean interface, white aesthetic",
+    "Technical schematic {topic}, blue holographic lines, 3d data"
 ]
 
 def generate_video_prompt(topic: str) -> str:
-    """
-    Konuya göre AI video üretimi için detaylı prompt hazırlar.
-    """
     template = random.choice(AI_PROMPT_TEMPLATES)
-    prompt = template.format(topic=topic)
-    logger.info(f"[AIVideo] Prompt üretildi: {prompt[:60]}...")
-    return prompt
+    return template.format(topic=topic)
 
-async def get_ai_fallback_clip(topic: str) -> str:
+async def generate_ai_video(prompt: str, video_type="short") -> str | None:
     """
-    Eğer gerçek video bulunamazsa AI prompt üretir (şimdilik mock).
+    v8.5: AI Video Generation / Artistic Fallback.
+    Şu an için özel 'Artistik' sorgularla stok sitelerinden en kaliteli sahneleri seçer.
+    Gelecekte buraya Luma/Haiper API anahtarları eklenebilir.
     """
-    prompt = generate_video_prompt(topic)
-    # Gelecekte Haiper/Luma API buraya gelecek
-    return None # Henüz indirme linki yok
+    logger.info(f"[AIVideo] Generating artistic scene for: {prompt[:50]}")
+    
+    # Gerçek bir AI Video API'si yoksa (Luma, Runway vb.), 
+    # stok sitelerindeki en artistik/fütüristik klipleri 'AI üretimi' gibi kullanırız.
+    try:
+        from src.media_engine import MediaEngine
+        me = MediaEngine()
+        
+        # Pexels'de 'artistic' ve 'futuristic' araması yap
+        search_query = f"futuristic {prompt.split(',')[0]}"
+        clips = me._download_from_pexels(search_query, "assets/temp_videos", 1, video_type=video_type)
+        
+        if clips:
+            logger.info(f"[AIVideo] Artistic clip acquired: {clips[0]}")
+            return clips[0]
+            
+        return None
+    except Exception as e:
+        logger.error(f"[AIVideo] AI generation hatası: {e}")
+        return None

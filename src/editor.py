@@ -23,28 +23,51 @@ class AutoEditor:
         self.font_regular = self._load_font("regular", 60)
 
     def _apply_cinematic_effects(self, clip):
-        """v8.0: Reused Content Protection"""
+        """v8.0: Reused Content Protection & Full Screen Zoom"""
         import random
         from moviepy.video.fx.all import speedx, lum_contrast, colorx
         
-        # 1. Random Speed Variation (0.95x - 1.1x)
-        spd = random.uniform(0.95, 1.1)
+        # 1. Random Speed Variation (0.98x - 1.05x) - More subtle for better audio sync
+        spd = random.uniform(0.98, 1.05)
         clip = speedx(clip, factor=spd)
         
-        # 2. Random Zoom (Slow zoom in or out)
-        zoom_speed = random.choice([0.02, 0.05, -0.02, -0.05])
+        # 2. Random Zoom (Always >= 1.0 to avoid black bars)
+        # Start at 1.02 and zoom in/out slightly within a safe range
+        zoom_range = random.uniform(0.04, 0.08)
+        direction = random.choice([1, -1]) # 1: zoom in, -1: zoom out
+        
         def zoom_fn(t):
-            return 1.0 + (zoom_speed * t)
+            if direction == 1:
+                return 1.0 + (zoom_range * (t / clip.duration))
+            else:
+                return (1.0 + zoom_range) - (zoom_range * (t / clip.duration))
+        
         clip = clip.resize(zoom_fn)
         
-        # 3. Subtle Color Grading / LUT fallback
-        color_shift = random.uniform(0.9, 1.1)
+        # 3. Subtle Color Grading
+        color_shift = random.uniform(0.95, 1.05)
         clip = colorx(clip, factor=color_shift)
         
         # 4. Lum/Contrast shift
-        clip = lum_contrast(clip, lum=random.randint(-5, 5), contrast=random.uniform(0.0, 0.1))
+        clip = lum_contrast(clip, lum=random.randint(-3, 3), contrast=random.uniform(0.0, 0.05))
         
         return clip
+
+    def _make_motion_background(self, duration, width=1920, height=1080):
+        """Creates a high-quality animated gradient background."""
+        def make_frame(t):
+            img = Image.new("RGB", (width, height), (10, 10, 20))
+            draw = ImageDraw.Draw(img)
+            # Animated gradient shift
+            shift = int(t * 50) % width
+            for x in range(0, width, 200):
+                draw.rectangle([x + shift - width if x + shift > width else x + shift, 0, 
+                                x + shift - width + 100 if x + shift > width else x + shift + 100, height], 
+                               fill=(20, 20, 40))
+            return np.array(img)
+        
+        from moviepy.editor import VideoClip
+        return VideoClip(make_frame, duration=duration)
 
     def _load_font(self, style="bold", size=60):
         bold_paths = [
@@ -350,7 +373,7 @@ class AutoEditor:
         output_path = os.path.join(self.output_dir, output_filename)
         os.makedirs(self.output_dir, exist_ok=True)
 
-        # HD Kalite export (8000k bitrate)
+        # HD Kalite export (8000k bitrate) - ULTRAFAST for speed
         final_video.write_videofile(
             output_path,
             fps=30,
@@ -359,7 +382,7 @@ class AutoEditor:
             bitrate="8000k",
             audio_bitrate="192k",
             threads=4,
-            preset="fast",
+            preset="ultrafast",
             logger="bar",
             ffmpeg_params=["-ac", "2", "-movflags", "+faststart"],
         )
@@ -645,7 +668,8 @@ class AutoEditor:
         os.makedirs(self.output_dir, exist_ok=True)
         final_video.write_videofile(
             output_full_path, fps=30, codec="libx264",
-            audio_codec="aac", preset="medium",
+            audio_codec="aac", preset="ultrafast",
+            threads=4, bitrate="8000k",
             ffmpeg_params=["-ac", "2"]
         )
         audio.close()
