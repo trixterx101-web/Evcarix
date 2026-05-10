@@ -136,54 +136,133 @@ def _llm_chain(prompt: str, fallback: str = "") -> str:
 # PUBLIC API
 # ─────────────────────────────────────────────────────────────────────────────
 
-def generate_title(topic: str, **kwargs) -> str:
-    prompt = f"Create ONE viral YouTube title for EV channel: {topic}. Max 60 chars. ONLY the title."
-    return _llm_chain(prompt, fallback=f"{topic} - EV Power")
+# ─────────────────────────────────────────────────────────────────────────────
+# PUBLIC API v8.5 (SEO & CTR Optimized)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
+    """Tek bir LLM çağrısı ile tüm SEO metadatayı (Title, Tags, Hook) üretir."""
+    brand_style = "Style: Data-driven, analytical, no-hype. Format: YouTube Professional."
+    
+    if is_long:
+        prompt = (
+            f"Generate SEO metadata for a 5-minute deep-dive EV video about: '{topic}'.\n"
+            f"{brand_style}\n"
+            "Return ONLY JSON:\n"
+            "{\n"
+            "  \"title\": \"Click-worthy but professional title (max 70 chars)\",\n"
+            "  \"tags\": [\"20 specific, ranked SEO tags\"],\n"
+            "  \"hook\": \"A shocking first sentence for the description\",\n"
+            "  \"keywords\": [\"5 main keywords\"]\n"
+            "}"
+        )
+    else:
+        prompt = (
+            f"Generate SEO metadata for a YouTube Short about: '{topic}'.\n"
+            f"{brand_style}\n"
+            "Return ONLY JSON:\n"
+            "{\n"
+            "  \"title\": \"Viral short title with a specific number (max 60 chars)\",\n"
+            "  \"tags\": [\"15 trending EV tags\"],\n"
+            "  \"hook\": \"Punchy opening line\"\n"
+            "}"
+        )
+    
+    res = _llm_chain(prompt)
+    try:
+        match = re.search(r'\{.*\}', res, re.DOTALL)
+        if match: return json.loads(match.group(0))
+    except: pass
+    return {"title": f"{topic} - Reality Check", "tags": ["ev", "electric car"], "hook": "The truth about EVs."}
 
 def generate_script(topic: str, duration_s: int = 40, is_long: bool = False, **kwargs) -> dict:
-    words = int(duration_s * 2.5)
-    if is_long:
-        prompt = f"Write a {duration_s}-second deep dive YouTube video script (~{words} words) about: {topic}. Break it down into sections. No hashtags. Professional and informative tone."
-    else:
-        prompt = f"Write a {duration_s}-second YouTube Shorts voiceover (~{words} words) about: {topic}. No hashtags. Viral and punchy tone."
+    words = int(duration_s * 2.4) # Slightly slower for clarity
+    tone = "Style: No hype. Just numbers. Fact-first. Start with 'Welcome to EV-care-icks.' and end with 'Subscribe to EV-care-icks for real EV data.'"
     
-    script = _llm_chain(prompt, fallback=f"Check out the {topic}! Subscribe for more EV data.")
-    return {"script": script, "voice": "female"}
-
-def generate_description(topic: str, title: str, tags_list: list, is_long: bool = False, **kwargs) -> str:
-    hashtags = " ".join(f"#{t.replace(' ', '')}" for t in tags_list[:10])
     if is_long:
-        return f"{title}\n\nIn this video, we dive deep into {topic}.\n\nTimestamps:\n0:00 Intro\n1:30 Deep Analysis\n3:00 Conclusion\n\n{hashtags}"
-    return f"{title}\n\n{topic}\n\n{hashtags}"
-
-def generate_tags(topic: str, *args, **kwargs) -> list:
-    prompt = f"Generate 10 YouTube tags for: {topic}. Return ONLY JSON list."
-    res = call_openrouter(prompt) or '["ev", "tesla"]'
-    try:
-        # Regex to find JSON list if LLM adds text
-        match = re.search(r'\[.*\]', res, re.DOTALL)
-        if match:
-            return json.loads(match.group(0))
-        return json.loads(res)
-    except:
-        return ["ev", "electric car"]
+        prompt = (
+            f"Write a professional {duration_s}-second deep-dive script (~{words} words) about: {topic}.\n"
+            f"{tone}\n"
+            "Structure: Hook -> Data Analysis -> Expert Insight -> Conclusion.\n"
+            "Output ONLY the script text."
+        )
+    else:
+        prompt = (
+            f"Write a viral {duration_s}-second YouTube Shorts script (~{words} words) about: {topic}.\n"
+            f"{tone}\n"
+            "Use specific percentages and kWh values.\n"
+            "Output ONLY the script text."
+        )
+    
+    script = _llm_chain(prompt, fallback=f"Welcome to EV-care-icks. Today we analyze {topic}. Subscribe for real data.")
+    return {"script": script, "voice": "male" if is_long else "female"}
 
 class CreativeWriter:
     def generate_short_content(self, topic: str):
-        title = generate_title(topic)
-        script_data = generate_script(topic, duration_s=45)
-        tags = generate_tags(topic)
-        desc = generate_description(topic, title, tags)
-        return {"title": title, "script": script_data["script"], "voice": script_data["voice"], "tags": tags, "description": desc}
+        meta = generate_seo_metadata(topic, is_long=False)
+        script_data = generate_script(topic, duration_s=45, is_long=False)
+        
+        # Tag temizliği ve 500 karakter sınırı
+        raw_tags = meta.get("tags", ["ev", "electric car", "evcarix"])
+        final_tags = self._clean_tags(raw_tags)
+        
+        desc = (
+            f"{meta['title']}\n\n"
+            f"📊 {meta['hook']}\n\n"
+            "Real EV data. No hype. Just numbers. — Evcarix\n\n"
+            f"{' '.join(['#' + t.replace(' ', '') for t in final_tags[:10]])}"
+        )
+        
+        return {
+            "title": meta['title'],
+            "script": script_data["script"],
+            "voice": script_data["voice"],
+            "tags": final_tags,
+            "description": desc,
+            "category": "short"
+        }
     
     def generate_long_content(self, topic: str, duration_s: int = 240):
-        title = generate_title(topic)
+        meta = generate_seo_metadata(topic, is_long=True)
         script_data = generate_script(topic, duration_s=duration_s, is_long=True)
-        tags = generate_tags(topic)
-        desc = generate_description(topic, title, tags, is_long=True)
-        return {"title": title, "script": script_data["script"], "voice": "male", "tags": tags, "description": desc}
-    
-    def generate_title(self, topic, **kwargs): return [generate_title(topic)]
-    def generate_script(self, topic, **kwargs): return generate_script(topic, **kwargs)
-    def generate_tags(self, topic, title, **kwargs): return generate_tags(topic)
-    def generate_description(self, **kwargs): return generate_description(kwargs.get('topic'), kwargs.get('title'), kwargs.get('tags_list', []))
+        
+        final_tags = self._clean_tags(meta.get("tags", []))
+        
+        # Long description with timestamps
+        desc = (
+            f"{meta['title']}\n\n"
+            f"💡 {meta['hook']}\n\n"
+            "In this deep-dive report, we analyze the raw data behind electric vehicle technology.\n\n"
+            "📌 Timestamps:\n"
+            "0:00 Introduction & Data Hook\n"
+            "1:15 Deep Dive Analysis\n"
+            "3:30 Final Verdict & Summary\n"
+            "4:45 Conclusion\n\n"
+            "No hype. Just numbers. Join the Evcarix community.\n\n"
+            f"{' '.join(['#' + t.replace(' ', '') for t in final_tags[:12]])}"
+        )
+        
+        return {
+            "title": meta['title'],
+            "script": script_data["script"],
+            "voice": "male",
+            "tags": final_tags,
+            "description": desc,
+            "category": "long"
+        }
+
+    def _clean_tags(self, tags: list) -> list:
+        """Tags limitine (500 char) ve kaliteye dikkat eder."""
+        must_have = ["evcarix", "EV", "ElectricVehicle", "Shorts"]
+        cleaned = []
+        for t in must_have: cleaned.append(t)
+        
+        current_len = sum(len(t) + 2 for t in cleaned)
+        for t in tags:
+            tag = re.sub(r'[^a-zA-Z0-9\s]', '', str(t)).strip()
+            if len(tag) < 2 or tag.lower() in [c.lower() for c in cleaned]:
+                continue
+            if current_len + len(tag) + 2 < 480:
+                cleaned.append(tag)
+                current_len += len(tag) + 2
+        return cleaned[:40]
