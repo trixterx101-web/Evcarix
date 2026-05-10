@@ -187,18 +187,21 @@ class EvcarixOrchestrator:
             print("\n[6/6] YouTube'a yükleniyor...", flush=True)
             print("      ⚠️  Thumbnail manuel eklenecek, atlanıyor.", flush=True)
             try:
+                thumb_path = thumbnail_path if (thumbnail_path and os.path.exists(thumbnail_path)) else None
                 video_id = self.uploader.upload_video(
                     file_path=final_video_path,
                     title=title,
                     description=description,
                     tags=tags,
                     playlist_name="Short Video",
-                    thumbnail_path=thumbnail_path if thumb_exists else None
+                    thumbnail_path=thumb_path
                 )
                 print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
                 print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
             except Exception as e:
-                print(f"      ❌ YouTube yükleme hatası: {e}")
+                print(f"      ❌ YouTube yükleme hatası: {e}", flush=True)
+                if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
+                    raise
         else:
             print("\n[6/6] Uploader pasif veya video yok, yükleme atlandı.", flush=True)
 
@@ -289,18 +292,21 @@ class EvcarixOrchestrator:
             print("\n[7/7] YouTube'a yükleniyor (Long-form)...", flush=True)
             print("      ⚠️  Thumbnail manuel eklenecek, atlanıyor.", flush=True)
             try:
+                thumb_path = thumbnail_path if (thumbnail_path and os.path.exists(thumbnail_path)) else None
                 video_id = self.uploader.upload_video(
                     file_path=final_video_path,
                     title=title,
                     description=description,
                     tags=tags,
                     playlist_name="EV Data Reports",
-                    thumbnail_path=thumbnail_path if thumb_exists else None
+                    thumbnail_path=thumb_path
                 )
                 print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
                 print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
             except Exception as e:
-                print(f"      ❌ YouTube yükleme hatası: {e}")
+                print(f"      ❌ YouTube yükleme hatası: {e}", flush=True)
+                if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
+                    raise
         else:
             print("\n[7/7] Uploader pasif veya video yok, yükleme atlandı.", flush=True)
 
