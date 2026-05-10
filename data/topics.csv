@@ -1,68 +1,68 @@
 id,category_id,category_title,topic,priority
-1,battery,Pil Bilimi & Teknoloji,LFP vs NMC vs NCA — gerçek dünya farkı,high
-2,battery,Pil Bilimi & Teknoloji,Solid-state pil: gerçekçi zaman çizelgesi,high
-3,battery,Pil Bilimi & Teknoloji,Pil degradasyon bilimi nasıl çalışır?,high
-4,battery,Pil Bilimi & Teknoloji,BMS (Pil Yönetim Sistemi) tam açıklama,medium
-5,battery,Pil Bilimi & Teknoloji,Pil ısıtma sistemleri karşılaştırması,high
-6,battery,Pil Bilimi & Teknoloji,Şarj döngüsü gerçekte nedir?,medium
-7,battery,Pil Bilimi & Teknoloji,Sıcak hava pilin ömrünü nasıl etkiler?,high
-8,battery,Pil Bilimi & Teknoloji,Pil kalibrasyon miti — doğru mu?,medium
-9,battery,Pil Bilimi & Teknoloji,1 milyon km LFP — veri analizi,high
-10,range,Menzil & Verimlilik Testleri,Kış menzil kaybı — tam veri seti,high
-11,range,Menzil & Verimlilik Testleri,Yaz vs kış menzil karşılaştırması,high
-12,range,Menzil & Verimlilik Testleri,Otoyol vs şehir menzil farkı,high
-13,range,Menzil & Verimlilik Testleri,Klima menzili yüzde kaç düşürür?,medium
-14,range,Menzil & Verimlilik Testleri,Hız ve menzil ilişkisi — eğri analizi,medium
-15,range,Menzil & Verimlilik Testleri,EV tüketim dökümleri (kWh/100km),high
-16,range,Menzil & Verimlilik Testleri,Rejeneratif frenleme ne kadar katkı sağlar?,medium
-17,range,Menzil & Verimlilik Testleri,Araç ağırlığı ve menzil ilişkisi,new
-18,range,Menzil & Verimlilik Testleri,Sürüş stili verimliliği nasıl etkiler?,medium
-19,charging,Şarj Teknolojisi,800V vs 400V — gerçek fark ne?,high
-20,charging,Şarj Teknolojisi,Hızlı şarj pili gerçekten mahveder mi?,high
-21,charging,Şarj Teknolojisi,CCS vs CHAdeMO vs Tesla — durum 2026,high
-22,charging,Şarj Teknolojisi,Şarj güç kaybı — kablo uzunluğu etkisi,new
-23,charging,Şarj Teknolojisi,Bi-directional şarj (V2G/V2H) gerçekçi mi?,new
-24,charging,Şarj Teknolojisi,Ev şarjı vs hızlı şarj maliyet analizi,high
-25,charging,Şarj Teknolojisi,Şarj ağı güvenilirlik testi — Avrupa,high
-26,charging,Şarj Teknolojisi,Güneş enerjisi + EV kombinasyonu hesabı,new
-27,charging,Şarj Teknolojisi,Geceleri şarj vs gündüz şarj,medium
-28,ownership,Sahiplik Maliyeti,5 yılda toplam EV vs dizel maliyeti,high
-29,ownership,Sahiplik Maliyeti,İkinci el EV değer kaybı verileri,high
-30,ownership,Sahiplik Maliyeti,Sigorta maliyeti gerçekten daha mı yüksek?,high
-31,ownership,Sahiplik Maliyeti,EV bakım maliyeti: fren - lastik - servis,high
-32,ownership,Sahiplik Maliyeti,Batarya değiştirme maliyeti 2026,medium
-33,ownership,Sahiplik Maliyeti,100.000+ km sonrası gerçek kullanıcı verileri,high
-34,ownership,Sahiplik Maliyeti,Yazılım güncellemesi performansı etkiler mi?,medium
-35,ownership,Sahiplik Maliyeti,Fren sistemi ömrü — EV avantajı,medium
-36,ownership,Sahiplik Maliyeti,Garanti gerçekte ne kapsar?,high
-37,comparison,Araç Karşılaştırmaları,Aynı segmentte EV karşılaştırması — sadece veri,high
-38,comparison,Araç Karşılaştırmaları,Platform mimarisi farkları gerçekte ne değiştirir?,medium
-39,comparison,Araç Karşılaştırmaları,70 araç — 2 indeks: büyük vs küçük analizi,high
-40,comparison,Araç Karşılaştırmaları,Motor tipi: tek eksen vs çift eksen veri,medium
-41,comparison,Araç Karşılaştırmaları,Bütçe EV karşılaştırması — 30.000 Euro altı,new
-42,comparison,Araç Karşılaştırmaları,Aile arabası: EV hangisi daha iyi?,new
-43,comparison,Araç Karşılaştırmaları,SUV menzil karşılaştırması — gerçek test,high
-44,comparison,Araç Karşılaştırmaları,Amerika pazarında EV seçim rehberi,new
-45,market,Pazar & Sektör Verileri,Ülkeye göre EV adaptasyon istatistikleri,new
-46,market,Pazar & Sektör Verileri,Marka pazar payı değişimi — 2024 vs 2025,new
-47,market,Pazar & Sektör Verileri,Çin EV markaları Avrupa'ya geliyor — veri,high
-48,market,Pazar & Sektör Verileri,EV satışları neden yavaşladı? — analiz,high
-49,market,Pazar & Sektör Verileri,Teşvik kaldırıldığında ne olur? — veri,medium
-50,market,Pazar & Sektör Verileri,EV fiyat deflasyonu — trend analizi,new
-51,market,Pazar & Sektör Verileri,İkinci el pazar büyüklüğü ve fırsatlar,new
-52,infrastructure,Altyapı & Şebeke,Şarj istasyonu güvenilirlik testi — sonuçlar,high
-53,infrastructure,Altyapı & Şebeke,Amerika şarj altyapısı haritası ve eksikler,new
-54,infrastructure,Altyapı & Şebeke,Apartman şarjı — çözümler ve maliyetler,new
-55,infrastructure,Altyapı & Şebeke,Şarj süresi hesaplama aracı,medium
-56,infrastructure,Altyapı & Şebeke,EV şebekeyi çöker mi? — gerçek hesap,high
-57,infrastructure,Altyapı & Şebeke,Yenilenebilir + EV kombinasyonu analizi,new
-58,infrastructure,Altyapı & Şebeke,Akıllı şarj (smart charging) nedir - fark eder mi?,medium
-59,education,Eğitim & Teknik Açıklamalar,Isı pompası nasıl çalışır — görsel açıklama,high
-60,education,Eğitim & Teknik Açıklamalar,PTC vs ısı pompası tam karşılaştırma,high
-61,education,Eğitim & Teknik Açıklamalar,One-pedal sürüş nasıl çalışır?,medium
-62,education,Eğitim & Teknik Açıklamalar,EV termal yönetim sistemi açıklaması,medium
-63,education,Eğitim & Teknik Açıklamalar,Sürüklenme (drag) ve menzil ilişkisi,new
-64,education,Eğitim & Teknik Açıklamalar,Şarj eğrisi neden düşer? — teknik açıklama,high
-65,education,Eğitim & Teknik Açıklamalar,SOH (State of Health) nedir - nasıl ölçülür?,medium
-66,education,Eğitim & Teknik Açıklamalar,EV inverter teknolojisi açıklaması,new
-67,education,Eğitim & Teknik Açıklamalar,WLTP vs EPA vs gerçek menzil farkı,high
+1,battery,Battery Science & Tech,LFP vs NMC vs NCA — real world difference,high
+2,battery,Battery Science & Tech,Solid-state batteries: realistic timeline,high
+3,battery,Battery Science & Tech,How battery degradation science works,high
+4,battery,Battery Science & Tech,BMS (Battery Management System) explained,medium
+5,battery,Battery Science & Tech,Battery heating systems comparison,high
+6,battery,Battery Science & Tech,What is a charge cycle actually?,medium
+7,battery,Battery Science & Tech,How hot weather affects battery life,high
+8,battery,Battery Science & Tech,Battery calibration myth — is it true?,medium
+9,battery,Battery Science & Tech,1 million km LFP — data analysis,high
+10,range,Range & Efficiency Tests,Winter range loss — full dataset,high
+11,range,Range & Efficiency Tests,Summer vs winter range comparison,high
+12,range,Range & Efficiency Tests,Highway vs city range difference,high
+13,range,Range & Efficiency Tests,How much does AC drop the range?,medium
+14,range,Range & Efficiency Tests,Speed and range relationship — curve analysis,medium
+15,range,Range & Efficiency Tests,EV consumption breakdowns (kWh/100km),high
+16,range,Range & Efficiency Tests,How much does regenerative braking contribute?,medium
+17,range,Range & Efficiency Tests,Vehicle weight and range relationship,new
+18,range,Range & Efficiency Tests,How driving style affects efficiency,medium
+19,charging,Charging Technology,800V vs 400V — what is the real difference?,high
+20,charging,Charging Technology,Does fast charging really destroy the battery?,high
+21,charging,Charging Technology,CCS vs CHAdeMO vs Tesla — status 2026,high
+22,charging,Charging Technology,Charging power loss — cable length effect,new
+23,charging,Charging Technology,Is bi-directional charging (V2G/V2H) realistic?,new
+24,charging,Charging Technology,Home charging vs fast charging cost analysis,high
+25,charging,Charging Technology,Charging network reliability test — Europe & US,high
+26,charging,Charging Technology,Solar energy + EV combination calculation,new
+27,charging,Charging Technology,Charging at night vs charging during the day,medium
+28,ownership,Cost of Ownership,Total EV vs diesel cost over 5 years,high
+29,ownership,Cost of Ownership,Second hand EV depreciation data,high
+30,ownership,Cost of Ownership,Is insurance cost really higher?,high
+31,ownership,Cost of Ownership,EV maintenance cost: brakes - tires - service,high
+32,ownership,Cost of Ownership,Battery replacement cost 2026,medium
+33,ownership,Cost of Ownership,Real user data after 100,000+ km,high
+34,ownership,Cost of Ownership,Do software updates affect performance?,medium
+35,ownership,Cost of Ownership,Brake system life — EV advantage,medium
+36,ownership,Cost of Ownership,What does the warranty actually cover?,high
+37,comparison,Vehicle Comparisons,Segment-based EV comparison — data only,high
+38,comparison,Vehicle Comparisons,Platform architecture differences — what changes?,medium
+39,comparison,Vehicle Comparisons,70 vehicles — 2 indices: large vs small analysis,high
+40,comparison,Vehicle Comparisons,Motor type: single axis vs dual axis data,medium
+41,comparison,Vehicle Comparisons,Budget EV comparison — under 30,000 USD,new
+42,comparison,Vehicle Comparisons,Family car: Which EV is better?,new
+43,comparison,Vehicle Comparisons,SUV range comparison — real world test,high
+44,comparison,Vehicle Comparisons,EV buyer's guide for the US market,new
+45,market,Market & Industry Data,EV adoption statistics by country,new
+46,market,Market & Industry Data,Brand market share change — 2024 vs 2025,new
+47,market,Market & Industry Data,Chinese EV brands coming to Europe — data,high
+48,market,Market & Industry Data,Why did EV sales slow down? — analysis,high
+49,market,Market & Industry Data,What happens when incentives are removed? — data,medium
+50,market,Market & Industry Data,EV price deflation — trend analysis,new
+51,market,Market & Industry Data,Second hand market size and opportunities,new
+52,infrastructure,Infrastructure & Grid,Charging station reliability test — results,high
+53,infrastructure,Infrastructure & Grid,US charging infrastructure map and gaps,new
+54,infrastructure,Infrastructure & Grid,Apartment charging — solutions and costs,new
+55,infrastructure,Infrastructure & Grid,Charging time calculation tool,medium
+56,infrastructure,Infrastructure & Grid,Will EVs crash the grid? — real calculation,high
+57,infrastructure,Infrastructure & Grid,Renewable + EV combination analysis,new
+58,infrastructure,Infrastructure & Grid,What is smart charging - does it matter?,medium
+59,education,Education & Tech Explanations,How heat pump works — visual explanation,high
+60,education,Education & Tech Explanations,PTC vs heat pump full comparison,high
+61,education,Education & Tech Explanations,How one-pedal driving works?,medium
+62,education,Education & Tech Explanations,EV thermal management system explanation,medium
+63,education,Education & Tech Explanations,Drag and range relationship,new
+64,education,Education & Tech Explanations,Why does the charging curve drop? — technical,high
+65,education,Education & Tech Explanations,What is SOH (State of Health) - how to measure?,medium
+66,education,Education & Tech Explanations,EV inverter technology explanation,new
+67,education,Education & Tech Explanations,WLTP vs EPA vs real range difference,high

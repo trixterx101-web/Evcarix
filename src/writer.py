@@ -142,17 +142,18 @@ def _llm_chain(prompt: str, fallback: str = "") -> str:
 
 def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
     """Tek bir LLM çağrısı ile tüm SEO metadatayı (Title, Tags, Hook) üretir."""
-    brand_style = "Style: Data-driven, analytical, no-hype. Format: YouTube Professional."
+    brand_style = "Style: Data-driven, analytical, no-hype. Language: ALWAYS US ENGLISH. Tone: Global Professional."
     
     if is_long:
         prompt = (
             f"Generate SEO metadata for a 5-minute deep-dive EV video about: '{topic}'.\n"
             f"{brand_style}\n"
+            "CRITICAL: USE US ENGLISH ONLY. Focus on Global/USA/Europe/China data.\n"
             "Return ONLY JSON:\n"
             "{\n"
-            "  \"title\": \"Click-worthy but professional title (max 70 chars)\",\n"
-            "  \"tags\": [\"20 specific, ranked SEO tags\"],\n"
-            "  \"hook\": \"A shocking first sentence for the description\",\n"
+            "  \"title\": \"Click-worthy professional title in US English (max 70 chars)\",\n"
+            "  \"tags\": [\"20 specific, ranked US English SEO tags\"],\n"
+            "  \"hook\": \"A shocking first sentence for the description in US English\",\n"
             "  \"keywords\": [\"5 main keywords\"]\n"
             "}"
         )
@@ -160,11 +161,12 @@ def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
         prompt = (
             f"Generate SEO metadata for a YouTube Short about: '{topic}'.\n"
             f"{brand_style}\n"
+            "CRITICAL: USE US ENGLISH ONLY. Viral global style.\n"
             "Return ONLY JSON:\n"
             "{\n"
-            "  \"title\": \"Viral short title with a specific number (max 60 chars)\",\n"
-            "  \"tags\": [\"15 trending EV tags\"],\n"
-            "  \"hook\": \"Punchy opening line\"\n"
+            "  \"title\": \"Viral US English short title with numbers (max 60 chars)\",\n"
+            "  \"tags\": [\"15 trending US English EV tags\"],\n"
+            "  \"hook\": \"Punchy opening line in US English\"\n"
             "}"
         )
     
@@ -177,13 +179,14 @@ def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
 
 def generate_script(topic: str, duration_s: int = 40, is_long: bool = False, **kwargs) -> dict:
     words = int(duration_s * 2.4) # Slightly slower for clarity
-    tone = "Style: No hype. Just numbers. Fact-first. Start with 'Welcome to EV-care-icks.' and end with 'Subscribe to EV-care-icks for real EV data.'"
+    tone = "Style: No hype. Just numbers. Fact-first. Language: MANDATORY US ENGLISH. Start with 'Welcome to EV-care-icks.' and end with 'Subscribe to EV-care-icks for real EV data.'"
     
     if is_long:
         prompt = (
             f"Write a professional {duration_s}-second deep-dive script (~{words} words) about: {topic}.\n"
             f"{tone}\n"
             "Structure: Hook -> Data Analysis -> Expert Insight -> Conclusion.\n"
+            "CRITICAL: USE US ENGLISH ONLY. GLOBAL PERSPECTIVE ONLY.\n"
             "Output ONLY the script text."
         )
     else:
@@ -191,6 +194,7 @@ def generate_script(topic: str, duration_s: int = 40, is_long: bool = False, **k
             f"Write a viral {duration_s}-second YouTube Shorts script (~{words} words) about: {topic}.\n"
             f"{tone}\n"
             "Use specific percentages and kWh values.\n"
+            "CRITICAL: USE US ENGLISH ONLY. GLOBAL PERSPECTIVE ONLY.\n"
             "Output ONLY the script text."
         )
     
