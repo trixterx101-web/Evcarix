@@ -37,27 +37,36 @@ class YouTubeUploader:
                     print("[Uploader] ✅ Token başarıyla yenilendi.", flush=True)
                 except Exception as e:
                     print(f"[Uploader] ❌ Token yenileme hatası: {e}", flush=True)
-                    if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
-                        raise Exception(f"CI ortamında token yenilenemedi: {e}")
+                    print("[Uploader] 🔑 Lütfen yerelinizde giriş yapıp yeni token.json içeriğini GitHub Secret'a (YOUTUBE_TOKEN_JSON) ekleyin.", flush=True)
+                    return None # Kimlik doğrulama başarısız
             else:
-                # CI/CD ortamında bu aşamaya gelmemeli
+                # CI/CD ortamında tarayıcı açılamaz
                 if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
                     print("[Uploader] ❌ Gerekli token.json bulunamadı veya geçersiz!", flush=True)
-                    print("Lütfen yerelinizde 'refresh_token.py' çalıştırıp çıkan JSON'ı secret'a ekleyin.", flush=True)
-                    raise Exception("GitHub Actions ortamında geçerli token.json bulunamadı!")
+                    return None
                 
                 print("[Uploader] 🔑 Tarayıcı üzerinden giriş yapılması bekleniyor...", flush=True)
                 flow = InstalledAppFlow.from_client_secrets_file(self.client_secrets_file, self.scopes)
                 creds = flow.run_local_server(port=0)
+        
+        if not creds:
+            return None
             
             # Gelecek kullanım için sakla
+        if not creds:
+            return None
+            
         try:
             with open(token_file, "w") as token:
                 token.write(creds.to_json())
         except Exception as e:
             print(f"[Uploader] ⚠️ token.json yazılamadı: {e}", flush=True)
         
-        return build("youtube", "v3", credentials=creds)
+        try:
+            return build("youtube", "v3", credentials=creds)
+        except Exception as e:
+            print(f"[Uploader] ❌ YouTube servisi oluşturulamadı: {e}", flush=True)
+            return None
 
     def upload_video(self, file_path, title, description, tags, category_id="2", max_retries=3,
                   playlist_name: str = None, thumbnail_path: str = None):

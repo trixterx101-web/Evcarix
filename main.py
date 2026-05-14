@@ -61,13 +61,10 @@ class EvcarixOrchestrator:
                 self.uploader = YouTubeUploader(secret_path)
                 log("[Uploader] YouTube Uploader basariyla baslatildi.")
             except Exception as e:
-                log(f"[Uploader] YouTube Uploader baslatilamadi: {e}")
-                if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
-                    raise Exception(f"YouTube uploader başlatılamadı: {e}")
-        else:
-            log("[Uploader] client_secret.json bulunamadi.")
-            if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
-                raise FileNotFoundError("GitHub Actions ortamında client_secret.json eksik!")
+                log(f"[Uploader] YouTube uploader başlatılamadı: {e}")
+                log("[Uploader] ⚠️ UYARI: Video üretilecek ancak otomatik yükleme yapılmayacak.")
+                # CI ortamında bile artık raise etmiyoruz, video üretilsin ki artifact'tan alınabilsin.
+                self.uploader = None
 
     async def run_daily_shorts_workflow(self):
         # ── Zaman damgası & slot bilgisi ──────────────────────────
@@ -126,7 +123,7 @@ class EvcarixOrchestrator:
                 thumbnail_path = lip_sync_result["thumbnail"]
                 
                 # Upload to YouTube
-                if self.uploader and os.path.exists(final_video_path):
+                if self.uploader and self.uploader.youtube and os.path.exists(final_video_path):
                     print("\n[6/6] YouTube'a yükleniyor...", flush=True)
                     try:
                         video_id = self.uploader.upload_video(
@@ -183,7 +180,7 @@ class EvcarixOrchestrator:
         thumbnail_path = None
 
         # ── 6. YouTube Yükleme ─────────────────────────────────────────
-        if self.uploader and os.path.exists(final_video_path):
+        if self.uploader and self.uploader.youtube and os.path.exists(final_video_path):
             print("\n[6/6] YouTube'a yükleniyor...", flush=True)
             print("      ⚠️  Thumbnail manuel eklenecek, atlanıyor.", flush=True)
             try:
@@ -319,7 +316,7 @@ class EvcarixOrchestrator:
         # Bu aşama writer.py içinde description üretilirken hallediliyor
 
         # ── 7. YouTube Yükleme ─────────────────────────────────────────
-        if self.uploader and os.path.exists(final_video_path):
+        if self.uploader and self.uploader.youtube and os.path.exists(final_video_path):
             print("\n[7/7] YouTube'a yükleniyor (Long-form)...", flush=True)
             print("      ⚠️  Thumbnail manuel eklenecek, atlanıyor.", flush=True)
             try:
