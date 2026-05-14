@@ -8,6 +8,7 @@ import time
 import logging
 from pathlib import Path
 from .voice_engine import VoiceEngine
+from .free_media_aggregator import FreeMediaAggregator
 
 logger = logging.getLogger("MediaEngine")
 
@@ -73,6 +74,7 @@ class MediaEngine:
         self.pexels_api_key = os.getenv("PEXELS_API_KEY")
         self.pixabay_api_key = os.getenv("PIXABAY_API_KEY")
         self.voice_engine = VoiceEngine()
+        self.aggregator = FreeMediaAggregator()
 
         Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
         Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
@@ -121,11 +123,19 @@ class MediaEngine:
 
     # ── Ana Video Toplama ────────────────────────────────────────────────────
     async def download_stock_videos(self, plan=None, target_clip_count=6, topic=None):
-        """v9.0 Pipeline: EV-Only Zero-Repetition Acquisition"""
-        # CI ortamında hızı artırmak için klip sayısını düşür
-        if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
+        """v10.0 Pipeline: Exhaustive Multi-Source Acquisition"""
+        video_type = plan.get("video_type", "short") if plan else "short"
+        
+        # CI ortamında Shorts için hızı artırmak için klip sayısını düşür, 
+        # ama Long videolar için asla düşürme (tekrarı önlemek için)
+        if (os.getenv("CI") or os.getenv("GITHUB_ACTIONS")) and video_type == "short":
             target_clip_count = min(target_clip_count, 4)
-            print(f"[MediaEngine] CI Hız Modu: Hedef klip sayısı {target_clip_count} olarak ayarlandı.")
+            print(f"[MediaEngine] CI Shorts Hız Modu: Hedef klip sayısı {target_clip_count} olarak ayarlandı.")
+        
+        if video_type == "long":
+            # Long videolar için daha fazla klip gerekiyor (4-6 dakika için ~60-100 klip)
+            target_clip_count = max(target_clip_count, 60)
+            print(f"[MediaEngine] Long Video Modu: Hedef klip sayısı {target_clip_count} olarak ayarlandı.")
         
         from src.pixabay_engine import search_pixabay_videos
         from src.ai_video_engine import generate_video_prompt, generate_ai_video
@@ -159,32 +169,49 @@ class MediaEngine:
         except Exception as e:
             logger.error(f"[MediaEngine] FF hatası: {e}")
 
-        # 2. Pexels (EV-only sorgular)
-        for q in query_pool:
-            if len(all_clips) >= (ff_target + px_target) * 2:
-                break
-            new = self._download_from_pexels(q, OUTPUT_DIR, px_target, video_type=video_type)
-            # URL'yi dosya adından kontrol et
-            new = [c for c in new if c and self._is_ev_relevant(c)]
-            all_clips.extend(new)
+        # ── EXHAUSTIVE FETCHING ──
+        # Tüm kaynaklardan sırayla ve bıkmadan indir
+        topic_text = topic or (plan.get("topic") if plan else "electric vehicle")
+        
+        # Birden fazla sorgu dene ki çeşitlilik artsın (Core konulara özel zenginleştirme)
+        search_queries = [topic_text]
+        topic_lower = topic_text.lower()
+        
+        if "artificial intelligence" in topic_lower or "ai" in topic_lower:
+            search_queries.extend(["digital brain technology", "neural network animation", "artificial intelligence future"])
+        elif "robotics" in topic_lower or "robot" in topic_lower:
+            search_queries.extend(["industrial robot arm", "humanoid robot walking", "robotic technology factory"])
+        elif "smart cities" in topic_lower:
+            search_queries.extend(["futuristic city night", "smart city technology", "connected city traffic"])
+        elif "battery" in topic_lower:
+            search_queries.extend(["lithium battery production", "battery cells laboratory", "electric vehicle battery pack"])
+        elif "new technologies" in topic_lower or "future" in topic_lower:
+            search_queries.extend(["futuristic technology 4k", "advanced science laboratory", "high tech innovation"])
+        elif topic:
+            # Genel zenginleştirme
+            search_queries.append(topic.split()[0] + " technology")
+            search_queries.append("futuristic " + topic.split()[-1])
+        
+        for q in search_queries:
+            if len(all_clips) >= target_clip_count: break
+            logger.info(f"[MediaEngine] Fetching from aggregator for: {q}")
+            agg_clips = await self.aggregator.get_all_media(q, count=target_clip_count - len(all_clips), video_type=video_type)
+            all_clips.extend(agg_clips)
 
-        # 3. Pixabay (EV-only sorgular)
-        orientation = "horizontal" if video_type == "long" else "vertical"
-        for q in query_pool:
-            if len(all_clips) >= needed * 3:
-                break
-            new = search_pixabay_videos(q, max_results=px_target, orientation=orientation)
-            new = [c for c in new if c and self._is_ev_relevant(c)]
-            all_clips.extend(new)
+        # Eğer hala eksikse eski yöntemlerle devam et
+        if len(all_clips) < target_clip_count:
+            # 2. Pexels (EV-only sorgular)
+            for q in query_pool:
+                if len(all_clips) >= target_clip_count: break
+                new = self._download_from_pexels(q, OUTPUT_DIR, 5, video_type=video_type)
+                all_clips.extend([c for c in new if c and self._is_ev_relevant(c)])
 
-        # 4. AI Video (Her zaman 1 tane yeni üretmeye çalış)
-        try:
-            ai_prompt = generate_video_prompt(topic_text)
-            ai_clip = await generate_ai_video(ai_prompt, video_type=video_type)
-            if ai_clip and self._is_ev_relevant(ai_clip):
-                all_clips.append(ai_clip)
-        except:
-            pass
+            # 3. Pixabay
+            orientation = "horizontal" if video_type == "long" else "vertical"
+            for q in query_pool:
+                if len(all_clips) >= target_clip_count: break
+                new = search_pixabay_videos(q, max_results=5, orientation=orientation)
+                all_clips.extend([c for c in new if c and self._is_ev_relevant(c)])
 
         # ── TEKRAR FİLTRESİ ──────────────────────────────────────────────────
         unique_and_fresh = []

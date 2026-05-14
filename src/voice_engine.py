@@ -11,8 +11,16 @@ print("=== NEW VOICE ENGINE LOADED ===", flush=True)
 logger = logging.getLogger("VoiceEngine")
 
 class VoiceEngine:
+    def __init__(self):
+        self.use_kokoro = False # Set to true if model is cached
+
     async def generate_voice(self, text: str, output_path: str, voice_type: str = "female"):
-        """v8.0: Guaranteed Word Timing Fallback"""
+        """v10.0: High-Quality Free TTS (Edge/Kokoro)"""
+        if self.use_kokoro:
+            return await self._generate_kokoro(text, output_path, voice_type)
+        return await self._generate_edge(text, output_path, voice_type)
+
+    async def _generate_edge(self, text: str, output_path: str, voice_type: str = "female"):
         import edge_tts
         
         voice = "en-US-AndrewNeural" if voice_type == "male" else "en-US-AvaNeural"
@@ -57,6 +65,13 @@ class VoiceEngine:
             res = subprocess.run(cmd, capture_output=True, text=True)
             return float(res.stdout.strip())
         except: return 0.0
+
+    async def _generate_kokoro(self, text, output_path, voice_type):
+        # Skeleton for Kokoro-TTS (Local high-quality)
+        # Needs kokoro-onnx and model files
+        logger.info("[VoiceEngine] Attempting Kokoro-TTS...")
+        # Fallback to edge for now if model missing
+        return await self._generate_edge(text, output_path, voice_type)
 
     def _generate_fallback_timings(self, text, duration):
         words = text.split()

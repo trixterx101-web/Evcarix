@@ -119,3 +119,10 @@ id,category_id,category_title,topic,priority
 118,ai,Artificial Intelligence & EVs,Tesla Robotaxi explained,high
 119,smart_city,Smart Cities & Infrastructure,The future of smart cities,high
 120,new_tech,New Technologies,This invention looks unreal,high
+121,ev_tech,Electric Vehicles & Future Tech,Electric Vehicles,high
+122,ai,Artificial Intelligence & EVs,Artificial Intelligence,high
+123,robotics,Robotics & Automation,Robotics,high
+124,new_tech,New Technologies,New Technologies,high
+125,battery,Battery Science & Tech,Battery Systems,high
+126,smart_city,Smart Cities & Infrastructure,Smart Cities,high
+127,future_devices,Future Devices & Gadgets,Devices of the Future,high

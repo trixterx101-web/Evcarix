@@ -46,6 +46,15 @@ class EvcarixBrain:
             except Exception as e:
                 print(f"[Brain] Trend hatası: {e}")
 
+        # 2. Manuel Konu Seçimi (GitHub Actions'tan gelen özel konular)
+        manual_topics = [
+            "electric vehicles", "artificial intelligence", "robotics",
+            "new technologies", "battery systems", "smart cities", "devices of the future"
+        ]
+        if content_mode in manual_topics:
+            print(f"[Brain] 🎯 Manuel konu seçildi: {content_mode}")
+            return content_mode, None
+
         # 2. Sıralı Havuz Kontrolü (Sequential Selection)
         try:
             csv_path = os.path.join("data", "topics.csv")

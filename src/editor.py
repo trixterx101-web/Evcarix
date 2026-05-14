@@ -23,33 +23,44 @@ class AutoEditor:
         self.font_regular = self._load_font("regular", 60)
 
     def _apply_cinematic_effects(self, clip):
-        """v8.0: Reused Content Protection & Full Screen Zoom"""
+        """v10.0: Pro-Level HD Effects & Ken Burns"""
         import random
         from moviepy.video.fx.all import speedx, lum_contrast, colorx
         
-        # 1. Random Speed Variation (0.98x - 1.05x) - More subtle for better audio sync
-        spd = random.uniform(0.98, 1.05)
+        # 1. Subtle Speed Ramping (0.95x - 1.05x)
+        spd = random.uniform(0.95, 1.05)
         clip = speedx(clip, factor=spd)
         
-        # 2. Random Zoom (Always >= 1.0 to avoid black bars)
-        # Start at 1.02 and zoom in/out slightly within a safe range
-        zoom_range = random.uniform(0.04, 0.08)
-        direction = random.choice([1, -1]) # 1: zoom in, -1: zoom out
+        # 2. Advanced Ken Burns Effect (Zoom & Pan)
+        w, h = clip.size
+        zoom_speed = random.uniform(0.05, 0.15)
+        mode = random.choice(["zoom_in", "zoom_out", "pan_left", "pan_right"])
         
-        def zoom_fn(t):
-            if direction == 1:
-                return 1.0 + (zoom_range * (t / clip.duration))
-            else:
-                return (1.0 + zoom_range) - (zoom_range * (t / clip.duration))
+        def effect_fn(get_frame, t):
+            frame = get_frame(t)
+            img = Image.fromarray(frame)
+            
+            # Zoom logic
+            zoom = 1.0 + (zoom_speed * (t / clip.duration)) if mode == "zoom_in" else \
+                   (1.0 + zoom_speed) - (zoom_speed * (t / clip.duration))
+            
+            # Pan logic (simulated by cropping after zoom)
+            new_w, new_h = int(w * zoom), int(h * zoom)
+            img = img.resize((new_w, new_h), Image.LANCZOS)
+            
+            left = (new_w - w) // 2
+            top = (new_h - h) // 2
+            
+            if "pan_left" in mode: left = int((new_w - w) * (t / clip.duration))
+            if "pan_right" in mode: left = int((new_w - w) * (1 - t / clip.duration))
+            
+            return np.array(img.crop((left, top, left + w, top + h)))
+            
+        clip = clip.fl(effect_fn)
         
-        clip = clip.resize(zoom_fn)
-        
-        # 3. Subtle Color Grading
-        color_shift = random.uniform(0.95, 1.05)
-        clip = colorx(clip, factor=color_shift)
-        
-        # 4. Lum/Contrast shift
-        clip = lum_contrast(clip, lum=random.randint(-3, 3), contrast=random.uniform(0.0, 0.05))
+        # 3. HDR-ready Color Grading
+        clip = colorx(clip, factor=random.uniform(1.0, 1.1))
+        clip = lum_contrast(clip, lum=random.randint(0, 5), contrast=random.uniform(0.05, 0.1))
         
         return clip
 
@@ -344,18 +355,18 @@ class AutoEditor:
         output_path = os.path.join(self.output_dir, output_filename)
         os.makedirs(self.output_dir, exist_ok=True)
 
-        # HD Kalite export (8000k bitrate) - ULTRAFAST for speed
+        # HD Kalite export (8000k bitrate, 60fps, CRF 18)
         final_video.write_videofile(
             output_path,
-            fps=30,
+            fps=60,
             codec="libx264",
             audio_codec="aac",
             bitrate="8000k",
-            audio_bitrate="192k",
-            threads=4,
-            preset="ultrafast",
+            audio_bitrate="320k",
+            threads=8,
+            preset="slow",
             logger="bar",
-            ffmpeg_params=["-ac", "2", "-movflags", "+faststart"],
+            ffmpeg_params=["-crf", "18", "-pix_fmt", "yuv420p", "-colorspace", "bt709"],
         )
         audio.close()
         final_video.close()

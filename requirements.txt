@@ -18,7 +18,11 @@ gradio_client
 fal-client>=0.5.0
 yt-dlp
 PyJWT>=2.8.0
-# LLM fallback chain providers
+beautifulsoup4
+lxml
+kokoro-onnx
+soundfile
+scipy
 anthropic
 openai
 cohere
