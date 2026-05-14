@@ -11,6 +11,10 @@ on:
         description: 'short / long'
         required: true
         default: 'short'
+        type: choice
+        options:
+          - short
+          - long
       content_mode:
         description: 'video content mode'
         required: true
