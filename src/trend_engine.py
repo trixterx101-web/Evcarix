@@ -8,7 +8,7 @@ import requests
 import pandas as pd
 from datetime import timezone, timedelta
 from dotenv import load_dotenv
-from src.writer import call_gemini, call_groq
+from src.writer import call_gemini, call_groq, call_openai
 
 load_dotenv()
 
@@ -67,6 +67,7 @@ BLOCKED_TOPICS = [
 
 class TrendEngine:
     def __init__(self):
+        print("[TrendEngine] Init: Setting up feeds...", flush=True)
         self.feeds = [
             "https://electrek.co/feed/",
             "https://insideevs.com/rss/articles/all/",
@@ -93,6 +94,7 @@ class TrendEngine:
             "fast charging impact battery health",
         ]
 
+        print("[TrendEngine] Init: Loading Gemini keys...", flush=True)
         self.gemini_api_keys = []
         if GEMINI_AVAILABLE:
             for i in range(1, 11):
@@ -103,10 +105,12 @@ class TrendEngine:
         self.gemini_client = None
         if GEMINI_AVAILABLE and self.gemini_api_keys:
             try:
+                print(f"[TrendEngine] Init: Creating Gemini client (Key: {self.gemini_api_keys[0][:8]}...)", flush=True)
                 self.gemini_client = genai.Client(api_key=self.gemini_api_keys[0])
             except Exception as e:
-                print(f"[TrendEngine] Gemini init hatası: {e}")
+                print(f"[TrendEngine] Gemini init hatası: {e}", flush=True)
 
+        print("[TrendEngine] Init: Loading other API keys...", flush=True)
         self.groq_keys = [k for k in [
             os.getenv("GROQ_API_KEY"),
             os.getenv("GROQ_API_KEY_2"),
@@ -118,6 +122,7 @@ class TrendEngine:
         self.together_key      = os.getenv("TOGETHER_API_KEY")
         self.openai_key        = os.getenv("OPENAI_API_KEY")
         self.ollama_url        = os.getenv("OLLAMA_URL", "http://localhost:11434")
+        print("[TrendEngine] Init: Done.", flush=True)
 
     def _is_relevant(self, title: str) -> bool:
         """Check if video title is relevant to EV data topics."""

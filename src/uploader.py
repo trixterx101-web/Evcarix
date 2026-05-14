@@ -37,9 +37,14 @@ class YouTubeUploader:
                     print("[Uploader] ✅ Token başarıyla yenilendi.", flush=True)
                 except Exception as e:
                     print(f"[Uploader] ❌ Token yenileme hatası: {e}", flush=True)
-                    print("[Uploader] 🔑 Lütfen yerelinizde giriş yapıp yeni token.json içeriğini GitHub Secret'a (YOUTUBE_TOKEN_JSON) ekleyin.", flush=True)
-                    return None # Kimlik doğrulama başarısız
-            else:
+                    if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
+                        print("[Uploader] 🔑 Lütfen yerelinizde giriş yapıp yeni token.json içeriğini GitHub Secret'a (YOUTUBE_TOKEN_JSON) ekleyin.", flush=True)
+                        return None
+                    else:
+                        print("[Uploader] 🔄 Yenileme başarısız, sıfırdan giriş denenecek...", flush=True)
+                        creds = None # Reset creds to trigger flow below
+            
+            if not creds or not creds.valid:
                 # CI/CD ortamında tarayıcı açılamaz
                 if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
                     print("[Uploader] ❌ Gerekli token.json bulunamadı veya geçersiz!", flush=True)

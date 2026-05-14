@@ -1,27 +1,31 @@
 {
-    "timestamp": "20260502_193427",
+    "timestamp": "20260514_210443",
     "slot": "evening",
     "config": {
         "type": "short",
         "duration": 55
     },
-    "topic": "Tata Punch EV reliability concerns",
-    "full_topic": "Tata Punch EV reliability concerns",
+    "topic": "Rivian R1T cargo and power analysis",
+    "full_topic": "Rivian R1T cargo and power analysis",
     "category": "comparisons",
-    "title": "27% EV Failure Rate",
+    "title": "R1T: 180kWh, 400mi",
     "all_titles": [
-        "27% EV Failure Rate"
+        "R1T: 180kWh, 400mi"
     ],
-    "script": "27% of compact EVs like the Tata Punch experience battery issues within 5 years. In the US, the Nissan Leaf has a 21% failure rate, while China's BYD Atto 3 has 12%. European models like the Peugeot e-208 show 18% battery degradation after 50,000 miles. Real data matters. Subscribe to Evcarix for real EV data.",
+    "script": "The Rivian R1T has a cargo capacity of 11.6 cubic feet in its frunk and 29 cubic feet in the Gear Tunnel. With a 180kWh battery pack, this EV achieves a range of 400 miles on a single charge, using 0.45kWh per mile. Its electric motor produces 750 horsepower, enabling 0-60mph in 3 seconds. Data shows that 70% of R1T owners use their vehicles for camping and off-grid adventures, highlighting the importance of cargo space and power. The R1T's maximum towing capacity is 11,000 pounds, with a 5% grade, it can tow 7,000 pounds. Analyzing the data, we see that the R1T's unique features make it an attractive option for those seeking adventure and utility in an EV.",
     "voice": "male",
-    "description": "27% EV Failure Rate\n\nReal EV data. No hype. Just numbers. — Evcarix\n\nWhat you'll learn:\n— 27% of compact EVs like the Tata Punch experience battery issues within 5 years\n\n#TataPunchEV\n#NissanLeaf\n#BYDAtto3\n#Peugeote-208\n#EVreliability\n#batteryissues\n#ev\n#electriccar\n#evcarix\n#Shorts\n#ElectricVehicle",
+    "description": "R1T: 180kWh, 400mi\n\nReal EV data. No hype. Just numbers. — Evcarix\n\nWhat you'll learn:\n— R1T: 180kWh, 400mi range, 11.6ft3 cargo\n\n#RivianR1T\n#ElectricTruck\n#CargoCapacity\n#EVRange\n#ElectricMotor\n#TowingCapacity\n#Off-GridAdventures\n#CampingEV\n#ElectricVehicleData\n#EVAnalysis\n#ev\n#electriccar\n#evcarix\n#Shorts\n#ElectricVehicle",
     "tags": [
-        "Tata Punch EV",
-        "Nissan Leaf",
-        "BYD Atto 3",
-        "Peugeot e-208",
-        "EV reliability",
-        "battery issues",
+        "Rivian R1T",
+        "Electric Truck",
+        "Cargo Capacity",
+        "EV Range",
+        "Electric Motor",
+        "Towing Capacity",
+        "Off-Grid Adventures",
+        "Camping EV",
+        "Electric Vehicle Data",
+        "EV Analysis",
         "ev",
         "electriccar",
         "evcarix",
@@ -37,6 +41,6 @@
             "📊"
         ]
     },
-    "inspired_by": "https://www.youtube.com/watch?v=UXPH4Aflvqo",
-    "source_video_id": "UXPH4Aflvqo"
+    "inspired_by": "https://www.youtube.com/watch?v=4W6SJYxHIUM",
+    "source_video_id": "4W6SJYxHIUM"
 }

@@ -27,24 +27,34 @@ class EvcarixOrchestrator:
         
         # Lazy imports to prevent hang during script startup
         try:
-            log("Loading Brain...")
+            log("Loading Brain (from src.brain)...")
             from src.brain import EvcarixBrain
+            log("Initializing Brain...")
             self.brain = EvcarixBrain()
+            log("Brain loaded successfully.")
             
-            log("Loading MediaEngine...")
+            log("Loading MediaEngine (from src.media_engine)...")
             from src.media_engine import MediaEngine
+            log("Initializing MediaEngine...")
             self.media_engine = MediaEngine()
+            log("MediaEngine loaded successfully.")
             
-            log("Loading Editor...")
+            log("Loading Editor (from src.editor)...")
             from src.editor import AutoEditor
+            log("Initializing Editor...")
             self.editor = AutoEditor()
+            log("Editor loaded successfully.")
             
-            log("Loading LipSyncGenerator...")
+            log("Loading LipSyncGenerator (from src.lip_sync_generator)...")
             from src.lip_sync_generator import LipSyncGenerator
+            log("Initializing LipSyncGenerator...")
             self.lip_sync = LipSyncGenerator()
+            log("LipSyncGenerator loaded successfully.")
             
+            log("Loading Config...")
             import config
             self.config_module = config
+            log("Config loaded successfully.")
         except Exception as e:
             log(f"FATAL ERROR during component loading: {e}")
             raise e

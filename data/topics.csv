@@ -31,7 +31,7 @@ id,category_id,category_title,topic,priority
 30,ownership,Cost of Ownership,Is insurance cost really higher?,high
 31,ownership,Cost of Ownership,EV maintenance cost: brakes - tires - service,high
 32,ownership,Cost of Ownership,Battery replacement cost 2026,medium
-33,ownership,Cost of Ownership,Real user data after 100,000+ km,high
+33,ownership,Cost of Ownership,Real user data after 100000+ km,high
 34,ownership,Cost of Ownership,Do software updates affect performance?,medium
 35,ownership,Cost of Ownership,Brake system life — EV advantage,medium
 36,ownership,Cost of Ownership,What does the warranty actually cover?,high
@@ -39,7 +39,7 @@ id,category_id,category_title,topic,priority
 38,comparison,Vehicle Comparisons,Platform architecture differences — what changes?,medium
 39,comparison,Vehicle Comparisons,70 vehicles — 2 indices: large vs small analysis,high
 40,comparison,Vehicle Comparisons,Motor type: single axis vs dual axis data,medium
-41,comparison,Vehicle Comparisons,Budget EV comparison — under 30,000 USD,new
+41,comparison,Vehicle Comparisons,Budget EV comparison — under 30000 USD,high
 42,comparison,Vehicle Comparisons,Family car: Which EV is better?,new
 43,comparison,Vehicle Comparisons,SUV range comparison — real world test,high
 44,comparison,Vehicle Comparisons,EV buyer's guide for the US market,new

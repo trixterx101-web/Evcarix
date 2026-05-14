@@ -2,6 +2,7 @@ import os
 import requests
 import random
 import logging
+import re
 from pathlib import Path
 
 # Logger
@@ -24,9 +25,13 @@ def search_pixabay_videos(query: str, max_results: int = 10, orientation: str = 
     output_dir = Path("assets/videos")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Otomatik negatif filtre ekle (konu dışı klibi API düzeyinde engellemek için)
-    negative_filters = " -massage -spa -cooking -yoga -beach -food -fitness -meditation"
-    safe_query = query + negative_filters
+    # Pixabay API q parametresi max 100 karakterdir.
+    # Negatif filtreleri ve sorguyu temizleyip kısaltalım.
+    clean_q = re.sub(r'[^a-zA-Z0-9\s]', '', query).strip()
+    negative_filters = " -massage -spa -cooking -yoga"
+    
+    # Toplam uzunluğu 100 ile sınırlayalım
+    safe_query = (clean_q[:70] + negative_filters)[:100]
 
     url = "https://pixabay.com/api/videos/"
     params = {

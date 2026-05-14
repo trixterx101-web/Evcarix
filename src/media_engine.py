@@ -122,6 +122,11 @@ class MediaEngine:
     # ── Ana Video Toplama ────────────────────────────────────────────────────
     async def download_stock_videos(self, plan=None, target_clip_count=6, topic=None):
         """v9.0 Pipeline: EV-Only Zero-Repetition Acquisition"""
+        # CI ortamında hızı artırmak için klip sayısını düşür
+        if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
+            target_clip_count = min(target_clip_count, 4)
+            print(f"[MediaEngine] CI Hız Modu: Hedef klip sayısı {target_clip_count} olarak ayarlandı.")
+        
         from src.pixabay_engine import search_pixabay_videos
         from src.ai_video_engine import generate_video_prompt, generate_ai_video
 

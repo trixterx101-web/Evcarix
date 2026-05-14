@@ -130,6 +130,9 @@ class LipSyncGenerator:
             return False
         
         try:
+            # CI ortamında hızı artırmak için resize_factor kullan
+            resize_factor = "2" if os.getenv("CI") or os.getenv("GITHUB_ACTIONS") else "1"
+            
             cmd = [
                 "python",
                 inference_path,
@@ -137,7 +140,7 @@ class LipSyncGenerator:
                 "--face", face_image,
                 "--audio", audio_path,
                 "--outfile", output_path,
-                "--resize_factor", "1"
+                "--resize_factor", resize_factor
             ]
             
             print(f"[LipSync] Wav2Lip çalıştırılıyor...")
@@ -179,6 +182,7 @@ class LipSyncGenerator:
                 "-filter_complex",
                 f"[1:v]scale=1080:1152[scaled];[0:v][scaled]overlay=(W-w)/2:50[v];[v]drawtext=text='{script_data['title']}':fontcolor=white:fontsize=48:x=(W-text_w)/2:y=1250:fontfile=C\\:/Windows/Fonts/arialbd.ttf",
                 "-c:v", "libx264",
+                "-preset", "ultrafast",
                 "-c:a", "aac",
                 "-shortest",
                 "-pix_fmt", "yuv420p",

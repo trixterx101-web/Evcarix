@@ -89,6 +89,26 @@ def call_openrouter(prompt: str, model: str = "meta-llama/llama-3-8b-instruct:fr
     except: pass
     return None
 
+def call_openai(prompt: str, model: str = "gpt-4o-mini") -> Optional[str]:
+    key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not key or key in _PLACEHOLDERS: return None
+    try:
+        import requests
+        response = requests.post(
+            url="https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}"},
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7
+            },
+            timeout=30
+        )
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content'].strip()
+    except: pass
+    return None
+
 def call_gemini(prompt: str, model: str = "gemini-2.0-flash") -> Optional[str]:
     if not ENABLE_GEMINI: return None
     avail = _available_keys(_GEMINI_KEYS)

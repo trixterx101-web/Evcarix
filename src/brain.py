@@ -31,7 +31,7 @@ class EvcarixBrain:
             json.dump(history, f, ensure_ascii=False, indent=2)
 
     def select_strategic_topic(self, video_type="short"):
-        """v9.0: Hybrid Topic Selector (Sequential for Auto/Long, Trends for Trend Mode)"""
+        """v9.1: Robust Hybrid Topic Selector (Sequential for Auto/Long, Trends for Trend Mode)"""
         content_mode = os.getenv("CONTENT_MODE", "auto").lower()
         
         # 1. Trend Modu (Sabah slotu veya manuel trend seçimi)
@@ -47,10 +47,15 @@ class EvcarixBrain:
                 print(f"[Brain] Trend hatası: {e}")
 
         # 2. Sıralı Havuz Kontrolü (Sequential Selection)
-        # Uzun videolar ve öğleden sonraki (auto) Shorts'lar için sırayla seçim yapar.
         try:
-            df = pd.read_csv("data/topics.csv")
+            csv_path = os.path.join("data", "topics.csv")
+            if not os.path.exists(csv_path):
+                print(f"[Brain] ❌ Hata: {csv_path} bulunamadı!")
+                return "Future of Electric Vehicles", None
+
+            df = pd.read_csv(csv_path, on_bad_lines='skip')
             if df.empty:
+                print("[Brain] ❌ Hata: topics.csv boş veya tüm satırlar hatalı!")
                 return "Future of Electric Vehicles", None
 
             state_file = "sequential_state.json"
@@ -59,11 +64,13 @@ class EvcarixBrain:
                 try:
                     with open(state_file, "r") as f:
                         state = json.load(f)
-                except: pass
+                except Exception as e:
+                    print(f"[Brain] State okuma hatası: {e}")
             
             idx = state.get("next_index", 0)
             if idx >= len(df):
-                idx = 0  # Başa dön (Unlimited loop)
+                print(f"[Brain] 🔄 Liste sonuna gelindi ({len(df)}), başa dönülüyor.")
+                idx = 0
             
             selected = df.iloc[idx]
             topic = selected['topic']
@@ -74,11 +81,13 @@ class EvcarixBrain:
             with open(state_file, "w") as f:
                 json.dump(state, f)
             
-            print(f"[Brain] 🔄 Sıralı seçim yapıldı [{idx+1}/{len(df)}] ({category}): {topic}")
+            print(f"[Brain] 🔄 Sıralı seçim: [{idx+1}/{len(df)}] ({category}) -> {topic}")
             return topic, None
 
         except Exception as e:
-            print(f"[Brain] Sıralı seçim hatası: {e}")
+            import traceback
+            print(f"[Brain] ❌ Sıralı seçim hatası: {e}")
+            traceback.print_exc()
             return "Future of Electric Vehicles", None
 
     def create_daily_plan(self, slot="evening", video_type="short"):
