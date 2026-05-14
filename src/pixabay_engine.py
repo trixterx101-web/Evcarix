@@ -24,10 +24,14 @@ def search_pixabay_videos(query: str, max_results: int = 10, orientation: str = 
     output_dir = Path("assets/videos")
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Otomatik negatif filtre ekle (konu dışı klibi API düzeyinde engellemek için)
+    negative_filters = " -massage -spa -cooking -yoga -beach -food -fitness -meditation"
+    safe_query = query + negative_filters
+
     url = "https://pixabay.com/api/videos/"
     params = {
         "key": PIXABAY_API_KEY,
-        "q": query,
+        "q": safe_query,
         "per_page": 30,
     }
 

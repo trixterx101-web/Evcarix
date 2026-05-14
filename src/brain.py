@@ -31,43 +31,54 @@ class EvcarixBrain:
             json.dump(history, f, ensure_ascii=False, indent=2)
 
     def select_strategic_topic(self, video_type="short"):
-        """v8.5: Strategic Topic Selector (Trends + 67 Topics)"""
-        # 1. Trend Kontrolü (Son 12 saatteki en sıcak konular)
-        try:
-            # Shorts için YouTube trendlerinden ilham al
-            if video_type == "short":
-                trend_plan = self.trend_engine.trigger_from_youtube_trend(hours_back=12)
+        """v9.0: Hybrid Topic Selector (Sequential for Auto/Long, Trends for Trend Mode)"""
+        content_mode = os.getenv("CONTENT_MODE", "auto").lower()
+        
+        # 1. Trend Modu (Sabah slotu veya manuel trend seçimi)
+        if content_mode == "trend" and video_type == "short":
+            try:
+                trend_plan = self.trend_engine.trigger_from_youtube_trend(hours_back=48)
                 if trend_plan:
-                    print(f"[Brain] 🔥 Trend konu seçildi: {trend_plan['title']}")
+                    print(f"[Brain] 🔥 Trend modu aktif: {trend_plan['title']}")
                     return trend_plan['full_topic'], trend_plan
-        except Exception as e:
-            print(f"[Brain] Trend kontrol hatası: {e}")
+                else:
+                    print("[Brain] ⚠️ Trend bulunamadı, auto/sıralı moda geçiliyor.")
+            except Exception as e:
+                print(f"[Brain] Trend hatası: {e}")
 
-        # 2. Havuz Kontrolü (data/topics.csv içindeki 67 stratejik konu)
+        # 2. Sıralı Havuz Kontrolü (Sequential Selection)
+        # Uzun videolar ve öğleden sonraki (auto) Shorts'lar için sırayla seçim yapar.
         try:
             df = pd.read_csv("data/topics.csv")
-            history = self._load_history()
+            if df.empty:
+                return "Future of Electric Vehicles", None
+
+            state_file = "sequential_state.json"
+            state = {"next_index": 0}
+            if os.path.exists(state_file):
+                try:
+                    with open(state_file, "r") as f:
+                        state = json.load(f)
+                except: pass
             
-            # Daha önce kullanılmamış olanları filtrele
-            unused = df[~df['topic'].isin(history)]
-            if unused.empty:
-                print("[Brain] ⚠️ Tüm konular bitti, havuz sıfırlanıyor.")
-                unused = df
-                history = []
+            idx = state.get("next_index", 0)
+            if idx >= len(df):
+                idx = 0  # Başa dön (Unlimited loop)
             
-            # Önceliğe (priority) göre ağırlıklı seçim yap
-            high_p = unused[unused['priority'] == 'high']
-            if not high_p.empty and random.random() < 0.7:
-                selected = high_p.sample(n=1).iloc[0]
-            else:
-                selected = unused.sample(n=1).iloc[0]
-            
+            selected = df.iloc[idx]
             topic = selected['topic']
             category = selected.get('category_id', 'general')
-            print(f"[Brain] 🎯 Havuzdan konu seçildi ({category}): {topic}")
+            
+            # Update state for next run
+            state["next_index"] = idx + 1
+            with open(state_file, "w") as f:
+                json.dump(state, f)
+            
+            print(f"[Brain] 🔄 Sıralı seçim yapıldı [{idx+1}/{len(df)}] ({category}): {topic}")
             return topic, None
+
         except Exception as e:
-            print(f"[Brain] Havuz seçim hatası: {e}")
+            print(f"[Brain] Sıralı seçim hatası: {e}")
             return "Future of Electric Vehicles", None
 
     def create_daily_plan(self, slot="evening", video_type="short"):

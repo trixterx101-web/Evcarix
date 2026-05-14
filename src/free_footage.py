@@ -61,6 +61,12 @@ TOPIC_BRAND_MAP = {
     "infrastructure": ["coverr", "doe", "tesla"],
     "education":      ["doe", "coverr", "tesla"],
     "tools":          ["coverr", "doe"],
+    "ev_tech":        ["tesla", "polestar", "coverr"],
+    "ai":             ["tesla", "coverr", "doe"],
+    "robotics":       ["tesla", "coverr"],
+    "new_tech":       ["doe", "coverr", "tesla"],
+    "smart_city":     ["doe", "coverr", "tesla"],
+    "future_devices": ["tesla", "coverr"],
     "default":        ["tesla", "volvo", "coverr", "doe"],
 }
 

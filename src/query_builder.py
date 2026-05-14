@@ -87,6 +87,51 @@ TOPIC_QUERY_MAP = [
       "digital dashboard information display",
       "chart graph business screen",
       "technology interface visualization"]),
+
+    # Electric Vehicles & Future Tech (New)
+    (["ev_tech", "motor type", "platform", "ota", "aerodynamics", "wireless", "900v"],
+     ["electric car motor engineering",
+      "modern vehicle platform chassis",
+      "car software update screen",
+      "wind tunnel car testing",
+      "wireless EV charging pad"]),
+
+    # Artificial Intelligence (New)
+    (["ai", "artificial intelligence", "self-driving", "autonomous", "neural", "predictive"],
+     ["self driving car interior POV",
+      "artificial intelligence brain digital",
+      "autonomous vehicle sensor radar",
+      "robot car driving automation",
+      "AI technology visualization"]),
+
+    # Robotics (New)
+    (["robotics", "robot", "humanoid", "factory", "automation", "robotic arm"],
+     ["car factory robot arm production",
+      "humanoid robot walking technology",
+      "robotic assembly line automobile",
+      "high tech industrial automation",
+      "Tesla Optimus robot style"]),
+
+    # New Technologies (New)
+    (["new_tech", "sodium-ion", "silicon anode", "v2g", "perovskite", "breakthrough"],
+     ["laboratory science battery research",
+      "futuristic technology energy grid",
+      "clean energy innovation lab",
+      "new tech breakthrough visualization"]),
+
+    # Smart Cities & Infrastructure (New)
+    (["smart_city", "smart city", "grid", "infrastructure", "connected car"],
+     ["smart city traffic management",
+      "modern city sunset high tech",
+      "electric grid power lines digital",
+      "connected vehicles smart city"]),
+
+    # Future Devices & Gadgets (New)
+    (["future_devices", "ar hud", "wearable", "smart tire", "gadget", "ar"],
+     ["augmented reality car windshield",
+      "futuristic tech gadget device",
+      "smart wearable technology",
+      "digital HUD display automotive"]),
 ]
 
 # Generic EV fallback queries — used when no keyword matches

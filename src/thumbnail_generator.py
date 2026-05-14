@@ -51,6 +51,12 @@ CATEGORY_PEXELS_QUERY = {
     "infrastructure": ["charging network stations", "EV infrastructure road", "charging hub airport"],
     "education":      ["electric car technology", "EV motor cutaway", "car technology dashboard"],
     "tools":          ["car dashboard data", "EV software digital", "automotive technology screen"],
+    "ev_tech":        ["electric car motor", "EV engine cutaway", "modern car technology"],
+    "ai":             ["artificial intelligence brain", "robot car driving", "autonomous vehicle radar"],
+    "robotics":       ["car factory robot arm", "humanoid robot technology", "industrial automation"],
+    "new_tech":       ["clean energy research", "battery laboratory", "future technology innovation"],
+    "smart_city":     ["smart city traffic", "connected city grid", "modern city night sky"],
+    "future_devices": ["augmented reality HUD", "futuristic tech gadget", "wearable technology"],
     "default":        ["electric vehicle cinematic", "EV car road", "Tesla Model exterior"],
 }
 
@@ -65,6 +71,12 @@ CATEGORY_ACCENT = {
     "infrastructure": "#00FFFF",
     "education":      "#4488FF",
     "tools":          "#FF0066",
+    "ev_tech":        "#00FF99",
+    "ai":             "#6600FF",
+    "robotics":       "#FF00FF",
+    "new_tech":       "#00D4FF",
+    "smart_city":     "#33CCFF",
+    "future_devices": "#FF0066",
     "default":        "#FFD700",
 }
 

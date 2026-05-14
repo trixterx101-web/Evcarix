@@ -66,3 +66,56 @@ id,category_id,category_title,topic,priority
 65,education,Education & Tech Explanations,What is SOH (State of Health) - how to measure?,medium
 66,education,Education & Tech Explanations,EV inverter technology explanation,new
 67,education,Education & Tech Explanations,WLTP vs EPA vs real range difference,high
+68,ev_tech,Electric Vehicles & Future Tech,Electric vehicle motor types explained: permanent magnet vs induction,high
+69,ev_tech,Electric Vehicles & Future Tech,Next-gen EV platforms: 800V vs 900V — what changes in 2026?,high
+70,ev_tech,Electric Vehicles & Future Tech,OTA software updates: how EVs improve without visiting a dealer,medium
+71,ev_tech,Electric Vehicles & Future Tech,EV aerodynamics: how drag coefficient directly impacts real range,medium
+72,ev_tech,Electric Vehicles & Future Tech,Wireless EV charging: current state and real-world feasibility,new
+73,ai,Artificial Intelligence & EVs,How AI optimizes battery management in real-time,high
+74,ai,Artificial Intelligence & EVs,Self-driving levels explained: L2 vs L3 vs L4 — where are we now?,high
+75,ai,Artificial Intelligence & EVs,AI-powered range prediction: how accurate is it really?,medium
+76,ai,Artificial Intelligence & EVs,Neural networks in EV thermal management — technical deep dive,new
+77,ai,Artificial Intelligence & EVs,AI vs human: energy efficiency on the same route — real data,high
+78,robotics,Robotics & Automation,EV factory robots vs human workers: quality and speed data,high
+79,robotics,Robotics & Automation,Robotic charging arms: do they actually work at scale?,new
+80,robotics,Robotics & Automation,Autonomous mobile robots (AMR) in EV gigafactories — 2026 update,medium
+81,robotics,Robotics & Automation,How Tesla Optimus and humanoid robots will impact EV production cost,high
+82,robotics,Robotics & Automation,Automated battery recycling robots: efficiency and recovery rates,new
+83,new_tech,New Technologies,Silicon anode batteries: real-world performance vs graphite,high
+84,new_tech,New Technologies,Sodium-ion batteries: can they replace lithium for entry-level EVs?,high
+85,new_tech,New Technologies,Ultra-fast charging: 350 kW vs 500 kW — thermal limits explained,high
+86,new_tech,New Technologies,Vehicle-to-grid (V2G) technology: real economics and grid impact,new
+87,new_tech,New Technologies,Perovskite solar cells on EVs: power output and viability data,new
+88,battery,Battery Science & Tech,Lithium-sulfur batteries: energy density breakthrough — real timeline,high
+89,battery,Battery Science & Tech,Battery second-life: repurposing EV packs for grid storage — costs,high
+90,battery,Battery Science & Tech,Cell-to-pack (CTP) vs cell-to-body (CTB) architecture comparison,medium
+91,battery,Battery Science & Tech,How formation cycling affects long-term battery life — data,medium
+92,battery,Battery Science & Tech,Battery fire risk: chemistry comparison LFP vs NMC vs NCA — stats,high
+93,smart_city,Smart Cities & Infrastructure,Smart charging grids: how cities balance EV load in real time,high
+94,smart_city,Smart Cities & Infrastructure,EV integration in smart city transport — data from pilot cities,new
+95,smart_city,Smart Cities & Infrastructure,Dynamic road pricing and EVs: how connected cars change commuting,new
+96,smart_city,Smart Cities & Infrastructure,Public charging deserts: city-by-city coverage gap analysis 2026,high
+97,smart_city,Smart Cities & Infrastructure,Bidirectional EVs powering buildings: real cost savings data,high
+98,future_devices,Future Devices & Gadgets,Solid-state battery in consumer electronics vs EVs — same race?,high
+99,future_devices,Future Devices & Gadgets,EV wearables and in-car health monitoring: 2026 tech roundup,new
+100,future_devices,Future Devices & Gadgets,Ultra-thin flexible solar panels for EVs — current efficiency data,new
+101,future_devices,Future Devices & Gadgets,Augmented reality HUDs in EVs: do they improve safety? — data,medium
+102,future_devices,Future Devices & Gadgets,Smart tires for EVs: real-time pressure and wear data integration,medium
+103,ev_tech,Electric Vehicles & Future Tech,Tesla’s biggest problem,high
+104,robotics,Robotics & Automation,The world’s smartest robot,high
+105,ai,Artificial Intelligence & EVs,AI just replaced this job,high
+106,ev_tech,Electric Vehicles & Future Tech,The future of flying cars,medium
+107,range,Range & Efficiency Tests,This EV has 2000km range,high
+108,infrastructure,Infrastructure & Grid,Japan’s futuristic transport,medium
+109,ai,Artificial Intelligence & EVs,Elon Musk’s next AI project,high
+110,robotics,Robotics & Automation,The rise of humanoid robots,high
+111,battery,Battery Science & Tech,The future of batteries,high
+112,ai,Artificial Intelligence & EVs,This AI can drive better than humans,high
+113,ev_tech,Electric Vehicles & Future Tech,The fastest electric car ever,high
+114,robotics,Robotics & Automation,The robot that cooks food,medium
+115,market,Market & Industry Data,China’s hidden tech empire,high
+116,ai,Artificial Intelligence & EVs,This car parks itself,medium
+117,future_devices,Future Devices & Gadgets,AI phones are coming,high
+118,ai,Artificial Intelligence & EVs,Tesla Robotaxi explained,high
+119,smart_city,Smart Cities & Infrastructure,The future of smart cities,high
+120,new_tech,New Technologies,This invention looks unreal,high

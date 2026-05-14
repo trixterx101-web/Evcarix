@@ -142,31 +142,42 @@ def _llm_chain(prompt: str, fallback: str = "") -> str:
 
 def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
     """Tek bir LLM çağrısı ile tüm SEO metadatayı (Title, Tags, Hook) üretir."""
-    brand_style = "Style: Data-driven, analytical, no-hype. Language: ALWAYS US ENGLISH. Tone: Global Professional."
+    brand_style = (
+        "Style: Data-driven, analytical, no-hype. Language: ALWAYS US ENGLISH. Tone: Global Professional. "
+        "Identity: Evcarix - The World's Lead EV Data Authority."
+    )
     
     if is_long:
         prompt = (
-            f"Generate SEO metadata for a 5-minute deep-dive EV video about: '{topic}'.\n"
+            f"Generate EXPERT YouTube SEO metadata for a 5-10 minute deep-dive EV video about: '{topic}'.\n"
             f"{brand_style}\n"
-            "CRITICAL: USE US ENGLISH ONLY. Focus on Global/USA/Europe/China data.\n"
+            "SEO RULES:\n"
+            "1. TITLE: Must be high-CTR (Click-Through Rate). Use psychological hooks (Curiosity, Urgency, or Fear). "
+            "Put main keywords (e.g., Tesla, Solid-State, Range) at the BEGINNING. Max 70 chars.\n"
+            "2. TAGS: Provide 20 'ranked' tags. Include high-volume broad terms, medium-tail specific terms, and 'Evcarix' brand tags.\n"
+            "3. DESCRIPTION HOOK: First 2 lines are CRITICAL for SEO. Use keywords naturally.\n"
+            "4. KEYWORDS: Extract the 5 most powerful ranking keywords.\n"
             "Return ONLY JSON:\n"
             "{\n"
-            "  \"title\": \"Click-worthy professional title in US English (max 70 chars)\",\n"
-            "  \"tags\": [\"20 specific, ranked US English SEO tags\"],\n"
-            "  \"hook\": \"A shocking first sentence for the description in US English\",\n"
-            "  \"keywords\": [\"5 main keywords\"]\n"
+            "  \"title\": \"[HIGH CTR TITLE]\",\n"
+            "  \"tags\": [\"tag1\", \"tag2\", ...],\n"
+            "  \"hook\": \"[SEO OPTIMIZED DESCRIPTION OPENER]\",\n"
+            "  \"keywords\": [\"kw1\", \"kw2\", ...]\n"
             "}"
         )
     else:
         prompt = (
-            f"Generate SEO metadata for a YouTube Short about: '{topic}'.\n"
+            f"Generate VIRAL YouTube Shorts SEO metadata for: '{topic}'.\n"
             f"{brand_style}\n"
-            "CRITICAL: USE US ENGLISH ONLY. Viral global style.\n"
+            "SEO RULES:\n"
+            "1. TITLE: Viral style. Use numbers (%, $, Miles). Must stop the scroll. Max 55 chars.\n"
+            "2. TAGS: 15 high-velocity trending tags (Shorts-specific).\n"
+            "3. HOOK: Punchy, keyword-rich opening sentence.\n"
             "Return ONLY JSON:\n"
             "{\n"
-            "  \"title\": \"Viral US English short title with numbers (max 60 chars)\",\n"
-            "  \"tags\": [\"15 trending US English EV tags\"],\n"
-            "  \"hook\": \"Punchy opening line in US English\"\n"
+            "  \"title\": \"[VIRAL SHORT TITLE]\",\n"
+            "  \"tags\": [\"tag1\", \"tag2\", ...],\n"
+            "  \"hook\": \"[PUNCHY HOOK]\"\n"
             "}"
         )
     
@@ -256,17 +267,22 @@ class CreativeWriter:
         }
 
     def _clean_tags(self, tags: list) -> list:
-        """Tags limitine (500 char) ve kaliteye dikkat eder."""
-        must_have = ["evcarix", "EV", "ElectricVehicle", "Shorts"]
+        """Tags limitine (500 char) ve kaliteye dikkat eder. 'Ranked' mantığı uygular."""
+        # En rütbeli/güçlü etiketler en başa
+        must_have = ["Evcarix", "Electric Vehicle", "EV", "Tech", "Data", "Shorts"]
         cleaned = []
-        for t in must_have: cleaned.append(t)
+        for t in must_have:
+            cleaned.append(t)
         
         current_len = sum(len(t) + 2 for t in cleaned)
+        # LLM'den gelen etiketleri temizle ve ekle
         for t in tags:
             tag = re.sub(r'[^a-zA-Z0-9\s]', '', str(t)).strip()
             if len(tag) < 2 or tag.lower() in [c.lower() for c in cleaned]:
                 continue
+            # Gereksiz boşlukları temizle
+            tag = " ".join(tag.split())
             if current_len + len(tag) + 2 < 480:
                 cleaned.append(tag)
                 current_len += len(tag) + 2
-        return cleaned[:40]
+        return cleaned[:45]

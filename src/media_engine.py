@@ -29,7 +29,7 @@ EV_BLOCKLIST = {
     "music", "concert", "dance", "party", "club",
     "beach", "swim", "pool", "ocean", "surf",
     "hiking", "mountain", "camping", "forest", "nature",
-    "baby", "child", "kids", "school", "education",
+    "baby", "child", "kids", "school",
     # Kısmen alakasız araç içeriği
     "motorcycle", "bike", "bicycle", "plane", "airplane", "boat", "ship",
     "truck", "semi", "tractor", "helicopter",
@@ -59,6 +59,12 @@ EV_QUERY_POOL = [
     "digital dashboard electric car",
     "electric vehicle night charging",
     "futuristic car exterior",
+    "electric car robot factory",
+    "AI technology digital brain",
+    "humanoid robot technology",
+    "smart city traffic future",
+    "flying car prototype tech",
+    "advanced battery laboratory",
 ]
 
 

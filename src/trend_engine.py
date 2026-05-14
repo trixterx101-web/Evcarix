@@ -22,12 +22,38 @@ TOPIC_HISTORY_FILE = "used_topics.json"
 TOPIC_HISTORY_LIMIT = 14
 
 ALLOWED_TOPICS = [
+    # Core EV
     "battery", "range", "charging", "ownership", "cost",
     "degradation", "LFP", "NMC", "heat pump", "efficiency",
     "winter range", "charging speed", "fast charging", "BMS",
     "real world test", "kWh", "electric vehicle data",
     "EV comparison", "electric car test", "charging network",
     "depreciation", "total cost", "solid state", "WLTP",
+    # Electric Vehicles & Future Tech
+    "electric vehicle", "EV platform", "OTA update", "aerodynamics",
+    "wireless charging", "motor type", "permanent magnet", "induction motor",
+    # Artificial Intelligence
+    "artificial intelligence", "AI", "machine learning", "neural network",
+    "self-driving", "autonomous", "autopilot", "AI range", "predictive",
+    # Robotics
+    "robot", "robotics", "humanoid", "automation", "gigafactory",
+    "Tesla Optimus", "robotic arm", "AMR", "battery recycling",
+    # New Technologies
+    "silicon anode", "sodium-ion", "sodium ion", "ultra-fast charging",
+    "V2G", "vehicle to grid", "perovskite", "breakthrough",
+    # Battery Systems
+    "lithium-sulfur", "second-life battery", "cell-to-pack", "CTP",
+    "CTB", "formation cycling", "battery fire", "battery safety",
+    # Smart Cities
+    "smart city", "smart grid", "smart charging", "bidirectional",
+    "V2H", "charging desert", "dynamic pricing", "connected car",
+    # Future Devices
+    "flexible solar", "augmented reality", "AR HUD", "smart tire",
+    "wearable", "in-car health", "future device", "gadget",
+    # Viral & Hook Topics
+    "Tesla", "Elon Musk", "flying car", "robotaxi", "humanoid",
+    "smartest robot", "2000km range", "Japan tech", "China tech",
+    "invention", "smart city", "AI phone", "fastest car",
 ]
 
 BLOCKED_TOPICS = [
@@ -830,16 +856,57 @@ Return ONLY this JSON (no markdown, no backticks):
                     print(f"[TrendEngine] Gemini error: {e}")
 
         core_topics = [
+            # Electric Vehicles & Future Tech
             "Real-world EV range test vs manufacturer claims",
+            "EV aerodynamics: how drag coefficient directly impacts real range",
+            "OTA software updates: how EVs improve without visiting a dealer",
+            # Battery Science
             "Battery degradation: LFP vs NMC after 100k miles",
-            "Winter range loss in modern electric cars: real data",
+            "DC fast charging impact on battery health: long-term data",
+            "Silicon anode batteries: real-world performance vs graphite",
+            "Battery second-life: repurposing EV packs for grid storage — costs",
+            "Battery fire risk: chemistry comparison LFP vs NMC vs NCA — stats",
+            # Charging & Infrastructure
             "EV charging speed: 400V vs 800V architecture comparison",
+            "Ultra-fast charging: 350 kW vs 500 kW — thermal limits explained",
+            "Vehicle-to-grid (V2G) technology: real economics and grid impact",
+            # AI & Autonomy
+            "How AI optimizes battery management in real-time",
+            "Self-driving levels explained: L2 vs L3 vs L4 — where are we now?",
+            "AI vs human: energy efficiency on the same route — real data",
+            # Robotics
+            "EV factory robots vs human workers: quality and speed data",
+            "How Tesla Optimus and humanoid robots will impact EV production cost",
+            # Smart Cities
+            "Smart charging grids: how cities balance EV load in real time",
+            "Bidirectional EVs powering buildings: real cost savings data",
+            "Public charging deserts: city-by-city coverage gap analysis 2026",
+            # General Ownership & Tech
+            "Winter range loss in modern electric cars: real data",
             "True cost of EV ownership over 100k miles",
             "Heat pump efficiency in extreme cold weather",
             "Solid-state battery progress: real timeline and data",
             "EV efficiency: Wh/km breakdown by model",
             "Tesla Model 3 vs BYD Seal: head-to-head efficiency test",
-            "DC fast charging impact on battery health: long-term data",
+            # Viral & Hook Topics
+            "Tesla’s biggest problem",
+            "The world’s smartest robot",
+            "AI just replaced this job",
+            "The future of flying cars",
+            "This EV has 2000km range",
+            "Japan’s futuristic transport",
+            "Elon Musk’s next AI project",
+            "The rise of humanoid robots",
+            "The future of batteries",
+            "This AI can drive better than humans",
+            "The fastest electric car ever",
+            "The robot that cooks food",
+            "China’s hidden tech empire",
+            "This car parks itself",
+            "AI phones are coming",
+            "Tesla Robotaxi explained",
+            "The future of smart cities",
+            "This invention looks unreal",
         ]
         unused_core = [t for t in core_topics if not self._is_used_recently(t)]
         pool = unused_core if unused_core else core_topics
@@ -953,19 +1020,17 @@ Return ONLY this JSON (no markdown, no backticks):
             f"A competitor published a Short about: \"{title}\"\n"
             f"Channel: {channel}\n"
             f"Their description: \"{description[:300]}\"\n\n"
-            f"Write a COMPLETELY ORIGINAL Evcarix script inspired by this TOPIC only.\n"
+            f"Write a COMPLETELY ORIGINAL Evcarix script and metadata inspired by this TOPIC.\n"
             f"Rules:\n"
-            f"- Do NOT copy their words or sentence structure\n"
-            f"- Data-driven: real stats, %, kWh, miles numbers\n"
-            f"- 35-45 seconds spoken (80-100 words)\n"
-            f"- Start with a shocking specific stat\n"
+            f"- SEO TITLE: Must be better than the competitor. Scroll-stopping, keywords-first, numbers included. Max 55 chars.\n"
+            f"- DESCRIPTION HOOK: High keyword density in the first 100 characters. No fluff.\n"
+            f"- SCRIPT: Data-driven, analytical. Real stats, %, kWh. 35-45 seconds spoken.\n"
+            f"- TAGS: Provide 10 specific, high-ranking SEO tags.\n"
             f"- End with: 'Subscribe to Evcarix for real EV data.'\n"
-            f"- English only, USA/Europe/China examples ONLY\n"
-            f"- Never mention Turkey\n\n"
+            f"- English only (USA/Europe/China examples).\n\n"
             f"Return ONLY this JSON (no backticks):\n"
-            f'{{"topic":"one line topic","title":"YouTube title under 70 chars with number",'
-            f'"script":"full script","tags":["tag1","tag2","tag3","tag4","tag5","tag6","tag7"],'
-            f'"hook":"first sentence","category":"battery_science|range_tests|charging|comparisons|market_data|education"}}'
+            f'{{"topic":"one line topic","title":"[SEO TITLE]","script":"[SCRIPT]","tags":["tag1","tag2",...],'
+            f'"hook":"[SEO DESCRIPTION HOOK]","category":"battery_science|range_tests|charging|comparisons|market_data|education"}}'
         )
 
         # LLM pipeline (Çoklu key desteği ile)
