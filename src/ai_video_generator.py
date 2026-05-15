@@ -112,14 +112,19 @@ class AIVideoGenerator:
 
     def _google_veo(self, prompt, idx):
         if not self.gemini_key: return None
-        import google.generativeai as genai
-        genai.configure(api_key=self.gemini_key)
-        model = genai.GenerativeModel("veo-3-1")
-        res = model.generate_content(prompt)
-        if res and hasattr(res, 'data'):
-            p = os.path.join(OUTPUT_DIR, f"veo_{idx}.mp4")
-            with open(p, "wb") as f: f.write(res.data)
-            return p
+        try:
+            from google import genai
+            client = genai.Client(api_key=self.gemini_key)
+            response = client.models.generate_content(
+                model="veo-3-1",
+                contents=prompt
+            )
+            if response and hasattr(response, 'data'):
+                p = os.path.join(OUTPUT_DIR, f"veo_{idx}.mp4")
+                with open(p, "wb") as f: f.write(response.data)
+                return p
+        except Exception as e:
+            logger.debug(f"[GoogleVeo] Yeni SDK Hatası: {e}")
         return None
 
     def _muapi(self, prompt, idx):
