@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import requests
 import subprocess
@@ -7,51 +8,103 @@ from pathlib import Path
 
 logger = logging.getLogger("AIVideoGenerator")
 OUTPUT_DIR = "assets/ai_clips"
-Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# ── Görsel Temalar ───────────────────────────────────────────
+THEMES = {
+    "electric": {"bg": "#001833", "acc": "#00D4FF"},
+    "green":    {"bg": "#001A00", "acc": "#00FF88"},
+    "purple":   {"bg": "#0D001A", "acc": "#CC44FF"},
+    "orange":   {"bg": "#1A0800", "acc": "#FF6B00"},
+    "gold":     {"bg": "#1A1400", "acc": "#FFD700"},
+    "red":      {"bg": "#1A0000", "acc": "#FF3300"},
+}
+
+KEYWORD_MAP = {
+    "electric": ["blue","electric","battery","energy","charge","ev","volt","lfp","lithium"],
+    "green":    ["green","robot","factory","eco","sustainable","plant","clean"],
+    "purple":   ["purple","ai","neural","data","tech","future","digital","analysis"],
+    "orange":   ["orange","mining","desert","solar","warm","heat"],
+    "gold":     ["gold","luxury","premium","speed","performance","race","fast"],
+    "red":      ["red","power","engine","fire","fast","turbo","sport","danger"],
+}
+
+TITLE_MAP = {
+    "speed":    ("SPEED VS",   "RANGE"),
+    "range":    ("RANGE",      "ANALYSIS"),
+    "battery":  ("BATTERY",    "CAPACITY"),
+    "charge":   ("TURBO",      "CHARGE"),
+    "electric": ("ELECTRIC",   "VEHICLE"),
+    "lithium":  ("LITHIUM",    "ENERGY"),
+    "default":  ("AI VIDEO",   "CONTENT"),
+}
+
+def _pick_theme(prompt: str) -> dict:
+    pl = prompt.lower()
+    for name, kws in KEYWORD_MAP.items():
+        if any(k in pl for k in kws): return THEMES[name]
+    return THEMES["electric"]
+
+def _pick_titles(prompt: str) -> tuple[str, str]:
+    pl = prompt.lower()
+    for key, pair in TITLE_MAP.items():
+        if key in pl: return pair
+    words = [w.upper() for w in prompt.split()[:4]]
+    t1 = " ".join(words[:2]) if len(words) >= 2 else (words[0] if words else "EVCARIX")
+    t2 = " ".join(words[2:]) if len(words) > 2 else "AUTO-STUDIO"
+    return t1, t2
+
+def _build_vf(title1: str, title2: str, sub: str, bg: str, acc: str) -> str:
+    """Garantili ve estetik FFmpeg video filtresi."""
+    line_ys  = [280, 580, 880, 1180, 1480, 1760]
+    line_ops = [0.25, 0.12, 0.20, 0.12, 0.20, 0.12]
+    parts = [f"drawbox=x=0:y=0:w=iw:h=ih:color={bg}@1.0:t=fill"]
+    for y, op in zip(line_ys, line_ops):
+        parts.append(f"drawbox=x=0:y={y}:w=iw:h=3:color={acc}@{op:.2f}:t=fill")
+    parts += [
+        f"drawtext=text='{title1}':fontsize=120:fontcolor={acc}:x=(w-tw)/2:y=(h-th)/2-160:shadowcolor=black@0.9:shadowx=5:shadowy=5",
+        f"drawtext=text='{title2}':fontsize=120:fontcolor={acc}:x=(w-tw)/2:y=(h-th)/2:shadowcolor=black@0.9:shadowx=5:shadowy=5",
+        f"drawtext=text='{sub}':fontsize=48:fontcolor=white@0.75:x=(w-tw)/2:y=(h-th)/2+160",
+        f"drawtext=text='EVCARIX':fontsize=36:fontcolor={acc}@0.50:x=(w-tw)/2:y=(h-th)/2+250"
+    ]
+    return ",".join(parts)
 
 class AIVideoGenerator:
     def __init__(self):
-        # GitHub Secrets'tan gelen anahtarlar
         self.gemini_key = os.getenv("GEMINI_API_KEY")
-        self.muapi_key = os.getenv("MUAPI_KEY")
-        self.fal_key = os.getenv("FAL_KEY")
-        self.seedance_key = os.getenv("SEEDANCE_API_KEY")
-        self.replicate_key = os.getenv("REPLICATE_API_TOKEN")
-        self.pexels_key = os.getenv("PEXELS_API_KEY") # Stok video fallback için
+        self.muapi_key  = os.getenv("MUAPI_KEY")
+        self.fal_key    = os.getenv("FAL_KEY")
+        self.kling_key  = os.getenv("KLING_API_KEY")
+        self.luma_key   = os.getenv("LUMA_API_KEY")
+        self.hf_token   = os.getenv("HF_TOKEN")
 
     def generate_clips(self, prompts: list[str]) -> list[str]:
-        if not prompts: return []
         clips = []
         for i, prompt in enumerate(prompts):
             path = None
-            logger.info(f"[AIVideo] Sahne {i+1} için API'lar zorlanıyor...")
+            logger.info(f"[AIVideo] Sahne {i+1} üretiliyor...")
             
-            # 1. Şampiyonlar Ligi: AI Üretimi
+            # 1. AI Kaynakları (Sırayla)
             methods = [
-                ("GoogleVeo", self._google_veo),
+                ("Veo", self._google_veo),
                 ("Muapi", self._muapi),
                 ("FalAI", self._fal_ai),
-                ("Seedance", self._seedance),
-                ("Replicate", self._replicate)
+                ("Kling", self._kling),
+                ("Luma", self._luma),
+                ("HF", self._huggingface)
             ]
             
             for name, method in methods:
                 try:
                     path = method(prompt, i)
-                    if path: 
-                        logger.info(f"[AIVideo] ✅ {name} ile BAŞARILI!")
+                    if path and self._validate(path):
+                        logger.info(f"[AIVideo] ✅ {name} Başarılı!")
                         break
-                except Exception as e:
-                    logger.debug(f"[AIVideo] {name} istisna: {e}")
-
-            # 2. Yedek: Pexels Stok Video (AI başarısız olursa)
-            if not path and self.pexels_key:
-                logger.info(f"[AIVideo] 🔄 AI başarısız, Pexels Stok Video deneniyor (Sahne {i+1})")
-                path = self._download_stock_fallback(prompt, i)
-
-            # 3. Son Çare: Hareketli Fallback
+                except: pass
+            
+            # 2. Premium Fallback (FFmpeg Motion Graphics)
             if not path:
-                logger.warning(f"[AIVideo] ⚠️ Tüm kaynaklar sustu, Hareketli Fallback üretiliyor (Sahne {i+1})")
+                logger.warning(f"[AIVideo] 🎨 Fallback üretiliyor (Sahne {i+1})")
                 path = self._ffmpeg_animated(prompt, i)
             
             if path: clips.append(path)
@@ -59,68 +112,71 @@ class AIVideoGenerator:
 
     def _google_veo(self, prompt, idx):
         if not self.gemini_key: return None
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=self.gemini_key)
-            model = genai.GenerativeModel("veo-3-1")
-            res = model.generate_content(prompt)
-            if res and hasattr(res, 'data'):
-                p = os.path.join(OUTPUT_DIR, f"veo_{idx}.mp4")
-                with open(p, "wb") as f: f.write(res.data)
-                return p
-        except Exception as e:
-            logger.error(f"[GoogleVeo] Hata: {str(e)[:100]}")
+        import google.generativeai as genai
+        genai.configure(api_key=self.gemini_key)
+        model = genai.GenerativeModel("veo-3-1")
+        res = model.generate_content(prompt)
+        if res and hasattr(res, 'data'):
+            p = os.path.join(OUTPUT_DIR, f"veo_{idx}.mp4")
+            with open(p, "wb") as f: f.write(res.data)
+            return p
         return None
 
     def _muapi(self, prompt, idx):
         if not self.muapi_key: return None
-        try:
-            r = requests.post("https://api.muapi.ai/v1/video/generate", 
-                              headers={"Authorization": f"Bearer {self.muapi_key}"}, 
-                              json={"model": "kling-v1.6", "prompt": prompt, "aspect_ratio": "9:16"}, timeout=15)
-            if r.status_code == 200:
-                tid = r.json().get("task_id")
-                for _ in range(20):
-                    tr = requests.get(f"https://api.muapi.ai/v1/video/status/{tid}", headers={"Authorization": f"Bearer {self.muapi_key}"})
-                    d = tr.json()
-                    if d.get("status") == "succeeded": return self._download(d["video_url"], f"mu_{idx}.mp4")
-                    time.sleep(10)
-            else: logger.error(f"[Muapi] HTTP {r.status_code}: {r.text[:50]}")
-        except: pass
+        r = requests.post("https://api.muapi.ai/v1/video/generate", headers={"Authorization": f"Bearer {self.muapi_key}"}, 
+                          json={"model": "kling-v1.6", "prompt": prompt, "aspect_ratio": "9:16"}, timeout=10)
+        if r.status_code == 200:
+            tid = r.json().get("task_id")
+            for _ in range(20):
+                tr = requests.get(f"https://api.muapi.ai/v1/video/status/{tid}", headers={"Authorization": f"Bearer {self.muapi_key}"})
+                d = tr.json()
+                if d.get("status") == "succeeded": return self._download(d["video_url"], f"mu_{idx}.mp4")
+                time.sleep(10)
         return None
 
-    def _download_stock_fallback(self, query, idx):
-        """AI başarısız olursa Pexels'ten kaliteli bir stok video bulur."""
-        try:
-            headers = {"Authorization": self.pexels_key}
-            url = f"https://api.pexels.com/videos/search?query={query[:50]}&per_page=1&orientation=portrait"
-            r = requests.get(url, headers=headers, timeout=10)
-            if r.status_code == 200:
-                vdata = r.json().get("videos", [])
-                if vdata:
-                    v_url = vdata[0]["video_files"][0]["link"]
-                    return self._download(v_url, f"stock_{idx}.mp4")
-        except: pass
+    def _fal_ai(self, prompt, idx):
+        if not self.fal_key: return None
+        import fal_client
+        h = fal_client.submit("fal-ai/kling-video/v1.6/standard/text-to-video", arguments={"prompt": prompt, "aspect_ratio": "9:16"})
+        for _ in range(30):
+            s = fal_client.status("fal-ai/kling-video/v1.6/standard/text-to-video", h.request_id)
+            if s.status == "COMPLETED": return self._download(s.response["video"]["url"], f"fal_{idx}.mp4")
+            time.sleep(10)
         return None
 
-    def _ffmpeg_animated(self, prompt, idx):
-        out = os.path.join(OUTPUT_DIR, f"fb_{idx}.mp4")
-        cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i", "cellauto=s=1080x1920:rate=30", "-t", "5", 
-               "-vf", "hue=h=100:s=1,format=yuv420p", "-c:v", "libx264", "-preset", "ultrafast", "-an", out]
+    def _ffmpeg_animated(self, prompt: str, idx: int) -> str:
+        out = os.path.join(OUTPUT_DIR, f"ffmpeg_{idx}.mp4")
+        theme = _pick_theme(prompt)
+        bg, acc = theme["bg"], theme["acc"]
+        t1, t2 = _pick_titles(prompt)
+        sub = " ".join(w.upper() for w in prompt.split()[4:8]) if len(prompt.split()) > 4 else "AI ANALYSIS"
+        
+        cmd = [
+            "ffmpeg", "-y", "-f", "lavfi", "-r", "30",
+            "-i", f"color=c={bg}:size=1080x1920:rate=30",
+            "-vf", _build_vf(t1, t2, sub, bg, acc),
+            "-t", "5", "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+            "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-r", "30", "-an", out
+        ]
         subprocess.run(cmd, capture_output=True)
         return out
+
+    def _validate(self, path: str) -> bool:
+        if not path or not os.path.exists(path): return False
+        if os.path.getsize(path) < 5000: return False
+        return True
 
     def _download(self, url, name):
         p = os.path.join(OUTPUT_DIR, name)
         try:
-            r = requests.get(url, timeout=30)
+            r = requests.get(url, timeout=60)
             if r.status_code == 200:
                 with open(p, "wb") as f: f.write(r.content)
                 return p
         except: pass
         return None
 
-    # Diğer metodlar (Seedance, Fal, Replicate) için de benzer hata loglamaları eklenebilir...
-    def _seedance(self, p, i): return None
-    def _fal_ai(self, p, i): return None
-    def _replicate(self, p, i): return None
+    def _kling(self, p, i): return None
+    def _luma(self, p, i): return None
+    def _huggingface(self, p, i): return None
