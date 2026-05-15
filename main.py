@@ -177,27 +177,35 @@ class EvcarixOrchestrator:
         # ── 3b. Arka Plan Müziği (isteğe bağlı, CC-BY) ───────────────────────
         if os.getenv("USE_BG_MUSIC", "true").lower() == "true":
             try:
-                from src.audio_bg_engine import AudioBgEngine
-                bg_engine = AudioBgEngine()
-                mood = plan.get("category", "technology")
-                bg_track = bg_engine.get_background_music(mood=mood)
-                if bg_track:
+                from src.music_fetcher import MusicFetcher
+                mf = MusicFetcher()
+                bg_track_path = mf.get_track(mood="tech_upbeat")
+                
+                if bg_track_path:
+                    # Voice ve BG mix
+                    from src.audio_bg_engine import AudioBgEngine
+                    abe = AudioBgEngine()
                     mixed_path = audio_output.replace(".mp3", "_mixed.mp3")
-                    audio_path = bg_engine.mix_bg_music_with_voice(
-                        audio_path, bg_track["path"], mixed_path,
+                    audio_path = abe.mix_bg_music_with_voice(
+                        audio_path, bg_track_path, mixed_path,
                         music_volume=0.10
                     )
-                    print(f"      🎵 BG Müzik: {bg_track['title']} ({bg_track.get('license','CC-BY')})",
-                          flush=True)
+                    print(f"      🎵 BG Müzik yüklendi.", flush=True)
             except Exception as e:
                 print(f"      ⚠️ BG Müzik hatası (atlanıyor): {e}", flush=True)
 
         # ── 4. Montaj ─────────────────────────────────────────────
         print("\n[4/6] Video montajlanıyor (MoviePy)...", flush=True)
         output_filename = f"evcarix_shorts_{ts}.mp4"
-        final_video_path = self.editor.assemble_short(
-            video_paths=video_paths,
+        final_video_path = self.editor.assemble(
+            clips_paths=video_paths,
             audio_path=audio_path,
+            title=title,
+            topic=topic,
+            words_with_times=word_timings,
+            is_short=True,
+            output_path=output_filename
+        )
             word_timings=word_timings,
             output_filename=output_filename,
             category=plan.get('category', 'general')

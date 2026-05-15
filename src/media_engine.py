@@ -155,26 +155,23 @@ class MediaEngine:
         # EV-only query havuzu (her çalışmada farklı sıra)
         query_pool = topic_queries + random.sample(EV_QUERY_POOL, min(6, len(EV_QUERY_POOL)))
 
-        ff_target = max(2, needed // 3)
-        px_target = max(2, needed // 3)
-
-        # ── KATMAN 1: YouTube Creative Commons (En Yüksek Kalite, Telif Sıfır) ──
-        # videoLicense=creativeCommon filtreli — sadece CC-BY videolar indirilir
-        # YOUTUBE_API_KEY yoksa sessizce atlanır
+        # ── KATMAN 1: Multi-Source Footage Fetcher (Safe & Robust) ──
+        # Pexels, Pixabay, NASA, Wikimedia, Archive.org
         try:
-            from src.youtube_cc_source import YouTubeCCSource
-            ytcc = YouTubeCCSource()
-            ytcc_target = max(2, needed // 3)
-            ytcc_clips = await ytcc.fetch(
-                topic=topic_text, count=ytcc_target, video_type=video_type
+            from src.footage_fetcher import FootageFetcher
+            fetcher = FootageFetcher()
+            # Fetch clips using the new logic (Primary + Fallbacks)
+            fetched_clips = fetcher.fetch(
+                query=topic_text, 
+                count=needed, 
+                is_short=(video_type == "short")
             )
-            ytcc_clips = [c for c in ytcc_clips if c and self._is_ev_relevant(c)]
-            all_clips.extend(ytcc_clips)
-            logger.info(f"[MediaEngine] YouTube CC: +{len(ytcc_clips)} klip")
+            all_clips.extend(fetched_clips)
+            logger.info(f"[MediaEngine] FootageFetcher: +{len(fetched_clips)} clips")
         except Exception as e:
-            logger.error(f"[MediaEngine] YouTube CC hatası: {e}")
+            logger.error(f"[MediaEngine] FootageFetcher error: {e}")
 
-        # ── KATMAN 2: Research & Gov (NASA, DOE, NREL) ──
+        # ── KATMAN 2: Research & Gov (ResearchFetcher - Legacy NASA Support) ──
         # Public Domain — Sıfır Telif Riski
         try:
             from src.research_fetcher import ResearchFetcher
