@@ -6,7 +6,7 @@ from pathlib import Path
 
 logger = logging.getLogger("Editor")
 
-class Editor:
+class AutoEditor:
     def assemble(self, video_clips, audio_path, output_path, is_short=True):
         """
         Videoyu MoviePy kullanmadan, doğrudan FFmpeg ile birleştirir.
