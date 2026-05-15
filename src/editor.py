@@ -139,6 +139,11 @@ class AutoEditor:
                     continue
                 try:
                     c = VideoFileClip(p).without_audio().resize(height=target_size[1])
+                    # duration string olarak geldiyse (bozuk metadata) bu klibi atla
+                    if not isinstance(c.duration, (int, float)) or c.duration <= 0:
+                        logger.warning(f"[Editor] Geçersiz süre, klip atlandı: {os.path.basename(p)} (dur={c.duration})")
+                        c.close()
+                        continue
                     if c.w > target_size[0]:
                         c = c.crop(x_center=c.w / 2, width=target_size[0])
                     v_clips.append(self._apply_ken_burns(c))
@@ -156,12 +161,19 @@ class AutoEditor:
 
             if audio_path and os.path.exists(audio_path):
                 audio = AudioFileClip(audio_path)
-                final_video = final_video.set_audio(audio.set_duration(final_video.duration))
+                vid_dur = final_video.duration
+                # Audio'yu video süresine göre kırp veya uzat
+                if audio.duration > vid_dur:
+                    audio = audio.subclip(0, vid_dur)
+                final_video = final_video.set_audio(audio)
 
             if words_with_times:
                 final_video = self._add_subtitles(final_video, words_with_times)
 
-            final_video.write_videofile(output_path, codec="libx264", audio_codec="aac", fps=30, preset="ultrafast")
+            final_video.write_videofile(
+                output_path, codec="libx264", audio_codec="aac",
+                fps=30, preset="ultrafast", logger=None
+            )
             return output_path
         except Exception as e:
             logger.error(f"[Editor] Assemble failed: {e}")

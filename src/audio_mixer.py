@@ -19,15 +19,14 @@ def mix_audio(tts_path: str, music_path: str, output_path: str, music_volume: fl
         return tts_path
     
     try:
-        # filter_complex explains:
-        # [1:a] loop the music infinitely, then apply volume
-        # amix: mix both, duration=first (ends when TTS ends)
+        # -stream_loop -1: müziği sonsuz döngüye al (aloop filter'dan daha uyumlu)
         cmd = [
             "ffmpeg", "-y",
             "-i", tts_path,
+            "-stream_loop", "-1",
             "-i", music_path,
             "-filter_complex",
-            f"[1:a]volume={music_volume},aloop=loop=-1:size=2e+09[music];"
+            f"[1:a]volume={music_volume}[music];"
             f"[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[out]",
             "-map", "[out]",
             "-c:a", "aac",
