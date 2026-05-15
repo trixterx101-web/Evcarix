@@ -14,8 +14,7 @@ def generate_scene_prompts(topic: str, script: str, count: int = 6) -> list[str]
         return _get_fallback_prompts(topic, count)
 
     genai.configure(api_key=api_key)
-    # models/ prefix'i bazı API versiyonlarında zorunludur
-    model = genai.GenerativeModel("models/gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash")
     
     system_prompt = f"""You are a cinematic video director for YouTube Shorts.
 Topic: {topic}

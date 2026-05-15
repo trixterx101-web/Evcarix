@@ -93,8 +93,7 @@ class AIVideoGenerator:
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.gemini_key)
-            # Veo 3.1 için en güncel model ismi
-            model = genai.GenerativeModel("models/veo-3-1") 
+            model = genai.GenerativeModel("veo-3-1") 
             result = model.generate_content(prompt)
             
             # Video içeriği genellikle file_data veya inline_data olarak döner
@@ -297,8 +296,9 @@ class AIVideoGenerator:
     def _ffmpeg_animated(self, prompt: str, idx: int) -> str:
         out = os.path.join(OUTPUT_DIR, f"fallback_{idx}.mp4")
         color = "0x001833" if "blue" in prompt.lower() else "0x0A0A1E"
+        # pix_fmt yuv420p: Görüntünün oynatıcılarda görünmesi için kritik format
         cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c={color}:size=1080x1920:rate=30", "-t", "5", 
-               "-c:v", "libx264", "-crf", "28", "-preset", "ultrafast", "-an", out]
+               "-c:v", "libx264", "-crf", "28", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an", out]
         subprocess.run(cmd, capture_output=True)
         return out
 

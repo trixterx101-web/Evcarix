@@ -311,7 +311,8 @@ class AutoEditor:
 
             final_video.write_videofile(
                 output_path, codec="libx264", audio_codec="aac",
-                fps=30, preset="ultrafast", logger=None
+                fps=30, preset="ultrafast", logger=None,
+                ffmpeg_params=["-pix_fmt", "yuv420p"]
             )
 
             if not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
