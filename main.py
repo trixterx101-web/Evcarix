@@ -206,10 +206,6 @@ class EvcarixOrchestrator:
             is_short=True,
             output_path=output_filename
         )
-            word_timings=word_timings,
-            output_filename=output_filename,
-            category=plan.get('category', 'general')
-        )
 
         # ── 5. Kapak (Thumbnail) İptal Edildi ─────────────────────
         print("\n[5/6] Thumbnail üretimi manuel yükleme için atlandı.", flush=True)
