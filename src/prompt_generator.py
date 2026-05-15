@@ -1,67 +1,63 @@
 import os
 import json
 import logging
-import google.generativeai as genai
+import requests
 
 logger = logging.getLogger("PromptGenerator")
 
 def generate_scene_prompts(topic: str, script: str, count: int = 6) -> list[str]:
-    """Gemini kullanarak sahneler tasarlar. Teşhis modu aktiftir."""
+    """Gemini'ye OpenAI protokolü üzerinden ve tüm anahtarları deneyerek bağlanır."""
     
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        logger.error("GEMINI_API_KEY eksik!")
+    # Tüm potansiyel anahtarları topla
+    keys = [os.getenv(f"GEMINI_API_KEY_{i}") for i in range(1, 10)]
+    keys = [k for k in keys if k]
+    if os.getenv("GEMINI_API_KEY"):
+        keys.insert(0, os.getenv("GEMINI_API_KEY"))
+    
+    if not keys:
+        logger.error("Hiçbir GEMINI_API_KEY bulunamadı!")
         return _get_fallback_prompts(topic, count)
 
-    genai.configure(api_key=api_key)
-    
-    # Kapsamlı model listesi
-    model_candidates = [
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro",
-        "gemini-2.0-flash-exp",
-        "gemini-pro",
-        "models/gemini-1.5-flash",
-        "models/gemini-pro"
-    ]
+    system_prompt = f"You are a cinematic director. Topic: {topic}. Generate {count} scene prompts as a JSON array."
 
-    system_prompt = f"Topic: {topic}\nGenerate exactly {count} cinematic video scene prompts as a JSON array of strings."
+    for api_key in keys:
+        # Google'ın OpenAI uyumlu endpoint'ini kullanıyoruz (En stabil yöntem)
+        # Bu yöntem 404 hatalarını ve kütüphane çakışmalarını baypas eder.
+        url = f"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "gemini-1.5-flash",
+            "messages": [{"role": "user", "content": system_prompt}],
+            "response_format": {"type": "json_object"}
+        }
 
-    success_text = None
-    
-    for model_name in model_candidates:
         try:
-            logger.info(f"[PromptGen] Deneniyor: {model_name}")
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(system_prompt)
-            if response and response.text:
-                success_text = response.text.strip()
-                logger.info(f"[PromptGen] ✅ {model_name} BAŞARILI!")
-                break
-        except Exception as e:
-            err_msg = str(e)
-            logger.warning(f"[PromptGen] {model_name} başarısız: {err_msg[:100]}")
+            logger.info(f"[PromptGen] Anahtar deneniyor (...{api_key[-5:]})")
+            r = requests.post(url, headers=headers, json=payload, timeout=30)
             
-            # Eğer 404 alıyorsak, API'nin neleri gördüğünü bir kez loglayalım
-            if "404" in err_msg and model_name == model_candidates[0]:
-                try:
-                    logger.info("[PromptGen] 🔍 Mevcut modeller taranıyor...")
-                    available_models = [m.name for m in genai.list_models()]
-                    logger.info(f"[PromptGen] API'nin gördüğü modeller: {available_models}")
-                except: pass
+            if r.status_code == 200:
+                data = r.json()
+                content = data['choices'][0]['message']['content']
+                prompts_obj = json.loads(content)
+                # JSON yapısına göre ayıkla
+                if isinstance(prompts_obj, dict):
+                    # Eğer Gemini 'prompts': [...] şeklinde dönerse
+                    for val in prompts_obj.values():
+                        if isinstance(val, list): return val[:count]
+                if isinstance(prompts_obj, list):
+                    return prompts_obj[:count]
+                logger.info(f"[PromptGen] ✅ Başarıyla üretildi.")
+                return list(prompts_obj)[:count]
+            else:
+                logger.warning(f"[PromptGen] HTTP {r.status_code}: {r.text[:100]}")
+        except Exception as e:
+            logger.debug(f"[PromptGen] Hata: {e}")
             continue
 
-    if success_text:
-        try:
-            if "```" in success_text:
-                success_text = success_text.split("```")[1].replace("json", "").strip()
-            prompts = json.loads(success_text)
-            if isinstance(prompts, list) and len(prompts) >= count:
-                return prompts[:count]
-        except: pass
-
-    logger.warning("[PromptGen] Hiçbir model çalışmadı, fallback'e geçiliyor.")
+    logger.warning("[PromptGen] Tüm anahtarlar başarısız oldu, fallback.")
     return _get_fallback_prompts(topic, count)
 
 def _get_fallback_prompts(topic: str, count: int) -> list[str]:
