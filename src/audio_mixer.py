@@ -6,6 +6,13 @@ import logging
 logger = logging.getLogger("AudioMixer")
 
 
+def _get_audio_codec(output_path: str) -> str:
+    """Dosya uzantısına göre doğru ses kodekini seçer."""
+    ext = os.path.splitext(output_path)[1].lower()
+    if ext == ".mp3":
+        return "libmp3lame"
+    return "aac"  # .aac, .m4a, .mp4 vb. için
+
 def _get_duration(path: str, default: float = 60.0) -> float:
     """ffprobe ile dosya süresini float olarak döndürür."""
     try:
@@ -25,10 +32,11 @@ def _get_duration(path: str, default: float = 60.0) -> float:
 
 
 def _reencode_tts(tts_path: str, output_path: str) -> str:
-    """TTS'yi temiz AAC olarak yeniden encode eder — her zaman geçerli bir dosya döndürür."""
+    """TTS'yi temiz ses olarak yeniden encode eder — her zaman geçerli bir dosya döndürür."""
+    codec = _get_audio_codec(output_path)
     cmd = [
         "ffmpeg", "-y", "-i", tts_path,
-        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+        "-c:a", codec, "-b:a", "192k", "-ar", "44100",
         output_path
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
@@ -59,7 +67,8 @@ def mix_audio(tts_path: str, music_path: str, output_path: str,
         return _reencode_tts(tts_path, output_path)
 
     # ── Karıştırma: atrim + amix (stream_loop ile güvenli) ───────────────────
-    # atrim: müziği tam TTS süresiyle sınırlar (aloop boş stream sorununu önler)
+    # Mix with music — uzantıya göre doğru codec
+    codec = _get_audio_codec(output_path)
     filter_complex = (
         f"[1:a]atrim=0:{duration},asetpts=PTS-STARTPTS,volume={music_volume}[music];"
         f"[0:a]volume=1.0[voice];"
@@ -72,7 +81,7 @@ def mix_audio(tts_path: str, music_path: str, output_path: str,
         "-stream_loop", "-1", "-i", music_path,
         "-filter_complex", filter_complex,
         "-map", "[out]",
-        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+        "-c:a", codec, "-b:a", "192k", "-ar", "44100",
         "-t", str(duration),
         output_path
     ]
