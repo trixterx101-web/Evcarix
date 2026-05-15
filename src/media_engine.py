@@ -158,6 +158,39 @@ class MediaEngine:
         ff_target = max(2, needed // 3)
         px_target = max(2, needed // 3)
 
+        # ── KATMAN 1: YouTube Creative Commons (En Yüksek Kalite, Telif Sıfır) ──
+        # videoLicense=creativeCommon filtreli — sadece CC-BY videolar indirilir
+        # YOUTUBE_API_KEY yoksa sessizce atlanır
+        try:
+            from src.youtube_cc_source import YouTubeCCSource
+            ytcc = YouTubeCCSource()
+            ytcc_target = max(2, needed // 3)
+            ytcc_clips = await ytcc.fetch(
+                topic=topic_text, count=ytcc_target, video_type=video_type
+            )
+            ytcc_clips = [c for c in ytcc_clips if c and self._is_ev_relevant(c)]
+            all_clips.extend(ytcc_clips)
+            logger.info(f"[MediaEngine] YouTube CC: +{len(ytcc_clips)} klip")
+        except Exception as e:
+            logger.error(f"[MediaEngine] YouTube CC hatası: {e}")
+
+        # ── KATMAN 2: Research & Gov (NASA, DOE, NREL) ──
+        # Public Domain — Sıfır Telif Riski
+        try:
+            from src.research_fetcher import ResearchFetcher
+            rf = ResearchFetcher()
+            # Konu bazlı NASA araması
+            res_clips = await rf.fetch_nasa(topic_text, count=2)
+            # Kritik konular için DOE b-roll
+            if any(k in topic_text.lower() for k in ["battery", "ev", "charging"]):
+                doe_clips = await rf.fetch_energy_gov(topic_text, count=1)
+                res_clips.extend(doe_clips)
+            
+            all_clips.extend(res_clips)
+            logger.info(f"[MediaEngine] Research/Gov: +{len(res_clips)} klip")
+        except Exception as e:
+            logger.error(f"[MediaEngine] ResearchFetcher hatası: {e}")
+
         # 1. Free Footage (OEM verified URLs — her zaman EV içeriği)
         try:
             from src.free_footage import FreeFootageEngine
@@ -197,6 +230,20 @@ class MediaEngine:
             logger.info(f"[MediaEngine] Fetching from aggregator for: {q}")
             agg_clips = await self.aggregator.get_all_media(q, count=target_clip_count - len(all_clips), video_type=video_type)
             all_clips.extend(agg_clips)
+
+        # ── YENİ: Genişletilmiş Ücretsiz Kaynaklar (Wikimedia + Archive + Coverr) ──
+        # Hiç API key gerektirmez, CC0/Public Domain garantili
+        if len(all_clips) < target_clip_count:
+            try:
+                from src.extended_sources import ExtendedMediaSources
+                ext = ExtendedMediaSources()
+                needed_ext = target_clip_count - len(all_clips)
+                ext_clips = ext.fetch_all(topic_text, count=needed_ext)
+                ext_clips = [c for c in ext_clips if c and self._is_ev_relevant(c)]
+                all_clips.extend(ext_clips)
+                logger.info(f"[MediaEngine] ExtendedSources: +{len(ext_clips)} klip")
+            except Exception as e:
+                logger.error(f"[MediaEngine] ExtendedSources hatası: {e}")
 
         # Eğer hala eksikse eski yöntemlerle devam et
         if len(all_clips) < target_clip_count:

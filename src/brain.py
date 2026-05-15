@@ -6,6 +6,13 @@ import pandas as pd
 from src.trend_engine import TrendEngine
 from src.writer import CreativeWriter
 
+# Yeni: ücretsiz içerik keşif motoru
+try:
+    from src.content_discovery import ContentDiscovery
+    _discovery = ContentDiscovery()
+except Exception:
+    _discovery = None
+
 HISTORY_FILE = "used_topics.json"
 HISTORY_LIMIT = 100
 
@@ -46,7 +53,24 @@ class EvcarixBrain:
             except Exception as e:
                 print(f"[Brain] Trend hatası: {e}")
 
-        # 2. Manuel Konu Seçimi (GitHub Actions'tan gelen özel konular)
+        # 2. İçerik Keşif Modları (ContentDiscovery ile — API key gerektirmez)
+        discovery_modes = ["educational", "scientific", "ev_news"]
+        if content_mode in discovery_modes and _discovery:
+            try:
+                topics = _discovery.discover(strategy=content_mode, limit=10)
+                if topics:
+                    chosen = random.choice(topics)
+                    topic_title = chosen.get("title", "Future of Electric Vehicles")
+                    print(f"[Brain] 🔍 ContentDiscovery ({content_mode}): {topic_title[:60]}")
+                    print(f"        Kaynak: {chosen.get('source', '?')}")
+                    _discovery.mark_used(topic_title)
+                    return topic_title, None
+                else:
+                    print(f"[Brain] ⚠️ ContentDiscovery ({content_mode}) boş döndü, auto moda geçiliyor.")
+            except Exception as e:
+                print(f"[Brain] ContentDiscovery hatası: {e}")
+
+        # 3. Manuel Konu Seçimi (GitHub Actions'tan gelen özel konular)
         manual_topics = [
             "electric vehicles", "artificial intelligence", "robotics",
             "new technologies", "battery systems", "smart cities", "devices of the future"

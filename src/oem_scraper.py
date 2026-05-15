@@ -24,63 +24,33 @@ USER_AGENTS = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
 ]
 
-# ── DIRECT CDN URLS — NO SCRAPING NEEDED ──────────────────────────────────────
-# These are verified direct links to high-quality press videos
+# ── DIRECT CDN URLS — ONLY PUBLIC DOMAIN & CC LICENSED ───────────────────────
+# ⚠️  TELİF HAKKI POLİTİKASI:
+#     - Tesla, BMW, Volvo, Polestar, Rivian, Lucid CDN URL'leri KULLANILMAZ
+#       (ticari kullanım için telif hakkı ihlali riski)
+#     - Sadece US Gov (Public Domain) + Wikimedia (CC) kabul edilir
 OEM_CDN_URLS = {
-    "tesla": [
-        "https://www.tesla.com/ns_videos/Homepage-Model-Y-Desktop-NA.mp4",
-        "https://www.tesla.com/ns_videos/tesla-model-y-product-page-hero-desktop.mp4",
-        "https://www.tesla.com/ns_videos/supercharger-v3-product-page.mp4",
-        "https://www.tesla.com/ns_videos/cybertruck-hero-desktop.mp4",
-        "https://www.tesla.com/ns_videos/tesla-powerwall-2-homepage-desktop.mp4",
-    ],
-    "volvo": [
-        "https://www.volvocars.com/images/videos/xc40-electric/xc40-recharge-overview-desktop.mp4",
-        "https://www.volvocars.com/images/videos/c40/c40-recharge-hero-desktop.mp4",
-        "https://www.volvocars.com/images/videos/ex30/ex30-hero-desktop.mp4",
-        "https://www.volvocars.com/images/videos/ex90/ex90-hero-desktop.mp4",
-    ],
-    "polestar": [
-        "https://www.polestar.com/dato-assets/11897/1666081397-polestar-2-hero-video-desktop.mp4",
-        "https://cdn.polestar.com/dato-assets/homepage-hero-desktop.mp4",
-    ],
-    "rivian": [
-        "https://rivian.com/assets/images/home/r1t-hero-loop.mp4",
-        "https://rivian.com/assets/images/home/r1s-hero-loop.mp4",
-    ],
-    "lucid": [
-        "https://www.lucidmotors.com/media/videos/hero-desktop.mp4",
-        "https://cdn.lucidmotors.com/media/videos/lucid-air-driving-loop.mp4",
-    ],
+    # ✅ US Department of Energy — Public Domain (ABD hükümeti içeriği)
     "doe": [
         "https://www.energy.gov/sites/default/files/2022-07/ev-charging-broll.mp4",
         "https://afdc.energy.gov/files/vehicles/electric_charging_broll.mp4",
     ],
+    # ✅ Wikimedia Commons — CC / Public Domain
+    # (Lisans: her dosya için commons.wikimedia.org'dan doğrula)
     "wikimedia": [
         "https://upload.wikimedia.org/wikipedia/commons/transcoded/8/8e/Electric_vehicle_charging.webm/Electric_vehicle_charging.webm.480p.webm",
-        "https://upload.wikimedia.org/wikipedia/commons/transcoded/3/3e/Nissan_Leaf_charging.ogv/Nissan_Leaf_charging.ogv.480p.webm",
         "https://upload.wikimedia.org/wikipedia/commons/transcoded/0/04/BMW_i3_charging.webm/BMW_i3_charging.webm.480p.webm",
-        "https://upload.wikimedia.org/wikipedia/commons/transcoded/5/52/Tesla_Supercharger_timelapse.webm/Tesla_Supercharger_timelapse.webm.480p.webm",
-        "https://upload.wikimedia.org/wikipedia/commons/transcoded/7/7c/Electric_car_battery_pack.webm/Electric_car_battery_pack.webm.480p.webm",
-        "https://upload.wikimedia.org/wikipedia/commons/transcoded/6/6a/EV_charging_station_night.webm/EV_charging_station_night.webm.480p.webm",
-        "https://upload.wikimedia.org/wikipedia/commons/transcoded/2/2b/Lithium_battery_cells.webm/Lithium_battery_cells.webm.480p.webm",
         "https://upload.wikimedia.org/wikipedia/commons/transcoded/f/f1/Electric_motor_animation.ogv/Electric_motor_animation.ogv.480p.webm",
-        "https://upload.wikimedia.org/wikipedia/commons/transcoded/9/9a/Highway_driving_electric_car.webm/Highway_driving_electric_car.webm.480p.webm",
-        "https://upload.wikimedia.org/wikipedia/commons/transcoded/4/4c/BYD_electric_vehicle.webm/BYD_electric_vehicle.webm.480p.webm",
     ],
-    "coverr": [
-        "https://cdn.coverr.co/videos/coverr-electric-car-charging-2/720p.mp4",
-        "https://cdn.coverr.co/videos/coverr-an-ev-charging/720p.mp4",
-        "https://cdn.coverr.co/videos/coverr-electric-vehicle/720p.mp4",
-        "https://cdn.coverr.co/videos/coverr-cars-on-a-highway/720p.mp4",
-        "https://cdn.coverr.co/videos/coverr-a-car-driving-at-night/720p.mp4",
-        "https://cdn.coverr.co/videos/coverr-technology-screen/720p.mp4",
-        "https://cdn.coverr.co/videos/coverr-data-center/720p.mp4",
-        "https://cdn.coverr.co/videos/coverr-solar-panels/720p.mp4",
-        "https://cdn.coverr.co/videos/coverr-renewable-energy/720p.mp4",
-        "https://cdn.coverr.co/videos/coverr-battery-charging/720p.mp4",
-    ],
+    # ❌ KALDIRILDI (TELİF RİSKİ):
+    # "tesla"  → tesla.com/ns_videos/ — ticari marka içeriği
+    # "volvo"  → volvocars.com/images/videos/ — ticari marka içeriği
+    # "polestar" → polestar.com/dato-assets/ — reklam videosu
+    # "rivian" → rivian.com/assets/ — ticari hero video
+    # "lucid"  → lucidmotors.com/media/ — ticari reklam
+    # "coverr" → Coverr License ≠ CC0, YouTube monetize için belirsiz
 }
+
 
 # ── Official Press/Newsroom pages ONLY ────────────────────────────────────────
 # These are editorially open pages — no product ads, no commercials

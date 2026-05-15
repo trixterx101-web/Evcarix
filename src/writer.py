@@ -172,16 +172,17 @@ def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
             f"Generate EXPERT YouTube SEO metadata for a 5-10 minute deep-dive EV video about: '{topic}'.\n"
             f"{brand_style}\n"
             "SEO RULES:\n"
-            "1. TITLE: Must be high-CTR (Click-Through Rate). Use psychological hooks (Curiosity, Urgency, or Fear). "
-            "Put main keywords (e.g., Tesla, Solid-State, Range) at the BEGINNING. Max 70 chars.\n"
-            "2. TAGS: Provide 20 'ranked' tags. Include high-volume broad terms, medium-tail specific terms, and 'Evcarix' brand tags.\n"
-            "3. DESCRIPTION HOOK: First 2 lines are CRITICAL for SEO. Use keywords naturally.\n"
-            "4. KEYWORDS: Extract the 5 most powerful ranking keywords.\n"
+            "1. Generate TWO TITLE VERSIONS (Version A: Fact-based, Version B: Curiositiy-based).\n"
+            "2. Max 70 chars per title. High-CTR. Put main keywords at the BEGINNING.\n"
+            "3. TAGS: 20 ranked tags.\n"
+            "4. DESCRIPTION HOOK: Two different opener lines (Hook A and Hook B).\n"
             "Return ONLY JSON:\n"
             "{\n"
-            "  \"title\": \"[HIGH CTR TITLE]\",\n"
+            "  \"title_a\": \"[FACT TITLE]\",\n"
+            "  \"title_b\": \"[CURIOSITY TITLE]\",\n"
             "  \"tags\": [\"tag1\", \"tag2\", ...],\n"
-            "  \"hook\": \"[SEO OPTIMIZED DESCRIPTION OPENER]\",\n"
+            "  \"hook_a\": \"[HOOK VERSION A]\",\n"
+            "  \"hook_b\": \"[HOOK VERSION B]\",\n"
             "  \"keywords\": [\"kw1\", \"kw2\", ...]\n"
             "}"
         )
@@ -190,16 +191,20 @@ def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
             f"Generate VIRAL YouTube Shorts SEO metadata for: '{topic}'.\n"
             f"{brand_style}\n"
             "SEO RULES:\n"
-            "1. TITLE: Viral style. Use numbers (%, $, Miles). Must stop the scroll. Max 55 chars.\n"
-            "2. TAGS: 15 high-velocity trending tags (Shorts-specific).\n"
-            "3. HOOK: Punchy, keyword-rich opening sentence.\n"
+            "1. Generate TWO TITLE VERSIONS (Version A: Number-heavy, Version B: Question-based).\n"
+            "2. Max 55 chars per title. Viral style. Use numbers (%, $, Miles).\n"
+            "3. TAGS: 15 high-velocity trending tags.\n"
+            "4. HOOK: Two punchy, keyword-rich opening sentences (Hook A and Hook B).\n"
             "Return ONLY JSON:\n"
             "{\n"
-            "  \"title\": \"[VIRAL SHORT TITLE]\",\n"
+            "  \"title_a\": \"[NUMBER TITLE]\",\n"
+            "  \"title_b\": \"[QUESTION TITLE]\",\n"
             "  \"tags\": [\"tag1\", \"tag2\", ...],\n"
-            "  \"hook\": \"[PUNCHY HOOK]\"\n"
+            "  \"hook_a\": \"[PUNCHY HOOK A]\",\n"
+            "  \"hook_b\": \"[PUNCHY HOOK B]\"\n"
             "}"
         )
+
     
     res = _llm_chain(prompt)
     try:
@@ -237,19 +242,19 @@ class CreativeWriter:
         meta = generate_seo_metadata(topic, is_long=False)
         script_data = generate_script(topic, duration_s=45, is_long=False)
         
-        # Tag temizliği ve 500 karakter sınırı
-        raw_tags = meta.get("tags", ["ev", "electric car", "evcarix"])
-        final_tags = self._clean_tags(raw_tags)
+        final_tags = self._clean_tags(meta.get("tags", ["ev", "ai", "tech"]))
         
+        # MASTER PLAN SEO TEMPLATE (Shorts)
         desc = (
-            f"{meta['title']}\n\n"
-            f"📊 {meta['hook']}\n\n"
-            "Real EV data. No hype. Just numbers. — Evcarix\n\n"
-            f"{' '.join(['#' + t.replace(' ', '') for t in final_tags[:10]])}"
+            f"⚡ {meta.get('hook_a', meta.get('hook', 'Interesting data.'))}\n\n"
+            f"In this video, we explore {topic} and why it matters today.\n\n"
+            "🔔 Subscribe for daily tech updates & real EV data.\n"
+            "📱 Follow Evcarix for more insights.\n\n"
+            f"{' '.join(['#' + t.replace(' ', '') for t in final_tags[:8]])}"
         )
         
         return {
-            "title": meta['title'],
+            "title": meta.get('title_a', meta.get('title', topic)),
             "script": script_data["script"],
             "voice": script_data["voice"],
             "tags": final_tags,
@@ -263,17 +268,19 @@ class CreativeWriter:
         
         final_tags = self._clean_tags(meta.get("tags", []))
         
-        # Long description with timestamps
+        # MASTER PLAN SEO TEMPLATE (Long)
         desc = (
-            f"{meta['title']}\n\n"
-            f"💡 {meta['hook']}\n\n"
-            "In this deep-dive report, we analyze the raw data behind electric vehicle technology.\n\n"
+            f"🚀 {meta.get('hook_a', meta.get('hook', 'Expert analysis.'))}\n\n"
+            f"Deep-diving into {topic}. We analyze the raw data and future trends.\n\n"
+            "⚡ Key points covered:\n"
+            "- Industry-leading data analysis\n"
+            "- Technical specifications & performance\n"
+            "- Future market impact\n\n"
             "📌 Timestamps:\n"
-            "0:00 Introduction & Data Hook\n"
-            "1:15 Deep Dive Analysis\n"
-            "3:30 Final Verdict & Summary\n"
-            "4:45 Conclusion\n\n"
-            "No hype. Just numbers. Join the Evcarix community.\n\n"
+            "0:00 Introduction & Hook\n"
+            "1:15 Deep Analysis\n"
+            "3:30 Final Verdict\n\n"
+            "🔔 Subscribe to Evcarix: The World's Lead EV Data Authority.\n\n"
             f"{' '.join(['#' + t.replace(' ', '') for t in final_tags[:12]])}"
         )
         

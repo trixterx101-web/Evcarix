@@ -64,21 +64,86 @@ class AutoEditor:
         
         return clip
 
-    def _make_motion_background(self, duration, width=1920, height=1080):
+    def _apply_ken_burns(self, clip, zoom_ratio=0.1):
+        """Statik bir görüntüye yavaşça zoom yaparak Ken Burns efekti verir."""
+        def zoom(t):
+            return 1 + zoom_ratio * (t / clip.duration)
+        return clip.resize(zoom)
+
+    def _create_dynamic_subtitles(self, words_with_times, video_width, video_height):
+        """
+        Kelimeleri tek tek, büyük ve renkli altyazılar olarak oluşturur.
+        Global Shorts trendlerine (Alex Hormozi tarzı) uygundur.
+        """
+        from moviepy.editor import TextClip, CompositeVideoClip
+        
+        subs = []
+        for word, start, end in words_with_times:
+            # Önemli kelimeleri sarı, diğerlerini beyaz yap
+            color = "yellow" if len(word) > 5 else "white"
+            
+            txt = TextClip(
+                word.upper(),
+                fontsize=video_width * 0.12, # Oldukça büyük
+                color=color,
+                font='Arial-Bold',
+                stroke_color='black',
+                stroke_width=2,
+                method='caption',
+                size=(video_width * 0.8, None)
+            ).set_start(start).set_duration(end - start).set_position(('center', video_height * 0.65))
+            
+            subs.append(txt)
+        return subs
         """Creates a high-quality animated gradient background."""
         def make_frame(t):
             img = Image.new("RGB", (width, height), (10, 10, 20))
             draw = ImageDraw.Draw(img)
-            # Animated gradient shift
             shift = int(t * 50) % width
             for x in range(0, width, 200):
-                draw.rectangle([x + shift - width if x + shift > width else x + shift, 0, 
-                                x + shift - width + 100 if x + shift > width else x + shift + 100, height], 
+                draw.rectangle([x + shift - width if x + shift > width else x + shift, 0,
+                                x + shift - width + 100 if x + shift > width else x + shift + 100, height],
                                fill=(20, 20, 40))
             return np.array(img)
-        
+
         from moviepy.editor import VideoClip
         return VideoClip(make_frame, duration=duration)
+
+    def _overlay_progress_bar(self, clip, total_duration: float,
+                              bar_color=(0, 212, 255), bar_height: int = 6):
+        """
+        Uzun videolar için alt progress bar overlay.
+        İnce, şık, dikkat çekici — retention artırır.
+        bar_color: (R,G,B) — varsayılan cyan (#00D4FF)
+        bar_height: piksel yüksekliği
+        """
+        W, H = clip.w, clip.h
+
+        def make_bar_frame(t):
+            progress = min(t / total_duration, 1.0)
+            frame = np.zeros((bar_height, W, 3), dtype=np.uint8)
+            filled = int(W * progress)
+            # Arka plan (koyu gri)
+            frame[:, :, :] = (30, 30, 30)
+            # Dolum (cyan gradient)
+            if filled > 0:
+                for x in range(filled):
+                    ratio = x / max(filled, 1)
+                    r = int(bar_color[0] * ratio + 0 * (1 - ratio))
+                    g = int(bar_color[1] * ratio)
+                    b = int(bar_color[2])
+                    frame[:, x] = (r, g, b)
+                # Parlak uç
+                tip_start = max(0, filled - 4)
+                frame[:, tip_start:filled] = (255, 255, 255)
+            return frame
+
+        from moviepy.editor import VideoClip, CompositeVideoClip
+        bar_clip = (
+            VideoClip(make_bar_frame, duration=total_duration, ismask=False)
+            .set_position((0, H - bar_height))
+        )
+        return CompositeVideoClip([clip, bar_clip], size=(W, H))
 
     def _load_font(self, style="bold", size=60):
         bold_paths = [
@@ -132,10 +197,12 @@ class AutoEditor:
             bbox   = draw.textbbox((0, 0), line, font=font)
             line_w = bbox[2] - bbox[0]
             x = (width - line_w) // 2
+            # Renk: beyaz metin, sarı highlight (ilk 2 kelime)
+            line_color = (255, 230, 0) if y_start < 1420 else (255, 255, 255)
             for dx in range(-4, 5):
                 for dy in range(-4, 5):
                     draw.text((x + dx, y_start + dy), line, font=font, fill=(0, 0, 0, 255))
-            draw.text((x, y_start), line, font=font, fill=(255, 255, 255, 255))
+            draw.text((x, y_start), line, font=font, fill=line_color + (255,))
             y_start += line_h
 
         return np.array(img)
@@ -349,6 +416,9 @@ class AutoEditor:
 
         final_video = CompositeVideoClip(all_layers, size=(final_w, final_h))
 
+        # Whoosh transitions
+        final_video = self._add_transitions_sfx(final_video, clips)
+        
         if final_video.w != final_w or final_video.h != final_h:
             final_video = final_video.resize((final_w, final_h))
 
@@ -689,6 +759,16 @@ class AutoEditor:
         # Video export
         output_full_path = os.path.join(self.output_dir, output_path)
         os.makedirs(self.output_dir, exist_ok=True)
+
+        # Progress bar ekle (uzun video için retention mekanizması)
+        try:
+            final_video = self._overlay_progress_bar(
+                final_video, total_duration=final_video.duration
+            )
+            print("[Editor] ✅ Progress bar eklendi.")
+        except Exception as e:
+            print(f"[Editor] ⚠️ Progress bar hatası (atlanıyor): {e}")
+
         final_video.write_videofile(
             output_full_path, fps=30, codec="libx264",
             audio_codec="aac", preset="ultrafast",

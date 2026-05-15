@@ -7,7 +7,7 @@ import asyncio
 from dotenv import load_dotenv
 
 # ABSOLUTE TOP LEVEL PRINT - Hiçbir kütüphane yüklenmeden önce
-print(">>> [SYSTEM] Python interpreter started main.py", flush=True)
+print(">>> [SYSTEM] Python interpreter started main.py v2", flush=True)
 
 # Add project root to sys.path for robust imports
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -163,7 +163,7 @@ class EvcarixOrchestrator:
             topic=full_topic
         )
 
-        # ── 3. Ses Üretimi ────────────────────────────────────────
+        # ── 3. Ses Üretimi ────────────────────────────────────────────────────
         print("\n[3/6] Ses ve zamanlama üretiliyor...", flush=True)
         audio_output = f"assets/audio/{ts}.mp3"
         voice_data = await self.media_engine.voice_engine.generate_voice(
@@ -173,6 +173,24 @@ class EvcarixOrchestrator:
         )
         audio_path = voice_data["audio_path"]
         word_timings = voice_data["word_timings"]
+
+        # ── 3b. Arka Plan Müziği (isteğe bağlı, CC-BY) ───────────────────────
+        if os.getenv("USE_BG_MUSIC", "true").lower() == "true":
+            try:
+                from src.audio_bg_engine import AudioBgEngine
+                bg_engine = AudioBgEngine()
+                mood = plan.get("category", "technology")
+                bg_track = bg_engine.get_background_music(mood=mood)
+                if bg_track:
+                    mixed_path = audio_output.replace(".mp3", "_mixed.mp3")
+                    audio_path = bg_engine.mix_bg_music_with_voice(
+                        audio_path, bg_track["path"], mixed_path,
+                        music_volume=0.10
+                    )
+                    print(f"      🎵 BG Müzik: {bg_track['title']} ({bg_track.get('license','CC-BY')})",
+                          flush=True)
+            except Exception as e:
+                print(f"      ⚠️ BG Müzik hatası (atlanıyor): {e}", flush=True)
 
         # ── 4. Montaj ─────────────────────────────────────────────
         print("\n[4/6] Video montajlanıyor (MoviePy)...", flush=True)
@@ -270,6 +288,24 @@ class EvcarixOrchestrator:
             voice_type=plan.get("voice", "female")
         )
         audio_path = voice_data["audio_path"]
+
+        # ── 3b. Arka Plan Müziği (uzun video — daha düşük volume) ─────────────
+        if os.getenv("USE_BG_MUSIC", "true").lower() == "true":
+            try:
+                from src.audio_bg_engine import AudioBgEngine
+                bg_engine = AudioBgEngine()
+                mood = plan.get("category", "science")
+                bg_track = bg_engine.get_background_music(mood=mood)
+                if bg_track:
+                    mixed_path = audio_output.replace(".mp3", "_mixed.mp3")
+                    audio_path = bg_engine.mix_bg_music_with_voice(
+                        audio_path, bg_track["path"], mixed_path,
+                        music_volume=0.08  # Uzun videolarda daha sessiz
+                    )
+                    print(f"      🎵 BG Müzik: {bg_track['title']} ({bg_track.get('license','CC-BY')})",
+                          flush=True)
+            except Exception as e:
+                print(f"      ⚠️ BG Müzik hatası (atlanıyor): {e}", flush=True)
 
         # ── 4. Montaj (Ağır İşlem) ────────────────────────────────
         print("\n[4/7] Video montajlanıyor (16:9 format)...", flush=True)

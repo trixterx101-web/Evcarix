@@ -34,54 +34,63 @@ HEADERS_JSON = {"Content-Type": "application/json"}
 
 # ── Topic → AI video prompt map ───────────────────────────────────────────────
 PROMPT_TEMPLATES = {
-    "battery": (
-        "Close-up cinematic shot of glowing lithium battery cells arranged "
-        "in a grid, blue energy pulses flowing through circuit patterns, "
-        "dark background, 4K, photorealistic, no text, no people"
-    ),
-    "range": (
-        "Aerial drone shot of a sleek white electric car driving on an empty "
-        "highway at sunset, motion blur on wheels, golden hour lighting, "
-        "cinematic, no text, no logos"
+    # ⚡ Elektrikli Araç (EV)
+    "electric vehicle": (
+        "Cinematic slow-motion shot of a futuristic electric car driving through a "
+        "neon-lit smart city at night, light trails, 8K resolution, photorealistic, "
+        "highly detailed, no text, no people"
     ),
     "charging": (
-        "Cinematic close-up of an electric vehicle charging connector "
-        "plugging into a modern EV port, blue electricity sparks, "
-        "dark background, 4K slow motion, no text, no people"
+        "Ultra-realistic close-up of a high-tech EV charging plug connecting to a "
+        "sleek electric vehicle, glowing blue energy pulses flowing through the cable, "
+        "bokeh background, 4K, cinematic lighting"
     ),
-    "ownership": (
-        "Split screen animation showing coins stacking vs fuel pump, "
-        "then electric charging icon, clean minimal style, "
-        "dark background, smooth motion, no text"
+    
+    # 🤖 Yapay Zeka (AI)
+    "artificial intelligence": (
+        "Abstract visualization of a neural network firing, glowing blue and gold "
+        "data nodes connecting, digital brain silhouette in the background, "
+        "cyberpunk aesthetic, high-speed data flow, 4K"
     ),
-    "comparison": (
-        "Two sleek electric cars side by side on a dark showroom floor, "
-        "rotating slowly, dramatic blue lighting, 4K cinematic, "
-        "no text, no logos, no people"
+    "ai": (
+        "Close-up of a futuristic digital interface with floating holographic "
+        "data charts and AI processing animations, sleek tech aesthetic, dark background"
     ),
-    "market": (
-        "Animated world map with glowing blue dots spreading across "
-        "continents representing EV adoption, dark background, "
-        "cinematic data visualization, no text"
+    
+    # 🦾 Robotik
+    "robotics": (
+        "Close-up of a highly advanced humanoid robot hand performing delicate movements, "
+        "intricate mechanical joints, silver and white metallic finish, factory laboratory "
+        "background, cinematic lighting, 8K"
     ),
-    "infrastructure": (
-        "Aerial view of a modern EV charging station with multiple cars "
-        "charging simultaneously, sunset lighting, cinematic drone shot, "
-        "no text, no logos"
+    "robot": (
+        "A futuristic robot walking through a high-tech facility, smooth movements, "
+        "robotic laboratory atmosphere, cinematic shadows and highlights, photorealistic"
     ),
-    "education": (
-        "Animated cross-section of an electric motor spinning, "
-        "glowing coils and magnets, blue energy flow, dark background, "
-        "technical visualization, 4K, no text"
+    
+    # 🔋 Batarya Teknolojisi
+    "battery": (
+        "Macro shot of glowing solid-state battery cells, blue liquid energy flowing "
+        "inside transparent containers, futuristic laboratory setting, 4K, high detail"
     ),
-    "tools": (
-        "Futuristic digital dashboard with animated EV data charts, "
-        "glowing graphs updating in real-time, dark UI, "
-        "cinematic tech aesthetic, no text readable, no people"
+    "lithium": (
+        "Cinematic animation of lithium ions moving through a battery structure, "
+        "glowing sparks of energy, technical visualization, vibrant colors, 4K"
     ),
+    
+    # 🚀 Geleceğin Teknolojileri
+    "future technology": (
+        "Aerial view of a futuristic smart city with flying vehicles and green "
+        "hanging gardens, sunset lighting, cinematic drone shot, utopian aesthetic, 8K"
+    ),
+    "quantum": (
+        "Abstract quantum computing visualization, particles in superposition, "
+        "glowing waves of probability, deep space background, cinematic, 4K"
+    ),
+    
     "default": (
-        "Sleek electric car driving through a modern city at night, "
-        "light trails, cinematic, 4K, no text, no logos, no people"
+        "Sleek futuristic technology concept, glowing blue lights, dark premium "
+        "background, cinematic 4K, high detail, no text"
     ),
 }
 
