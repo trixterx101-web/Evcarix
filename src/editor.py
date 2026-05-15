@@ -7,7 +7,7 @@ from pathlib import Path
 logger = logging.getLogger("Editor")
 
 class AutoEditor:
-    def assemble(self, video_clips, audio_path, output_path, is_short=True):
+    def assemble(self, clips_paths, audio_path, output_path, is_short=True):
         """
         Videoyu MoviePy kullanmadan, doğrudan FFmpeg ile birleştirir.
         Bu yöntem 'siyah ekran' sorununu %100 çözer.
@@ -18,7 +18,7 @@ class AutoEditor:
             # 1. Geçici bir dosya listesi oluştur (FFmpeg concat için)
             concat_list = "clips_to_merge.txt"
             with open(concat_list, "w") as f:
-                for clip in video_clips:
+                for clip in clips_paths:
                     # Dosya yollarını FFmpeg'in anlayacağı formatta yaz
                     f.write(f"file '{os.path.abspath(clip)}'\n")
 
