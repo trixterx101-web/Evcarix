@@ -6,7 +6,7 @@ import google.generativeai as genai
 logger = logging.getLogger("PromptGenerator")
 
 def generate_scene_prompts(topic: str, script: str, count: int = 6) -> list[str]:
-    """Gemini kullanarak sinematik video sahneleri tasarlar. Akıllı model seçici içerir."""
+    """Gemini kullanarak sahneler tasarlar. Teşhis modu aktiftir."""
     
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -15,21 +15,18 @@ def generate_scene_prompts(topic: str, script: str, count: int = 6) -> list[str]
 
     genai.configure(api_key=api_key)
     
-    # Denenecek model isimleri (Öncelik sırasına göre)
+    # Kapsamlı model listesi
     model_candidates = [
         "gemini-1.5-flash",
         "gemini-1.5-flash-latest",
+        "gemini-1.5-pro",
+        "gemini-2.0-flash-exp",
         "gemini-pro",
-        "models/gemini-1.5-flash"
+        "models/gemini-1.5-flash",
+        "models/gemini-pro"
     ]
 
-    system_prompt = f"""You are a cinematic video director for YouTube Shorts.
-Topic: {topic}
-Script: {script[:500]}
-
-Generate exactly {count} different cinematic video scene prompts.
-Format: JSON array of strings.
-Style: Photorealistic, 4K, cinematic lighting, no text."""
+    system_prompt = f"Topic: {topic}\nGenerate exactly {count} cinematic video scene prompts as a JSON array of strings."
 
     success_text = None
     
@@ -40,28 +37,35 @@ Style: Photorealistic, 4K, cinematic lighting, no text."""
             response = model.generate_content(system_prompt)
             if response and response.text:
                 success_text = response.text.strip()
-                logger.info(f"[PromptGen] ✅ {model_name} ile başarıyla üretildi.")
+                logger.info(f"[PromptGen] ✅ {model_name} BAŞARILI!")
                 break
         except Exception as e:
-            logger.warning(f"[PromptGen] {model_name} başarısız: {str(e)[:100]}")
+            err_msg = str(e)
+            logger.warning(f"[PromptGen] {model_name} başarısız: {err_msg[:100]}")
+            
+            # Eğer 404 alıyorsak, API'nin neleri gördüğünü bir kez loglayalım
+            if "404" in err_msg and model_name == model_candidates[0]:
+                try:
+                    logger.info("[PromptGen] 🔍 Mevcut modeller taranıyor...")
+                    available_models = [m.name for m in genai.list_models()]
+                    logger.info(f"[PromptGen] API'nin gördüğü modeller: {available_models}")
+                except: pass
             continue
 
     if success_text:
         try:
-            # JSON temizleme
             if "```" in success_text:
                 success_text = success_text.split("```")[1].replace("json", "").strip()
-            
             prompts = json.loads(success_text)
             if isinstance(prompts, list) and len(prompts) >= count:
                 return prompts[:count]
-        except Exception as e:
-            logger.error(f"JSON Parse hatası: {e}")
+        except: pass
 
+    logger.warning("[PromptGen] Hiçbir model çalışmadı, fallback'e geçiliyor.")
     return _get_fallback_prompts(topic, count)
 
 def _get_fallback_prompts(topic: str, count: int) -> list[str]:
-    """Tüm modeller başarısız olursa konu bazlı hazır kaliteli promptlar döner."""
+    # ... (Aynı fallback mantığı)
     FALLBACKS = {
         "battery": [
             "Extreme macro shot of glowing lithium battery cells with blue energy pulses, 8K cinematic lighting",

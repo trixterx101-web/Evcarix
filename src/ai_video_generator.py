@@ -88,15 +88,16 @@ class AIVideoGenerator:
         return clips
 
     def _google_veo(self, prompt: str, idx: int) -> str | None:
-        """En yüksek kalite, filigransız Google Veo üretimi (Akıllı seçim)."""
+        """En yüksek kalite, filigransız Google Veo üretimi."""
         if not self.gemini_key: return None
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.gemini_key)
             
-            # Denenecek Veo model isimleri
-            for model_name in ["veo-3-1", "models/veo-3-1", "imagen-video-v3"]:
+            # Veo için denenecek isimler
+            for model_name in ["veo-3-1", "models/veo-3-1", "gemini-1.5-flash"]: # Bazı bölgelerde flash video üretebilir
                 try:
+                    logger.info(f"[GoogleVeo] Deneniyor: {model_name}")
                     model = genai.GenerativeModel(model_name)
                     result = model.generate_content(prompt)
                     
@@ -106,9 +107,8 @@ class AIVideoGenerator:
                         path = os.path.join(OUTPUT_DIR, f"veo_{idx}.mp4")
                         with open(path, "wb") as f: f.write(result.data)
                         return path
-                    # Eğer buraya geldiyse ama data yoksa bir sonraki modeli dene
                 except: continue
-        except Exception as e: logger.debug(f"[GoogleVeo] {e}")
+        except Exception as e: logger.debug(f"[GoogleVeo] Hata: {e}")
         return None
 
     # ── PixVerse (Gerçekçi & Cömert) ────────────────────────────────────────
