@@ -1,51 +1,89 @@
 import os
 import json
 import logging
-from google import genai
 
 logger = logging.getLogger("PromptGenerator")
 
 def generate_scene_prompts(topic: str, script: str, count: int = 6) -> list[str]:
-    """Yeni google-genai SDK'sını kullanarak sahneleri kurgular."""
-    
-    api_key = os.getenv("GEMINI_API_KEY")
-    if api_key:
+    """Groq ile sahne promptları üret (Gemini başarısız olursa)."""
+
+    # ── 1. Groq (Ücretsiz, Hızlı) ────────────────────────────────
+    groq_key = os.getenv("GROQ_API_KEY")
+    if groq_key:
         try:
-            logger.info("[PromptGen] Yeni Gemini SDK (genai) deneniyor...")
-            client = genai.Client(api_key=api_key)
-            
-            prompt_text = f"Director: Generate exactly {count} cinematic scene descriptions for a video about '{topic}'. Return ONLY a JSON array of strings."
-            
-            # Yeni SDK'da model ismi v1beta gibi ekler gerektirmez
+            logger.info("[PromptGen] Groq deneniyor...")
+            from groq import Groq
+            client = Groq(api_key=groq_key)
+
+            prompt_text = f"""You are a cinematic video director. Generate exactly {count} short cinematic scene descriptions for a YouTube Shorts video about: '{topic}'
+
+Rules:
+- Each scene must be visually descriptive and cinematic
+- Focus on electric vehicles, technology, energy
+- Return ONLY a valid JSON array of {count} strings, nothing else
+
+Example format:
+["scene 1 description", "scene 2 description", ...]"""
+
+            response = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt_text}],
+                temperature=0.7,
+                max_tokens=500
+            )
+
+            text = response.choices[0].message.content
+            result = _parse_json_list(text, count)
+            if result:
+                logger.info(f"[PromptGen] ✅ Groq başarılı: {len(result)} sahne")
+                return result
+        except Exception as e:
+            logger.warning(f"[PromptGen] Groq hatası: {e}")
+
+    # ── 2. Gemini (Yedek) ─────────────────────────────────────────
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        try:
+            logger.info("[PromptGen] Gemini deneniyor...")
+            from google import genai
+            client = genai.Client(api_key=gemini_key)
+
+            prompt_text = f"Generate exactly {count} cinematic scene descriptions for a video about '{topic}'. Return ONLY a JSON array of strings."
             response = client.models.generate_content(
-                model="gemini-2.0-flash", # En hızlı ve yeni model
+                model="gemini-2.0-flash",
                 contents=prompt_text
             )
-            
             if response and response.text:
-                res = _parse_json_list(response.text, count)
-                if res: return res
+                result = _parse_json_list(response.text, count)
+                if result:
+                    logger.info(f"[PromptGen] ✅ Gemini başarılı: {len(result)} sahne")
+                    return result
         except Exception as e:
-            logger.error(f"[PromptGen] Yeni SDK Hatası: {e}")
+            logger.warning(f"[PromptGen] Gemini hatası: {e}")
 
-    # Fallback her zaman devrededir
+    # ── 3. Statik Fallback ────────────────────────────────────────
+    logger.warning("[PromptGen] Tüm AI'lar başarısız, statik fallback kullanılıyor.")
     return _get_fallback_prompts(topic, count)
+
 
 def _parse_json_list(text, count):
     try:
-        # JSON olmayan kısımları temizle
         clean_text = text.strip()
         if "```" in clean_text:
             clean_text = clean_text.split("```")[1]
-            if clean_text.startswith("json"): clean_text = clean_text[4:]
-        
+            if clean_text.startswith("json"):
+                clean_text = clean_text[4:]
         data = json.loads(clean_text.strip())
         if isinstance(data, dict):
             for v in data.values():
-                if isinstance(v, list): return [str(x) for x in v[:count]]
-        if isinstance(data, list): return [str(x) for x in data[:count]]
-    except: pass
+                if isinstance(v, list):
+                    return [str(x) for x in v[:count]]
+        if isinstance(data, list):
+            return [str(x) for x in data[:count]]
+    except:
+        pass
     return None
+
 
 def _get_fallback_prompts(topic: str, count: int) -> list[str]:
     base = [
