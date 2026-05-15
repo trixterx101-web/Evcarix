@@ -56,10 +56,18 @@ class MediaEngine:
             ai_gen = AIVideoGenerator()
             # Kalan miktar kadar prompt üret ve AI ile tamamla
             needed = count - len(final_clips)
-            from src.prompt_generator import generate_scene_prompts
             prompts = generate_scene_prompts(topic, script, needed)
             ai_clips = ai_gen.generate_clips(prompts)
             final_clips.extend(ai_clips)
+
+        # 4. Son Çare: Eğer hala eksik varsa (Gerçekten hiçbiri çalışmadıysa)
+        if len(final_clips) < count:
+            logger.warning(f"[MediaEngine] 🎨 KRİTİK: Hiçbir kaynak bulunamadı, {count - len(final_clips)} klip için Animasyon üretiliyor.")
+            from src.ai_video_generator import AIVideoGenerator
+            ai_gen = AIVideoGenerator()
+            for i in range(len(final_clips), count):
+                fb_path = ai_gen._ffmpeg_animated(topic, i)
+                final_clips.append(fb_path)
 
         self._save_used_hashes()
         return final_clips

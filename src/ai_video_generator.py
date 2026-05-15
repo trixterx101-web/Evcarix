@@ -102,10 +102,9 @@ class AIVideoGenerator:
                         break
                 except: pass
             
-            # 2. Premium Fallback (FFmpeg Motion Graphics)
+            # 2. AI Başarısız bildirimi (Artık fallback burada üretilmiyor, Pexels'e şans veriliyor)
             if not path:
-                logger.warning(f"[AIVideo] 🎨 Fallback üretiliyor (Sahne {i+1})")
-                path = self._ffmpeg_animated(prompt, i)
+                logger.warning(f"[AIVideo] ⚠️ Sahne {i+1} için AI başarısız, Pexels/Pixabay devreye girecek.")
             
             if path: clips.append(path)
         return clips
