@@ -311,7 +311,8 @@ class AutoEditor:
 
             final_video.write_videofile(
                 output_path, codec="libx264", audio_codec="aac",
-                fps=30, preset="ultrafast", logger=None,
+                fps=30, preset="slow", logger=None,
+                bitrate="5000k",
                 ffmpeg_params=["-pix_fmt", "yuv420p"]
             )
 
