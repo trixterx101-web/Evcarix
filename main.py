@@ -149,6 +149,9 @@ class EvcarixOrchestrator:
                         )
                         print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
                         print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
+                    except Exception as e:
+                        print(f"      ❌ YouTube yükleme hatası: {e}")
+                
                 print(f"\n{'='*60}")
                 print(f"  ✅ DAILY SHORTS TAMAMLANDI!")
                 print(f"  Video: {final_video_path}")
