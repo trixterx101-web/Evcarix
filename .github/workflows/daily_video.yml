@@ -160,6 +160,18 @@ jobs:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          # AI Video Generative Keys
+          SEEDANCE_API_KEY: ${{ secrets.SEEDANCE_API_KEY }}
+          PIXVERSE_API_KEY: ${{ secrets.PIXVERSE_API_KEY }}
+          VIDU_API_KEY: ${{ secrets.VIDU_API_KEY }}
+          MUAPI_KEY: ${{ secrets.MUAPI_KEY }}
+          VIDEOGEN_API_KEY: ${{ secrets.VIDEOGEN_API_KEY }}
+          ZSKY_API_KEY: ${{ secrets.ZSKY_API_KEY }}
+          FAL_KEY: ${{ secrets.FAL_KEY }}
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+          KLING_API_KEY: ${{ secrets.KLING_API_KEY }}
+          LUMA_API_KEY: ${{ secrets.LUMA_API_KEY }}
+          RUNWAY_API_KEY: ${{ secrets.RUNWAY_API_KEY }}
           # Routing
           CONTENT_MODE: ${{ github.event.inputs.content_mode || (github.event.schedule == '0 7 * * *' && 'trend' || 'auto') }}
           VIDEO_TYPE: ${{ github.event.inputs.video_type || (github.event.schedule == '0 5 * * 0' && 'long' || 'short') }}
