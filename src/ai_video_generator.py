@@ -12,8 +12,10 @@ Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 class AIVideoGenerator:
     def __init__(self):
         # Ücretsiz / Cömert Kaynaklar
-        self.seedance_key = os.getenv("SEEDANCE_API_KEY") # 100 kredi/gün
-        self.zsky_key = os.getenv("ZSKY_API_KEY")         # Günlük limit
+        self.seedance_key = os.getenv("SEEDANCE_API_KEY") 
+        self.zsky_key = os.getenv("ZSKY_API_KEY")         
+        self.videogen_key = os.getenv("VIDEOGEN_API_KEY") # videogenapi.com
+        self.muapi_key = os.getenv("MUAPI_KEY")           # muapi.ai (Unified API)
         
         # Kredili / Ücretli Kaynaklar
         self.fal_key = os.getenv("FAL_KEY")
@@ -32,11 +34,19 @@ class AIVideoGenerator:
 
             # ── STRATEJİ: Önce tamamen ücretsiz/cömert olanlar ──
             
-            # 1. Seedance (100 kredi/gün - Çok cömert)
+            # 1. Seedance (100 kredi/gün)
             if self.seedance_key:
                 path = self._seedance(prompt, i)
             
-            # 2. ZSky AI
+            # 2. Muapi.ai (Unified - 200+ model)
+            if not path and self.muapi_key:
+                path = self._muapi(prompt, i)
+
+            # 3. VideoGen API
+            if not path and self.videogen_key:
+                path = self._videogen(prompt, i)
+
+            # 4. ZSky AI
             if not path and self.zsky_key:
                 path = self._zsky(prompt, i)
 
@@ -87,6 +97,45 @@ class AIVideoGenerator:
                 elif data.get("status") == "failed": break
                 time.sleep(10)
         except Exception as e: logger.debug(f"[Seedance] {e}")
+        return None
+
+    # ── VideoGen API ────────────────────────────────────────────────────────
+    def _videogen(self, prompt: str, idx: int) -> str | None:
+        try:
+            r = requests.post("https://api.videogenapi.com/v1/video/generate", headers={
+                "Authorization": f"Bearer {self.videogen_key}", "Content-Type": "application/json"
+            }, json={"prompt": prompt, "aspect_ratio": "9:16", "duration": 5}, timeout=30)
+            if r.status_code == 200:
+                tid = r.json().get("id")
+                for _ in range(30):
+                    tr = requests.get(f"https://api.videogenapi.com/v1/video/{tid}", headers={"Authorization": f"Bearer {self.videogen_key}"}, timeout=15)
+                    if tr.json().get("status") == "completed":
+                        return self._download(tr.json()["url"], f"videogen_{idx}.mp4")
+                    time.sleep(10)
+        except Exception as e: logger.debug(f"[VideoGen] {e}")
+        return None
+
+    # ── Muapi.ai (Unified API - 200+ Models) ────────────────────────────────
+    def _muapi(self, prompt: str, idx: int) -> str | None:
+        try:
+            # Muapi genellikle Kling veya WAN modellerini yönlendirir
+            r = requests.post("https://api.muapi.ai/v1/video/generate", headers={
+                "Authorization": f"Bearer {self.muapi_key}", "Content-Type": "application/json"
+            }, json={
+                "model": "kling-v1.6", # Veya "wan-v2.1"
+                "prompt": prompt,
+                "aspect_ratio": "9:16"
+            }, timeout=30)
+            if r.status_code == 200:
+                tid = r.json().get("task_id")
+                for _ in range(40):
+                    tr = requests.get(f"https://api.muapi.ai/v1/video/status/{tid}", headers={"Authorization": f"Bearer {self.muapi_key}"}, timeout=15)
+                    data = tr.json()
+                    if data.get("status") == "succeeded":
+                        return self._download(data["video_url"], f"muapi_{idx}.mp4")
+                    elif data.get("status") == "failed": break
+                    time.sleep(10)
+        except Exception as e: logger.debug(f"[Muapi] {e}")
         return None
 
     # ── ZSky AI ─────────────────────────────────────────────────────────────
