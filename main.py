@@ -212,7 +212,7 @@ class EvcarixOrchestrator:
                 print(f"      ⚠️ Ses miksaj hatası (atlanıyor): {e}", flush=True)
 
         # ── 4. Montaj ─────────────────────────────────────────────
-        print("\n[4/6] Video montajlanıyor (MoviePy)...", flush=True)
+        print("\n[4/6] Video montajlanıyor...", flush=True)
         output_filename = f"evcarix_shorts_{ts}.mp4"
         final_video_path = self.editor.assemble(
             clips_paths=video_paths,
@@ -223,8 +223,11 @@ class EvcarixOrchestrator:
             is_short=True,
             output_path=output_filename
         )
-        
-        final_video_path = safe_path(final_video_path, "Final Video")
+
+        # assemble() hiçbir zaman None döndürmemeli ama yine de kontrol et
+        if not final_video_path or not os.path.exists(final_video_path):
+            raise RuntimeError(f"[Main] Montaj çıktısı bulunamadı: {final_video_path}")
+        print(f"      ✅ Video hazır: {final_video_path}", flush=True)
 
         # ── 5. Kapak (Thumbnail) İptal Edildi ─────────────────────
         print("\n[5/6] Thumbnail üretimi manuel yükleme için atlandı.", flush=True)
