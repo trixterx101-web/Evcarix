@@ -93,6 +93,11 @@ jobs:
           python -m pip install --upgrade pip wheel setuptools
           pip install -r requirements.txt
 
+      - name: 🛠️ Fix ImageMagick Security Policy
+        run: |
+          sudo sed -i 's/rights="none" pattern="@\*"/rights="read|write" pattern="@*"/' /etc/ImageMagick-6/policy.xml
+          echo "✅ ImageMagick policy fixed"
+
       # ── 6. HuggingFace Model Cache ────────────────────────────────────────────
       - name: Restore HuggingFace Model Cache
         uses: actions/cache@v4.2.0

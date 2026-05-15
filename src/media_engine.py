@@ -192,12 +192,13 @@ class MediaEngine:
         try:
             from src.free_footage import FreeFootageEngine
             ff_engine = FreeFootageEngine()
-            ff_clips = ff_engine.get_clips(topic_text, count=ff_target * 2, video_type=video_type)
-            # OEM kaynakları zaten EV içeriği ama yine de filtrele
-            ff_clips = [c for c in ff_clips if c and self._is_ev_relevant(c)]
-            all_clips.extend(ff_clips)
+            ff_target_count = max(2, (needed // 3))
+            ff_clips = ff_engine.get_clips(topic_text, count=ff_target_count, video_type=video_type)
+            if ff_clips:
+                ff_clips = [c for c in ff_clips if c and self._is_ev_relevant(c)]
+                all_clips.extend(ff_clips)
         except Exception as e:
-            logger.error(f"[MediaEngine] FF hatası: {e}")
+            logger.error(f"[MediaEngine] FreeFootage error: {e}")
 
         # ── EXHAUSTIVE FETCHING ──
         # Tüm kaynaklardan sırayla ve bıkmadan indir

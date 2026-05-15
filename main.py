@@ -16,10 +16,13 @@ if project_root not in sys.path:
 
 load_dotenv()
 
-def log(msg):
-    print(f">>> {msg}", flush=True)
-
-print("=== EVCARIX NEW PIPELINE ACTIVE ===", flush=True)
+def safe_path(path, label="file") -> str:
+    """Path'in None olmadığını ve dosyanın var olduğunu doğrular."""
+    if path is None:
+        raise ValueError(f"[Main] {label} path is None")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"[Main] {label} not found: {path}")
+    return path
 
 class EvcarixOrchestrator:
     def __init__(self):
@@ -146,9 +149,6 @@ class EvcarixOrchestrator:
                         )
                         print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
                         print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
-                    except Exception as e:
-                        print(f"      ❌ YouTube yükleme hatası: {e}")
-                
                 print(f"\n{'='*60}")
                 print(f"  ✅ DAILY SHORTS TAMAMLANDI!")
                 print(f"  Video: {final_video_path}")
@@ -162,6 +162,13 @@ class EvcarixOrchestrator:
             target_clip_count=clip_count,
             topic=full_topic
         )
+        if not video_paths:
+            print("      ⚠️ Hiç klip bulunamadı, fallback üretiliyor...", flush=True)
+            from src.utils.fallback import generate_fallback_video
+            f_path = f"assets/footage/fallback_{ts}.mp4"
+            os.makedirs("assets/footage", exist_ok=True)
+            generate_fallback_video(30, topic, f_path)
+            video_paths = [f_path]
 
         # ── 3. Ses Üretimi ────────────────────────────────────────────────────
         print("\n[3/6] Ses ve zamanlama üretiliyor...", flush=True)
@@ -171,28 +178,27 @@ class EvcarixOrchestrator:
             output_path=audio_output,
             voice_type=plan.get("voice", "female")
         )
-        audio_path = voice_data["audio_path"]
-        word_timings = voice_data["word_timings"]
+        
+        if not voice_data or not voice_data.get("audio_path"):
+             raise RuntimeError("[Main] TTS üretimi başarısız oldu.")
+             
+        audio_path = safe_path(voice_data["audio_path"], "TTS Audio")
+        word_timings = voice_data.get("word_timings", [])
 
-        # ── 3b. Arka Plan Müziği (isteğe bağlı, CC-BY) ───────────────────────
+        # ── 3b. Arka Plan Müziği ───────────────────────
         if os.getenv("USE_BG_MUSIC", "true").lower() == "true":
             try:
                 from src.music_fetcher import MusicFetcher
+                from src.audio_mixer import mix_audio
                 mf = MusicFetcher()
                 bg_track_path = mf.get_track(mood="tech_upbeat")
                 
                 if bg_track_path:
-                    # Voice ve BG mix
-                    from src.audio_bg_engine import AudioBgEngine
-                    abe = AudioBgEngine()
                     mixed_path = audio_output.replace(".mp3", "_mixed.mp3")
-                    audio_path = abe.mix_bg_music_with_voice(
-                        audio_path, bg_track_path, mixed_path,
-                        music_volume=0.10
-                    )
-                    print(f"      🎵 BG Müzik yüklendi.", flush=True)
+                    audio_path = mix_audio(audio_path, bg_track_path, mixed_path)
+                    print(f"      🎵 Sesler karıştırıldı (AudioMixer).", flush=True)
             except Exception as e:
-                print(f"      ⚠️ BG Müzik hatası (atlanıyor): {e}", flush=True)
+                print(f"      ⚠️ Ses miksaj hatası (atlanıyor): {e}", flush=True)
 
         # ── 4. Montaj ─────────────────────────────────────────────
         print("\n[4/6] Video montajlanıyor (MoviePy)...", flush=True)
@@ -206,6 +212,8 @@ class EvcarixOrchestrator:
             is_short=True,
             output_path=output_filename
         )
+        
+        final_video_path = safe_path(final_video_path, "Final Video")
 
         # ── 5. Kapak (Thumbnail) İptal Edildi ─────────────────────
         print("\n[5/6] Thumbnail üretimi manuel yükleme için atlandı.", flush=True)
