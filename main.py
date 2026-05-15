@@ -16,6 +16,10 @@ if project_root not in sys.path:
 
 load_dotenv()
 
+def log(message: str) -> None:
+    """Flush-guaranteed print helper used throughout the orchestrator."""
+    print(message, flush=True)
+
 def safe_path(path, label="file") -> str:
     """Path'in None olmadığını ve dosyanın var olduğunu doğrular."""
     if path is None:
