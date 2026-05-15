@@ -155,21 +155,21 @@ class MediaEngine:
         # EV-only query havuzu (her çalışmada farklı sıra)
         query_pool = topic_queries + random.sample(EV_QUERY_POOL, min(6, len(EV_QUERY_POOL)))
 
-        # ── KATMAN 1: Multi-Source Footage Fetcher (Safe & Robust) ──
-        # Pexels, Pixabay, NASA, Wikimedia, Archive.org
+        # ── KATMAN 1: Multi-Source Footage Fetcher (8 kaynak, registry tabanlı) ──
         try:
             from src.footage_fetcher import FootageFetcher
             fetcher = FootageFetcher()
-            # Fetch clips using the new logic (Primary + Fallbacks)
             fetched_clips = fetcher.fetch(
-                query=topic_text, 
-                count=needed, 
-                is_short=(video_type == "short")
+                query=topic_text,
+                count=needed,
+                is_short=(video_type == "short"),
+                topic=plan.get("category", "") if plan else ""
             )
             all_clips.extend(fetched_clips)
-            logger.info(f"[MediaEngine] FootageFetcher: +{len(fetched_clips)} clips")
+            logger.info(f"[MediaEngine] FootageFetcher: +{len(fetched_clips)} klip")
         except Exception as e:
-            logger.error(f"[MediaEngine] FootageFetcher error: {e}")
+            logger.error(f"[MediaEngine] FootageFetcher hatası: {e}")
+
 
         # ── KATMAN 2: Research & Gov (ResearchFetcher - Legacy NASA Support) ──
         # Public Domain — Sıfır Telif Riski
