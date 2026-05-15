@@ -65,6 +65,7 @@ def _log_license(file_path: str, source: str, license_type: str,
 
 def _download_audio(url: str, dest: str, timeout: int = 60) -> bool:
     try:
+        url = url.replace(" ", "%20")
         r = requests.get(url, headers=HEADERS, stream=True, timeout=timeout)
         if r.status_code != 200:
             logger.warning(f"Audio HTTP {r.status_code}: {url}")

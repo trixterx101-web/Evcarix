@@ -250,10 +250,14 @@ class YouTubeCCSource:
             "--no-playlist",
             "--quiet",
             "--no-warnings",
+            "--no-check-certificate",
+            "--geo-bypass",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "--socket-timeout", "30",
             "--retries", "3",
             f"https://www.youtube.com/watch?v={video_id}",
         ]
+
 
         try:
             result = subprocess.run(cmd, capture_output=True, timeout=120)

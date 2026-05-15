@@ -384,7 +384,7 @@ class AutoEditor:
             clean_title = output_filename.replace("_", " ").replace(".mp4", "").upper()
             
             # 1s sürecek bir intro görseli üret
-            tg.create(title=clean_title, category=category, is_short=True, 
+            tg.generate(title=clean_title, category=category, is_short=True, 
                       output_path=hook_img_path)
             
             if os.path.exists(hook_img_path):
