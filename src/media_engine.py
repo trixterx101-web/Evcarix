@@ -113,40 +113,37 @@ class MediaEngine:
         """
         Verilen dosya adı veya URL'de blocklist kelimesi varsa False döner.
         Sadece EV/araç/teknoloji ile     async def download_stock_videos(self, plan=None, target_clip_count=6, topic=None):
-        """Sadeleştirilmiş Pipeline: Sadece Pexels ve Pixabay kaynaklı HD klipler."""
+        """AI Video Pipeline: Gemini ile sahne tasarımı + AI Video üretimi."""
         video_type = plan.get("video_type", "short") if plan else "short"
         topic_text = topic or (plan.get("topic") if plan else "electric vehicle")
+        script     = plan.get("script", "") if plan else ""
         
-        # Shorts için 6, Long için daha fazla klip
-        if video_type == "short":
-            needed = 6
-        else:
-            needed = target_clip_count if target_clip_count > 6 else 40
-
-        logger.info(f"[MediaEngine] {needed} adet klip aranıyor: {topic_text}")
+        # Shorts için 6 sahne idealdir
+        needed = 6 if video_type == "short" else 15
+        
+        logger.info(f"[MediaEngine] AI Video üretimi başlatılıyor: {topic_text}")
 
         try:
-            from src.footage_fetcher import FootageFetcher
-            fetcher = FootageFetcher()
+            # 1. Sahne Tasarımı (Gemini)
+            from src.prompt_generator import generate_scene_prompts
+            prompts = generate_scene_prompts(topic_text, script, count=needed)
             
-            # FootageFetcher artık kendi içinde 5 saniyeye kırpıyor ve HD ölçekliyor
-            all_clips = fetcher.fetch(
-                query=topic_text,
-                count=needed,
-                is_short=(video_type == "short"),
-                topic=plan.get("category", "") if plan else ""
-            )
+            # 2. Video Üretimi (Fal/Kling/Luma/Runway)
+            from src.ai_video_generator import AIVideoGenerator
+            ai_gen = AIVideoGenerator()
+            all_clips = ai_gen.generate_clips(prompts)
             
             if not all_clips:
-                logger.error("[MediaEngine] Hiç klip bulunamadı!")
+                logger.error("[MediaEngine] Hiç AI klip üretilemedi!")
                 return []
 
-            logger.info(f"[MediaEngine] ✅ {len(all_clips)} klip başarıyla toplandı.")
+            logger.info(f"[MediaEngine] ✅ {len(all_clips)} AI klip hazır.")
             return all_clips
 
         except Exception as e:
-            logger.error(f"[MediaEngine] Kritik hata: {e}")
+            logger.error(f"[MediaEngine] AI Pipeline hatası: {e}")
             return []
+
 random.shuffle(cached_files)
             for f in cached_files:
                 if not self._is_ev_relevant(str(f)):
