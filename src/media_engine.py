@@ -10,6 +10,7 @@ logger = logging.getLogger("MediaEngine")
 
 class MediaEngine:
     def __init__(self):
+        # MediaEngine initialize edildiğinde ses motorunu da yükler
         from src.voice_engine import VoiceEngine
         self.voice_engine = VoiceEngine()
         self.pexels_api_key = os.getenv("PEXELS_API_KEY")
@@ -29,45 +30,46 @@ class MediaEngine:
         with open(self.used_hashes_path, "w") as f:
             json.dump(list(self.used_hashes), f)
 
-    def download_stock_videos(self, topic: str, script: str, count: int = 6, plan=None, **kwargs) -> list:
+    # Parametre isimlerini main.py ile %100 uyumlu hale getirdik (topic, target_clip_count, plan)
+    async def download_stock_videos(self, topic: str, target_clip_count: int = 6, plan=None, **kwargs) -> list:
         """
-        Gerçek stok videoları (Pexels/Pixabay) indirir. 
-        Bulamazsa AI Video üretimine (veya fallback'e) devredilir.
+        Main.py ile tam uyumlu metod imzası. 
+        Pexels -> Pixabay -> AI Video -> FFmpeg Animation hiyerarşisini çalıştırır.
         """
-        logger.info(f"[MediaEngine] '{topic}' için medya hazırlanıyor...")
+        logger.info(f"[MediaEngine] '{topic}' için {target_clip_count} klip hazırlanıyor...")
         final_clips = []
         
         # 1. Pexels Denemesi
         if self.pexels_api_key:
             logger.info("[MediaEngine] Pexels stok videoları aranıyor...")
-            final_clips = self._download_pexels_videos(topic, count)
+            final_clips = self._download_pexels_videos(topic, target_clip_count)
             
-        # 2. Pixabay Denemesi (Pexels yetersizse)
-        if len(final_clips) < count and self.pixabay_api_key:
-            logger.info("[MediaEngine] Pixabay stok videoları aranıyor...")
-            needed = count - len(final_clips)
-            pix_clips = self._download_pixabay_videos(topic, needed)
-            final_clips.extend(pix_clips)
+        # 2. Pixabay Denemesi
+        if len(final_clips) < target_clip_count and self.pixabay_api_key:
+            needed = target_clip_count - len(final_clips)
+            logger.info(f"[MediaEngine] Pixabay deneniyor (Eksik: {needed})...")
+            final_clips.extend(self._download_pixabay_videos(topic, needed))
 
-        # 3. AI Video Fallback (Hala eksik varsa)
-        if len(final_clips) < count:
-            logger.warning(f"[MediaEngine] {count - len(final_clips)} klip eksik, AI Video Generator devreye giriyor.")
+        # 3. AI Video Denemesi
+        if len(final_clips) < target_clip_count:
+            needed = target_clip_count - len(final_clips)
+            logger.info(f"[MediaEngine] AI Video deneniyor (Eksik: {needed})...")
             from src.ai_video_generator import AIVideoGenerator
+            from src.prompt_generator import generate_scene_prompts
             ai_gen = AIVideoGenerator()
-            # Kalan miktar kadar prompt üret ve AI ile tamamla
-            needed = count - len(final_clips)
+            # Script bilgisi plan içinde olabilir, yoksa topic kullan
+            script = plan.get("script", "") if plan and isinstance(plan, dict) else topic
             prompts = generate_scene_prompts(topic, script, needed)
-            ai_clips = ai_gen.generate_clips(prompts)
-            final_clips.extend(ai_clips)
+            final_clips.extend(ai_gen.generate_clips(prompts))
 
-        # 4. Son Çare: Eğer hala eksik varsa (Gerçekten hiçbiri çalışmadıysa)
-        if len(final_clips) < count:
-            logger.warning(f"[MediaEngine] 🎨 KRİTİK: Hiçbir kaynak bulunamadı, {count - len(final_clips)} klip için Animasyon üretiliyor.")
+        # 4. Son Çare: FFmpeg Animasyon
+        if len(final_clips) < target_clip_count:
+            needed = target_clip_count - len(final_clips)
+            logger.warning(f"[MediaEngine] 🎨 Animasyon Fallback üretiliyor (Eksik: {needed}).")
             from src.ai_video_generator import AIVideoGenerator
             ai_gen = AIVideoGenerator()
-            for i in range(len(final_clips), count):
-                fb_path = ai_gen._ffmpeg_animated(topic, i)
-                final_clips.append(fb_path)
+            for i in range(len(final_clips), target_clip_count):
+                final_clips.append(ai_gen._ffmpeg_animated(topic, i))
 
         self._save_used_hashes()
         return final_clips
@@ -85,12 +87,11 @@ class MediaEngine:
                     v_url = v["video_files"][0]["link"]
                     v_hash = hashlib.md5(v_url.encode()).hexdigest()
                     if v_hash in self.used_hashes: continue
-                    
                     path = self._download(v_url, f"pexels_{v_hash[:8]}.mp4")
                     if path:
                         clips.append(path)
                         self.used_hashes.add(v_hash)
-        except Exception as e: logger.error(f"[Pexels] Hata: {e}")
+        except: pass
         return clips
 
     def _download_pixabay_videos(self, query: str, count: int) -> list:
@@ -99,20 +100,17 @@ class MediaEngine:
         try:
             r = requests.get(url, timeout=15)
             if r.status_code == 200:
-                videos = r.json().get("hits", [])
-                for v in videos:
+                for v in r.json().get("hits", []):
                     if len(clips) >= count: break
-                    # Pixabay'de 'large' veya 'medium' seç
                     v_url = v["videos"].get("medium", {}).get("url") or v["videos"].get("small", {}).get("url")
                     if not v_url: continue
                     v_hash = hashlib.md5(v_url.encode()).hexdigest()
                     if v_hash in self.used_hashes: continue
-                    
                     path = self._download(v_url, f"pixabay_{v_hash[:8]}.mp4")
                     if path:
                         clips.append(path)
                         self.used_hashes.add(v_hash)
-        except Exception as e: logger.error(f"[Pixabay] Hata: {e}")
+        except: pass
         return clips
 
     def _download(self, url, name):
