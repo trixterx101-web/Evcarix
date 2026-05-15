@@ -29,7 +29,7 @@ class MediaEngine:
         with open(self.used_hashes_path, "w") as f:
             json.dump(list(self.used_hashes), f)
 
-    def prepare_media(self, topic: str, script: str, count: int = 6) -> list:
+    def download_stock_videos(self, topic: str, script: str, count: int = 6) -> list:
         """
         Gerçek stok videoları (Pexels/Pixabay) indirir. 
         Bulamazsa AI Video üretimine (veya fallback'e) devredilir.
