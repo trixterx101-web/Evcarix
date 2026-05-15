@@ -6,7 +6,7 @@ import google.generativeai as genai
 logger = logging.getLogger("PromptGenerator")
 
 def generate_scene_prompts(topic: str, script: str, count: int = 6) -> list[str]:
-    """Gemini kullanarak sinematik video sahneleri tasarlar."""
+    """Gemini kullanarak sinematik video sahneleri tasarlar. Akıllı model seçici içerir."""
     
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -14,43 +14,54 @@ def generate_scene_prompts(topic: str, script: str, count: int = 6) -> list[str]
         return _get_fallback_prompts(topic, count)
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
     
+    # Denenecek model isimleri (Öncelik sırasına göre)
+    model_candidates = [
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-pro",
+        "models/gemini-1.5-flash"
+    ]
+
     system_prompt = f"""You are a cinematic video director for YouTube Shorts.
 Topic: {topic}
-Script Summary: {script[:500]}
+Script: {script[:500]}
 
 Generate exactly {count} different cinematic video scene prompts.
-Each prompt = one 5-second high-quality shot that visually represents this topic.
+Format: JSON array of strings.
+Style: Photorealistic, 4K, cinematic lighting, no text."""
 
-Rules:
-- Photorealistic, 8K, cinematic lighting, dramatic composition.
-- No text, no logos, no watermarks, no distorted faces.
-- Each scene must be visually distinct from the others.
-- Optimized for portrait (9:16) AI video generation.
-- Focus on tech, electric vehicles, and future energy aesthetics.
-
-Return ONLY a JSON array of {count} strings. No explanation."""
-
-    try:
-        response = model.generate_content(system_prompt)
-        text = response.text.strip()
-        
-        # Markdown bloklarını temizle
-        if "```" in text:
-            text = text.split("```")[1].replace("json", "").strip()
-        
-        prompts = json.loads(text)
-        if isinstance(prompts, list) and len(prompts) >= count:
-            logger.info(f"✅ Gemini {len(prompts)} sahne tarifi üretti.")
-            return prompts[:count]
-    except Exception as e:
-        logger.error(f"Gemini prompt üretimi hatası: {e}")
+    success_text = None
     
+    for model_name in model_candidates:
+        try:
+            logger.info(f"[PromptGen] Deneniyor: {model_name}")
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(system_prompt)
+            if response and response.text:
+                success_text = response.text.strip()
+                logger.info(f"[PromptGen] ✅ {model_name} ile başarıyla üretildi.")
+                break
+        except Exception as e:
+            logger.warning(f"[PromptGen] {model_name} başarısız: {str(e)[:100]}")
+            continue
+
+    if success_text:
+        try:
+            # JSON temizleme
+            if "```" in success_text:
+                success_text = success_text.split("```")[1].replace("json", "").strip()
+            
+            prompts = json.loads(success_text)
+            if isinstance(prompts, list) and len(prompts) >= count:
+                return prompts[:count]
+        except Exception as e:
+            logger.error(f"JSON Parse hatası: {e}")
+
     return _get_fallback_prompts(topic, count)
 
 def _get_fallback_prompts(topic: str, count: int) -> list[str]:
-    """Gemini başarısız olursa konu bazlı hazır kaliteli promptlar döner."""
+    """Tüm modeller başarısız olursa konu bazlı hazır kaliteli promptlar döner."""
     FALLBACKS = {
         "battery": [
             "Extreme macro shot of glowing lithium battery cells with blue energy pulses, 8K cinematic lighting",

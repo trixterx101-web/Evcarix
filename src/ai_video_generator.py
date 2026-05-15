@@ -87,22 +87,27 @@ class AIVideoGenerator:
 
         return clips
 
-    # ── Google Veo 3.1 (Google AI Studio) ──────────────────────────────────
     def _google_veo(self, prompt: str, idx: int) -> str | None:
-        """En yüksek kalite, filigransız Google Veo üretimi."""
+        """En yüksek kalite, filigransız Google Veo üretimi (Akıllı seçim)."""
+        if not self.gemini_key: return None
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.gemini_key)
-            model = genai.GenerativeModel("veo-3-1") 
-            result = model.generate_content(prompt)
             
-            # Video içeriği genellikle file_data veya inline_data olarak döner
-            if result and hasattr(result, 'video_uri'):
-                return self._download(result.video_uri, f"veo_{idx}.mp4")
-            elif result and hasattr(result, 'data'):
-                path = os.path.join(OUTPUT_DIR, f"veo_{idx}.mp4")
-                with open(path, "wb") as f: f.write(result.data)
-                return path
+            # Denenecek Veo model isimleri
+            for model_name in ["veo-3-1", "models/veo-3-1", "imagen-video-v3"]:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    result = model.generate_content(prompt)
+                    
+                    if result and hasattr(result, 'video_uri'):
+                        return self._download(result.video_uri, f"veo_{idx}.mp4")
+                    elif result and hasattr(result, 'data'):
+                        path = os.path.join(OUTPUT_DIR, f"veo_{idx}.mp4")
+                        with open(path, "wb") as f: f.write(result.data)
+                        return path
+                    # Eğer buraya geldiyse ama data yoksa bir sonraki modeli dene
+                except: continue
         except Exception as e: logger.debug(f"[GoogleVeo] {e}")
         return None
 
