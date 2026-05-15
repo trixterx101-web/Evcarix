@@ -93,9 +93,9 @@ class AIVideoGenerator:
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.gemini_key)
-            # Veo model adı güncelliğine göre değişebilir (veo-3-1 veya imagen-video-v3)
-            model = genai.GenerativeModel("veo-3-1") 
-            result = model.generate_content(prompt) # Video generation API call
+            # Veo 3.1 için en güncel model ismi
+            model = genai.GenerativeModel("models/veo-3-1") 
+            result = model.generate_content(prompt)
             
             # Video içeriği genellikle file_data veya inline_data olarak döner
             if result and hasattr(result, 'video_uri'):

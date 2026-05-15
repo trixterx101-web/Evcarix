@@ -8,6 +8,8 @@ logger = logging.getLogger("MediaEngine")
 
 class MediaEngine:
     def __init__(self):
+        from src.voice_engine import VoiceEngine
+        self.voice_engine = VoiceEngine()
         self.pexels_api_key = os.getenv("PEXELS_API_KEY")
         self.used_hashes_path = "used_hashes.json"
         self.used_hashes = self._load_used_hashes()
