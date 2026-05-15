@@ -45,4 +45,8 @@ class AutoEditor:
 
         except Exception as e:
             logger.error(f"[Editor] Kritik hata: {e}")
+<<<<<<< Updated upstream
             return False
+=======
+            return False
+>>>>>>> Stashed changes
