@@ -10,7 +10,6 @@ logger = logging.getLogger("MediaEngine")
 
 class MediaEngine:
     def __init__(self):
-        # MediaEngine initialize edildiğinde ses motorunu da yükler
         from src.voice_engine import VoiceEngine
         self.voice_engine = VoiceEngine()
         self.pexels_api_key = os.getenv("PEXELS_API_KEY")
@@ -30,42 +29,38 @@ class MediaEngine:
         with open(self.used_hashes_path, "w") as f:
             json.dump(list(self.used_hashes), f)
 
-    # Parametre isimlerini main.py ile %100 uyumlu hale getirdik (topic, target_clip_count, plan)
     async def download_stock_videos(self, topic: str, target_clip_count: int = 6, plan=None, **kwargs) -> list:
-        """
-        Main.py ile tam uyumlu metod imzası. 
-        Pexels -> Pixabay -> AI Video -> FFmpeg Animation hiyerarşisini çalıştırır.
-        """
-        logger.info(f"[MediaEngine] '{topic}' için {target_clip_count} klip hazırlanıyor...")
+        logger.info(f"[MediaEngine] '{topic}' için akıllı medya aranıyor...")
         final_clips = []
         
-        # 1. Pexels Denemesi
-        if self.pexels_api_key:
-            logger.info("[MediaEngine] Pexels stok videoları aranıyor...")
-            final_clips = self._download_pexels_videos(topic, target_clip_count)
-            
-        # 2. Pixabay Denemesi
-        if len(final_clips) < target_clip_count and self.pixabay_api_key:
-            needed = target_clip_count - len(final_clips)
-            logger.info(f"[MediaEngine] Pixabay deneniyor (Eksik: {needed})...")
-            final_clips.extend(self._download_pixabay_videos(topic, needed))
+        # 1. Akıllı Arama Terimleri Üret (LLM ile)
+        queries = self._generate_search_queries(topic)
+        logger.info(f"[MediaEngine] Arama Terimleri: {queries}")
 
-        # 3. AI Video Denemesi
+        # 2. Pexels & Pixabay Denemesi (Tüm terimler için)
+        for query in queries:
+            if len(final_clips) >= target_clip_count: break
+            
+            needed = target_clip_count - len(final_clips)
+            if self.pexels_api_key:
+                final_clips.extend(self._download_pexels_videos(query, 2)) # Her terimden 2 tane
+            
+            if len(final_clips) < target_clip_count and self.pixabay_api_key:
+                needed = target_clip_count - len(final_clips)
+                final_clips.extend(self._download_pixabay_videos(query, 1))
+
+        # 3. AI Video & Fallback (Eksik varsa)
         if len(final_clips) < target_clip_count:
             needed = target_clip_count - len(final_clips)
-            logger.info(f"[MediaEngine] AI Video deneniyor (Eksik: {needed})...")
             from src.ai_video_generator import AIVideoGenerator
-            from src.prompt_generator import generate_scene_prompts
             ai_gen = AIVideoGenerator()
-            # Script bilgisi plan içinde olabilir, yoksa topic kullan
             script = plan.get("script", "") if plan and isinstance(plan, dict) else topic
+            from src.prompt_generator import generate_scene_prompts
             prompts = generate_scene_prompts(topic, script, needed)
             final_clips.extend(ai_gen.generate_clips(prompts))
 
-        # 4. Son Çare: FFmpeg Animasyon
         if len(final_clips) < target_clip_count:
             needed = target_clip_count - len(final_clips)
-            logger.warning(f"[MediaEngine] 🎨 Animasyon Fallback üretiliyor (Eksik: {needed}).")
             from src.ai_video_generator import AIVideoGenerator
             ai_gen = AIVideoGenerator()
             for i in range(len(final_clips), target_clip_count):
@@ -74,15 +69,26 @@ class MediaEngine:
         self._save_used_hashes()
         return final_clips
 
+    def _generate_search_queries(self, topic: str) -> list:
+        """Konuyu görsel terimlere dönüştürür."""
+        # Basit ama etkili fallback terimleri (Elektrikli araç odaklı)
+        base = [topic, f"electric car {topic}", "EV technology", "futuristic transportation"]
+        # Eğer konu batarya ile ilgiliyse özel terimler ekle
+        if "battery" in topic.lower():
+            base = ["EV battery factory", "electric car charging", "lithium battery tech", "battery cell"]
+        elif "cost" in topic.lower() or "price" in topic.lower():
+            base = ["car payment", "saving money car", "electric vehicle charging station", "EV luxury interior"]
+        
+        return list(set(base))[:4]
+
     def _download_pexels_videos(self, query: str, count: int) -> list:
         headers = {"Authorization": self.pexels_api_key}
-        url = f"https://api.pexels.com/videos/search?query={query}&per_page={count*3}&orientation=portrait"
+        url = f"https://api.pexels.com/videos/search?query={query}&per_page=5&orientation=portrait"
         clips = []
         try:
             r = requests.get(url, headers=headers, timeout=15)
             if r.status_code == 200:
-                videos = r.json().get("videos", [])
-                for v in videos:
+                for v in r.json().get("videos", []):
                     if len(clips) >= count: break
                     v_url = v["video_files"][0]["link"]
                     v_hash = hashlib.md5(v_url.encode()).hexdigest()
@@ -95,7 +101,7 @@ class MediaEngine:
         return clips
 
     def _download_pixabay_videos(self, query: str, count: int) -> list:
-        url = f"https://pixabay.com/api/videos/?key={self.pixabay_api_key}&q={query}&per_page={count*3}&orientation=vertical"
+        url = f"https://pixabay.com/api/videos/?key={self.pixabay_api_key}&q={query}&per_page=5&orientation=vertical"
         clips = []
         try:
             r = requests.get(url, timeout=15)
