@@ -114,17 +114,37 @@ class AIVideoGenerator:
         if not self.gemini_key: return None
         try:
             from google import genai
+            from google.genai import types
+            
             client = genai.Client(api_key=self.gemini_key)
-            response = client.models.generate_content(
-                model="veo-3-1",
-                contents=prompt
+            logger.info(f"[GoogleVeo] Veo 2.0 ile video üretimi başlatılıyor (Sahne {idx+1})")
+            
+            operation = client.models.generate_videos(
+                model="veo-2.0-generate-001",
+                prompt=prompt,
+                config=types.GenerateVideosConfig(
+                    aspect_ratio="9:16",
+                    duration_seconds=5,
+                    number_of_videos=1,
+                )
             )
-            if response and hasattr(response, 'data'):
+
+            # Üretim tamamlanana kadar bekle (max 3 dakika)
+            for _ in range(36):
+                if operation.done:
+                    break
+                time.sleep(5)
+                operation = client.operations.get(operation)
+
+            if operation.done and operation.response.generated_videos:
+                video = operation.response.generated_videos[0]
                 p = os.path.join(OUTPUT_DIR, f"veo_{idx}.mp4")
-                with open(p, "wb") as f: f.write(response.data)
-                return p
+                # Videoyu indir
+                client.files.download(file=video.video, download_path=p)
+                return p if os.path.exists(p) else None
+
         except Exception as e:
-            logger.debug(f"[GoogleVeo] Yeni SDK Hatası: {e}")
+            logger.debug(f"[GoogleVeo] Hata: {e}")
         return None
 
     def _muapi(self, prompt, idx):
