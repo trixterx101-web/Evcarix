@@ -112,20 +112,25 @@ class AIVideoGenerator:
         return None
 
     # ── PixVerse (Gerçekçi & Cömert) ────────────────────────────────────────
-    def _pixverse(self, prompt: str, idx: int) -> str | None:
+    def _seedance(self, prompt: str, idx: int) -> str | None:
         try:
-            r = requests.post("https://api.pixverse.ai/v1/video/generate", headers={
-                "Authorization": f"Bearer {self.pixverse_key}"}, json={
-                "prompt": prompt, "model": "v5.6", "ratio": "9:16"}, timeout=30)
+            r = requests.post("https://api.seedance.tv/v1/video/generate", headers={
+                "Authorization": f"Bearer {self.seedance_key}"}, json={
+                "prompt": prompt, "aspect_ratio": "9:16"}, timeout=30)
             if r.status_code == 200:
                 tid = r.json().get("task_id")
-                for _ in range(40):
-                    tr = requests.get(f"https://api.pixverse.ai/v1/video/status/{tid}", 
-                                      headers={"Authorization": f"Bearer {self.pixverse_key}"}, timeout=15)
-                    if tr.json().get("status") == "completed":
-                        return self._download(tr.json()["video_url"], f"pixverse_{idx}.mp4")
+                for _ in range(40): # 3-4 dk bekle
+                    tr = requests.get(f"https://api.seedance.tv/v1/video/status/{tid}", headers={"Authorization": f"Bearer {self.seedance_key}"}, timeout=15)
+                    data = tr.json()
+                    if data.get("status") == "completed":
+                        return self._download(data["video_url"], f"seedance_{idx}.mp4")
+                    elif data.get("status") == "failed": 
+                        logger.error(f"[Seedance] Görev başarısız: {data.get('error')}")
+                        break
                     time.sleep(10)
-        except Exception as e: logger.debug(f"[PixVerse] {e}")
+            else:
+                logger.error(f"[Seedance] Hata {r.status_code}: {r.text}")
+        except Exception as e: logger.debug(f"[Seedance] İstisna: {e}")
         return None
 
     # ── Vidu Q3 (Ultra Hızlı) ───────────────────────────────────────────────
