@@ -11,13 +11,16 @@ Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
 class AIVideoGenerator:
     def __init__(self):
-        # Ücretsiz / Cömert Kaynaklar
+        # Şampiyonlar Ligi (En Kaliteli & Ücretsiz)
+        self.gemini_key = os.getenv("GEMINI_API_KEY")     # Google Veo 3.1
         self.seedance_key = os.getenv("SEEDANCE_API_KEY") 
-        self.zsky_key = os.getenv("ZSKY_API_KEY")         
-        self.videogen_key = os.getenv("VIDEOGEN_API_KEY") # videogenapi.com
-        self.muapi_key = os.getenv("MUAPI_KEY")           # muapi.ai (Unified API)
+        self.pixverse_key = os.getenv("PIXVERSE_API_KEY") # Günde 10 video
+        self.vidu_key = os.getenv("VIDU_API_KEY")         # Ultra hızlı
         
-        # Kredili / Ücretli Kaynaklar
+        # Diğer Ücretsiz / Cömert Kaynaklar
+        self.muapi_key = os.getenv("MUAPI_KEY")           
+        self.videogen_key = os.getenv("VIDEOGEN_API_KEY") 
+        self.zsky_key = os.getenv("ZSKY_API_KEY")         
         self.fal_key = os.getenv("FAL_KEY")
         self.replicate_key = os.getenv("REPLICATE_API_TOKEN") # $5 free credit
         self.kling_key = os.getenv("KLING_API_KEY")
@@ -32,23 +35,27 @@ class AIVideoGenerator:
             path = None
             logger.info(f"[AIVideo] Sahne {i+1} üretiliyor: {prompt[:50]}...")
 
-            # ── STRATEJİ: Önce tamamen ücretsiz/cömert olanlar ──
+            # ── STRATEJİ: Kalite ve Ücretsizlik Sırasına Göre ──
             
-            # 1. Seedance (100 kredi/gün)
-            if self.seedance_key:
+            # 1. Google Veo 3.1 (AI Studio - En İyisi)
+            if self.gemini_key:
+                path = self._google_veo(prompt, i)
+
+            # 2. Seedance 2.0 (100 Kredi/Gün - Filigransız)
+            if not path and self.seedance_key:
                 path = self._seedance(prompt, i)
             
-            # 2. Muapi.ai (Unified - 200+ model)
+            # 3. PixVerse (Gerçekçi & Cömert)
+            if not path and self.pixverse_key:
+                path = self._pixverse(prompt, i)
+
+            # 4. Vidu Q3 (Ultra Hızlı)
+            if not path and self.vidu_key:
+                path = self._vidu(prompt, i)
+
+            # 5. Muapi.ai (Unified - 200+ model)
             if not path and self.muapi_key:
                 path = self._muapi(prompt, i)
-
-            # 3. VideoGen API
-            if not path and self.videogen_key:
-                path = self._videogen(prompt, i)
-
-            # 4. ZSky AI
-            if not path and self.zsky_key:
-                path = self._zsky(prompt, i)
 
             # 3. Fal.ai (Hızlı ve kaliteli)
             if not path and self.fal_key:
@@ -79,6 +86,60 @@ class AIVideoGenerator:
                 logger.info(f"[AIVideo] ✅ Sahne {i+1}/6 hazır: {os.path.basename(path)}")
 
         return clips
+
+    # ── Google Veo 3.1 (Google AI Studio) ──────────────────────────────────
+    def _google_veo(self, prompt: str, idx: int) -> str | None:
+        """En yüksek kalite, filigransız Google Veo üretimi."""
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=self.gemini_key)
+            # Veo model adı güncelliğine göre değişebilir (veo-3-1 veya imagen-video-v3)
+            model = genai.GenerativeModel("veo-3-1") 
+            result = model.generate_content(prompt) # Video generation API call
+            
+            # Video içeriği genellikle file_data veya inline_data olarak döner
+            if result and hasattr(result, 'video_uri'):
+                return self._download(result.video_uri, f"veo_{idx}.mp4")
+            elif result and hasattr(result, 'data'):
+                path = os.path.join(OUTPUT_DIR, f"veo_{idx}.mp4")
+                with open(path, "wb") as f: f.write(result.data)
+                return path
+        except Exception as e: logger.debug(f"[GoogleVeo] {e}")
+        return None
+
+    # ── PixVerse (Gerçekçi & Cömert) ────────────────────────────────────────
+    def _pixverse(self, prompt: str, idx: int) -> str | None:
+        try:
+            r = requests.post("https://api.pixverse.ai/v1/video/generate", headers={
+                "Authorization": f"Bearer {self.pixverse_key}"}, json={
+                "prompt": prompt, "model": "v5.6", "ratio": "9:16"}, timeout=30)
+            if r.status_code == 200:
+                tid = r.json().get("task_id")
+                for _ in range(40):
+                    tr = requests.get(f"https://api.pixverse.ai/v1/video/status/{tid}", 
+                                      headers={"Authorization": f"Bearer {self.pixverse_key}"}, timeout=15)
+                    if tr.json().get("status") == "completed":
+                        return self._download(tr.json()["video_url"], f"pixverse_{idx}.mp4")
+                    time.sleep(10)
+        except Exception as e: logger.debug(f"[PixVerse] {e}")
+        return None
+
+    # ── Vidu Q3 (Ultra Hızlı) ───────────────────────────────────────────────
+    def _vidu(self, prompt: str, idx: int) -> str | None:
+        try:
+            r = requests.post("https://api.vidu.studio/v1/generations", headers={
+                "Authorization": f"Bearer {self.vidu_key}"}, json={
+                "prompt": prompt, "duration": 5, "aspect_ratio": "9:16"}, timeout=30)
+            if r.status_code == 200:
+                gid = r.json().get("id")
+                for _ in range(30):
+                    tr = requests.get(f"https://api.vidu.studio/v1/generations/{gid}", 
+                                      headers={"Authorization": f"Bearer {self.vidu_key}"}, timeout=15)
+                    if tr.json().get("state") == "completed":
+                        return self._download(tr.json()["video_url"], f"vidu_{idx}.mp4")
+                    time.sleep(5) # Vidu çok hızlıdır
+        except Exception as e: logger.debug(f"[Vidu] {e}")
+        return None
 
     # ── Seedance AI (100 Kredi/Gün!) ────────────────────────────────────────
     def _seedance(self, prompt: str, idx: int) -> str | None:
