@@ -108,31 +108,56 @@ class AutoEditor:
             subs.append(txt)
         return CompositeVideoClip([video_clip] + subs)
 
-    def assemble(self, clips_paths: list, audio_path: str, title: str, topic: str, 
+    def _validate_clip(self, path: str) -> bool:
+        """ffprobe ile klibin okunabilir olup olmadığını hızlıca doğrular."""
+        try:
+            result = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", "stream=duration", "-of", "default=noprint_wrappers=1", path],
+                capture_output=True, timeout=10
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def assemble(self, clips_paths: list, audio_path: str, title: str, topic: str,
                  words_with_times: list = None, is_short: bool = True, output_path: str = "final.mp4"):
         try:
             v_clips = []
             target_size = (1080, 1920) if is_short else (1920, 1080)
-            
+
             for p in clips_paths:
-                if not p or not os.path.exists(p): continue
-                c = VideoFileClip(p).without_audio().resize(height=target_size[1])
-                if c.w > target_size[0]:
-                    c = c.crop(x_center=c.w/2, width=target_size[0])
-                v_clips.append(self._apply_ken_burns(c))
+                if not p or not os.path.exists(p):
+                    continue
+                # Bozuk dosyaları ffprobe ile önceden eliyoruz
+                if not self._validate_clip(p):
+                    logger.warning(f"[Editor] Bozuk klip atlandı (ffprobe failed): {os.path.basename(p)}")
+                    try:
+                        os.remove(p)  # Önbellekten temizle
+                    except Exception:
+                        pass
+                    continue
+                try:
+                    c = VideoFileClip(p).without_audio().resize(height=target_size[1])
+                    if c.w > target_size[0]:
+                        c = c.crop(x_center=c.w / 2, width=target_size[0])
+                    v_clips.append(self._apply_ken_burns(c))
+                except Exception as clip_err:
+                    logger.warning(f"[Editor] Klip yüklenemedi, atlanıyor ({os.path.basename(p)}): {clip_err}")
 
             if not v_clips:
+                logger.warning("[Editor] Hiç geçerli klip yok, fallback üretiliyor...")
                 from src.utils.fallback import generate_fallback_video
                 p = os.path.join(self.temp_dir, "fallback.mp4")
                 generate_fallback_video(30, topic, p)
                 v_clips = [VideoFileClip(p)]
 
             final_video = concatenate_videoclips(self._add_transitions_sfx(v_clips), method="compose")
-            
+
             if audio_path and os.path.exists(audio_path):
                 audio = AudioFileClip(audio_path)
                 final_video = final_video.set_audio(audio.set_duration(final_video.duration))
-            
+
             if words_with_times:
                 final_video = self._add_subtitles(final_video, words_with_times)
 

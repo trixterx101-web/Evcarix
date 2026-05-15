@@ -83,18 +83,39 @@ class ResearchFetcher:
             "ev": "https://afdc.energy.gov/files/vehicles/electric_charging_broll.mp4",
             "future": "https://www.energy.gov/sites/default/files/2023-01/grid-modernization-broll.mp4"
         }
-        
+
+        # Substring eşleşmesi: 'How battery degradation...' → 'battery' key'ini bulur
+        topic_lower = topic.lower()
+        url = doe_sources["ev"]  # varsayılan
+        for key, key_url in doe_sources.items():
+            if key in topic_lower:
+                url = key_url
+                break
+
         paths = []
-        url = doe_sources.get(topic.lower()) or doe_sources["ev"]
         try:
-            fname = f"doe_{topic}.mp4"
+            # Dosya adını güvenli hale getir (boşluk ve özel karakter yok)
+            safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in topic_lower[:40])
+            fname = f"doe_{safe_name}.mp4"
             dest = os.path.join(TEMP_DIR, fname)
+
             if not os.path.exists(dest):
-                r = requests.get(url, stream=True)
-                with open(dest, "wb") as f:
-                    for chunk in r.iter_content(65536): f.write(chunk)
-            if os.path.exists(dest):
+                r = requests.get(url, stream=True, timeout=30)
+                if r.status_code == 200:
+                    with open(dest, "wb") as f:
+                        for chunk in r.iter_content(65536):
+                            f.write(chunk)
+                else:
+                    logger.warning(f"[DOE] HTTP {r.status_code} for {url} — atlanıyor")
+                    return []
+
+            # Boyut doğrulaması — bozuk (0-byte) dosyaları listeye ekleme
+            if os.path.exists(dest) and os.path.getsize(dest) > 50_000:
                 self._log_license(dest, "US DOE", "Energy B-Roll", url)
                 paths.append(dest)
-        except: pass
+            elif os.path.exists(dest):
+                logger.warning(f"[DOE] Bozuk dosya silindi: {dest}")
+                os.remove(dest)
+        except Exception as e:
+            logger.warning(f"[DOE] fetch_energy_gov hatası: {e}")
         return paths

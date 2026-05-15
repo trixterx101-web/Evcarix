@@ -202,8 +202,12 @@ class EvcarixOrchestrator:
                 
                 if bg_track_path:
                     mixed_path = audio_output.replace(".mp3", "_mixed.mp3")
-                    audio_path = mix_audio(audio_path, bg_track_path, mixed_path)
-                    print(f"      🎵 Sesler karıştırıldı (AudioMixer).", flush=True)
+                    result_path = mix_audio(audio_path, bg_track_path, mixed_path)
+                    if result_path and result_path != audio_path:
+                        audio_path = result_path
+                        print(f"      🎵 Sesler karıştırıldı (AudioMixer).", flush=True)
+                    else:
+                        print(f"      ⚠️ AudioMixer mix başarısız, orijinal TTS kullanılıyor.", flush=True)
             except Exception as e:
                 print(f"      ⚠️ Ses miksaj hatası (atlanıyor): {e}", flush=True)
 
