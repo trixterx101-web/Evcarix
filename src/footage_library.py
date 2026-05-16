@@ -180,9 +180,9 @@ class FootageLibrary:
                 # Get files list
                 f_url = f"https://archive.org/metadata/{ident}"
                 fr = requests.get(f_url, timeout=10).json()
-                mp4s = [f for f in fr.get("files", []) if f["name"].endswith(".mp4") and int(f.get("size", 0)) < 50000000]
+                mp4s = [f for f in fr.get("files", []) if f["name"].endswith(".mp4") and int(f.get("size") or 0) < 50000000]
                 if mp4s:
-                    best = sorted(mp4s, key=lambda x: int(x.get("size", 0)), reverse=True)[0]
+                    best = sorted(mp4s, key=lambda x: int(x.get("size") or 0), reverse=True)[0]
                     dl_url = f"https://archive.org/download/{ident}/{best['name']}"
                     out = os.path.join(self.output_dir, f"archive_{ident}.mp4")
                     if self._download_direct(dl_url, out):
@@ -220,7 +220,7 @@ class FootageLibrary:
             videos = r.json().get("videos", [])
             results = []
             for v in videos:
-                files = [f for f in v["video_files"] if f["width"] >= 720]
+                files = [f for f in v["video_files"] if int(f.get("width", 0) or 0) >= 720]
                 if files:
                     out = os.path.join(self.output_dir, f"pexels_{v['id']}.mp4")
                     if self._download_direct(files[0]["link"], out):
