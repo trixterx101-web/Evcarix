@@ -171,122 +171,115 @@ class AIVideoGenerator:
             time.sleep(10)
         return None
 
-    def _ffmpeg_animated(self, prompt: str, idx: int) -> str:
-        """Sınırsız ve her seferinde farklı 3D-benzeri procedural animasyon üretir."""
-        out = os.path.join(OUTPUT_DIR, f"gen_{idx}_{int(time.time()) % 1000}.mp4")
-        
-        # 1. Prompt'a göre 'Seed' ve 'Tema' belirle
-        seed = int(hashlib.md5(prompt.encode()).hexdigest(), 16) % 10000
-        random.seed(seed)
-        
+    def _ffmpeg_animated(self, prompt: str, idx: int) -> str | None:
+        """
+        Generate unique 3D cinematic animation using FFmpeg lavfi.
+        Every call produces visually different output.
+        Zero external dependencies. Unlimited and free.
+        """
+        out = os.path.join(OUTPUT_DIR, f"anim_{idx}_{random.randint(1000,9999)}.mp4")
         theme = _pick_theme(prompt)
-        bg, acc = theme["bg"], theme["acc"]
-        t1, t2 = _pick_titles(prompt)
+        p = self._get_random_params()
+        base_filter = self._pick_effect(prompt, p)
+        color_filter = self._apply_theme_color(base_filter, theme)
+        text_filter = self._add_text_overlay(color_filter, prompt, theme, p)
+        cmd = self._build_ffmpeg_cmd(text_filter, out, duration=5)
         
-        # 2. Archetype Seçimi (Rastgele ama prompt'tan etkilenen)
-        archetypes = ["grid", "vortex", "pulse", "stream", "rain", "polygons", "tunnel"]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            if result.returncode == 0 and os.path.exists(out) and os.path.getsize(out) > 5000:
+                logger.info(f"[FFmpeg3D] ✅ Clip {idx}: {out}")
+                return out
+            logger.error(f"[FFmpeg3D] Failed: {result.stderr[-300:]}")
+        except Exception as e:
+            logger.error(f"[FFmpeg3D] Error: {e}")
+        return None
+
+    def _get_random_params(self) -> dict:
+        return {
+            "freq1": round(random.uniform(20, 60), 1),
+            "freq2": round(random.uniform(30, 80), 1),
+            "freq3": round(random.uniform(15, 45), 1),
+            "speed1": round(random.uniform(1.5, 5.0), 2),
+            "speed2": round(random.uniform(2.0, 6.0), 2),
+            "r_amp": random.randint(80, 127),
+            "g_amp": random.randint(60, 127),
+            "b_amp": random.randint(100, 127),
+            "grid": random.choice([40, 60, 80, 100, 120]),
+            "cx_offset": random.randint(-100, 100),
+            "cy_offset": random.randint(-200, 200),
+            "seed": random.randint(1, 9999),
+            "variant": random.randint(0, 3)
+        }
+
+    def _pick_effect(self, prompt: str, p: dict) -> str:
         pl = prompt.lower()
-        
-        # Keyword-based bias
-        if "data" in pl or "stats" in pl: arch = "grid"
-        elif "energy" in pl or "flow" in pl: arch = "stream"
-        elif "battery" in pl or "charge" in pl: arch = "pulse"
-        elif "ai" in pl or "neural" in pl: arch = "vortex"
-        elif "city" in pl or "urban" in pl: arch = "grid"
-        elif "speed" in pl or "fast" in pl: arch = "tunnel"
-        else: arch = random.choice(archetypes)
-        
-        logger.info(f"[AIVideo] Generative 3D: Arch={arch}, Seed={seed}")
-        
-        # 3. Parametreleri Rastgeleleştir (Sınırsız varyasyon için)
-        params = {
-            "speed": random.uniform(0.5, 3.0),
-            "thickness": random.randint(1, 10),
-            "density": random.randint(5, 20),
-            "zoom": random.uniform(1.1, 1.5),
-            "rotation": random.uniform(-10, 10),
-            "opacity": random.uniform(0.2, 0.8),
-            "hue_shift": random.randint(0, 360)
+        effects = {
+            "plasma": f"geq=r='{p['r_amp']}+100*sin(2*PI*(X/W+T/{p['speed1']}))':g='{p['g_amp']}+80*cos(2*PI*(Y/H+T/{p['speed2']}))':b='{p['b_amp']}+55*sin(2*PI*(X/W+Y/H+T/2))'",
+            "tunnel": f"geq=r='{p['r_amp']}+127*sin(hypot(X-W/2-{p['cx_offset']},Y-H/2-{p['cy_offset']})/{p['freq1']}-T*{p['speed1']})':g='{p['g_amp']}+127*sin(hypot(X-W/2,Y-H/2)/{p['freq2']}-T*{p['speed2']})':b='{p['b_amp']}'",
+            "particles": f"geq=r='255*gt(sin(X/{p['grid']/10}+T*{p['speed1']}),0.95)':g='255*gt(sin(Y/8+T*{p['speed2']}),0.95)':b='{p['b_amp']}'",
+            "matrix": f"geq=lum='255*gt(random(floor(X/{p['grid']/2})*floor(T*{p['speed1']})),0.97)':cb=128:cr=100",
+            "wormhole": f"geq=r='128+127*sin(10*atan2(Y-H/2,X-W/2)+hypot(X-W/2,Y-H/2)/{p['freq1']}-T*{p['speed1']})':g='128+127*cos(8*atan2(Y-H/2,X-W/2)-T*{p['speed2']})':b='{p['b_amp']}+55*sin(T*2)'",
+            "grid": f"geq=r='255*lt(mod(X,{p['grid']}),2)':g='200*lt(mod(Y,{p['grid']}),2)':b='255*lt(mod(X,{p['grid']}),2)+255*lt(mod(Y,{p['grid']}),2)'",
+            "lava": f"geq=r='200+55*sin(X/{p['freq1']}+T*{p['speed1']})':g='80+40*cos(Y/{p['freq2']}+T*{p['speed2']})':b='30'",
+            "stars": f"geq=lum='255*gt(random(floor(X/3)+floor(Y/3)*{p['seed']}),0.995)':cb=128:cr=128",
+            "scan": f"geq=r='255*gt(sin(Y/5+T*{p['speed1']*2}),0.98)+100*sin(X/100+T)':g='200*gt(sin(Y/5+T*{p['speed1']*2}),0.98)':b='255*sin(X/50+T*2)'",
+            "quantum": f"geq=r='128+127*sin(X/{p['freq1']})*cos(T*{p['speed1']})':g='128+127*cos(Y/{p['freq2']})*sin(T*{p['speed2']})':b='200+55*sin((X+Y)/{p['freq3']}+T)'"
         }
         
-        # 4. Archetype'a göre üret
-        if arch == "grid": return self._gen_grid(t1, bg, acc, params, out)
-        if arch == "vortex": return self._gen_vortex(t1, bg, acc, params, out)
-        if arch == "pulse": return self._gen_pulse(t1, bg, acc, params, out)
-        if arch == "stream": return self._gen_stream(t1, bg, acc, params, out)
-        if arch == "tunnel": return self._gen_tunnel(t1, bg, acc, params, out)
+        if any(k in pl for k in ["electric", "battery", "charge", "energy"]):
+            return random.choice([effects["tunnel"], effects["grid"]])
+        if any(k in pl for k in ["ai", "neural", "data", "tech"]):
+            return random.choice([effects["matrix"], effects["scan"]])
+        if any(k in pl for k in ["robot", "factory", "mechanical"]):
+            return random.choice([effects["grid"], effects["particles"]])
+        if any(k in pl for k in ["mining", "lithium", "chemical"]):
+            return random.choice([effects["plasma"], effects["lava"]])
+        if any(k in pl for k in ["future", "space", "quantum"]):
+            return random.choice([effects["wormhole"], effects["stars"]])
+        if any(k in pl for k in ["speed", "fast", "performance"]):
+            return random.choice([effects["quantum"], effects["tunnel"]])
+            
+        return random.choice(list(effects.values()))
+
+    def _apply_theme_color(self, base_filter: str, theme: dict) -> str:
+        acc = theme["acc"].lower()
+        r, g, b = 1.0, 1.0, 1.0
+        if "00d4ff" in acc or "blue" in acc: r, g, b = 0.5, 1.0, 1.5
+        elif "00ff88" in acc or "green" in acc: r, g, b = 0.5, 1.5, 0.5
+        elif "cc44ff" in acc or "purple" in acc: r, g, b = 1.2, 0.5, 1.5
+        elif "ff6b00" in acc or "orange" in acc: r, g, b = 1.5, 0.8, 0.2
+        elif "ffd700" in acc or "gold" in acc: r, g, b = 1.5, 1.2, 0.2
+        elif "ff3300" in acc or "red" in acc: r, g, b = 1.5, 0.2, 0.2
         
-        return self._gen_grid(t1, bg, acc, params, out)
+        return f"{base_filter},colorchannelmixer=rr={r}:gg={g}:bb={b}"
 
-    def _gen_grid(self, t1, bg, acc, p, out):
-        """3D Perspective Grid Animation."""
-        vf = (
-            f"color=c={bg}:s=1080x1920[bg];"
-            f"color=c={acc}:s=1080x1920,geq=lum='if(lt(mod(X,100),3)+lt(mod(Y+T*{p['speed']}*100,150),3), 255, 0)':cb=128:cr=128,"
-            f"perspective=x0=0:y0=H/2:x1=W:y1=H/2:x2=-W:y2=H:x3=2*W:y3=H:interpolation=linear[grid];"
-            f"[bg][grid]overlay=format=auto,"
-            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/4:shadowcolor=black@0.8:shadowx=5:shadowy=5,"
-            f"hue=h={p['hue_shift']}:s=1.2[v]"
-        )
-        return self._run_ffmpeg(vf, out)
+    def _add_text_overlay(self, video_filter: str, prompt: str, theme: dict, params: dict) -> str:
+        t1, t2 = _pick_titles(prompt)
+        acc = theme["acc"]
+        
+        t1 = "".join(c for c in t1 if c.isalnum() or c in " -").strip()[:20]
+        t2 = "".join(c for c in t2 if c.isalnum() or c in " -").strip()[:20]
+        
+        TEXT_STYLES = [
+            f"drawtext=text='{t1}':fontsize=110:fontcolor=white:x=(w-tw)/2:y=800:shadowcolor={acc}@0.8:shadowx=6:shadowy=6:borderw=3:bordercolor={acc}",
+            f"drawbox=x=0:y=780:w=25:h=220:color={acc}:t=fill,drawtext=text='{t1}':fontsize=100:fontcolor=white:x=80:y=820:shadowcolor=black@0.5:shadowx=3:shadowy=3",
+            f"drawbox=x=0:y=1400:w=iw:h=300:color=black@0.7:t=fill,drawtext=text='{t1}':fontsize=90:fontcolor={acc}:x=(w-tw)/2:y=1450",
+            f"drawtext=text='{t1}':fontsize=90:fontcolor={acc}:x=(w-tw)/2:y=720,drawtext=text='{t2}':fontsize=90:fontcolor=white:x=(w-tw)/2:y=850"
+        ]
+        
+        style = random.choice(TEXT_STYLES)
+        return f"{video_filter},{style}"
 
-    def _gen_vortex(self, t1, bg, acc, p, out):
-        """Spiral / Vortex motion."""
-        vf = (
-            f"color=c={bg}:s=1080x1920,mandelbrot=s=1080x1920:maxiter=50,"
-            f"rotate='t*{p['speed']}*0.5':fillcolor={bg}:ow=iw:oh=ih,"
-            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2:shadowcolor=black:shadowx=4:shadowy=4,"
-            f"hue=h={p['hue_shift']}:s=1.5[v]"
-        )
-        return self._run_ffmpeg(vf, out)
-
-    def _gen_pulse(self, t1, bg, acc, p, out):
-        """Pulsing energy rings."""
-        vf = (
-            f"color=c={bg}:s=1080x1920[bg];"
-            f"color=c={acc}:s=1080x1920,geq=lum='if(lt(abs(hypot(X-W/2,Y-H/2)-mod(T*{p['speed']}*300,1200)),{p['thickness']}*5), 255, 0)':cb=128:cr=128[pulse];"
-            f"[bg][pulse]overlay=format=auto,boxblur=5:1,"
-            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2-100,"
-            f"hue=h={p['hue_shift']}:s=1.5[v]"
-        )
-        return self._run_ffmpeg(vf, out)
-
-    def _gen_stream(self, t1, bg, acc, p, out):
-        """Horizontal particle streams."""
-        vf = (
-            f"color=c={bg}:s=1080x1920,geq=lum='if(gt(random(1),{1-p['density']/100.0}), 255, 0)':cb=128:cr=128,"
-            f"scroll=horizontal=t*{p['speed']}*0.1,"
-            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2,"
-            f"hue=h={p['hue_shift']}:s=1.5[v]"
-        )
-        return self._run_ffmpeg(vf, out)
-
-    def _gen_tunnel(self, t1, bg, acc, p, out):
-        """3D Tunnel travel effect."""
-        vf = (
-            f"testsrc2=s=1080x1920:r=30:d=5,zoompan=z='zoom+0.002':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=150:s=1080x1920,"
-            f"hue=h={p['hue_shift']}:s=0.5,"
-            f"drawtext=text='{t1}':fontsize=120:fontcolor={acc}:x=(w-tw)/2:y=h/2:shadowcolor=black:shadowx=10:shadowy=10[v]"
-        )
-        return self._run_ffmpeg(vf, out)
-
-    def _run_ffmpeg(self, vf, out):
-        try:
-            # Switch to -filter_complex for robust multi-source chains
-            cmd = [
-                "ffmpeg", "-y", "-t", "5",
-                "-filter_complex", vf,
-                "-map", "[v]",
-                "-c:v", "libx264", "-crf", "18", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an", out
-            ]
-            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            return out
-        except subprocess.CalledProcessError as e:
-            logger.error(f"[AIVideo] FFmpeg Complex Error: {e.stderr}")
-            return None
-        except Exception as e:
-            logger.error(f"[AIVideo] Generative Error: {e}")
-            return None
+    def _build_ffmpeg_cmd(self, filter_chain: str, output: str, duration: int = 5) -> list:
+        return [
+            "ffmpeg", "-y", "-t", str(duration),
+            "-f", "lavfi", "-i", f"nullsrc=s=1080x1920:r=30",
+            "-filter_complex", f"[0:v]{filter_chain}[v]",
+            "-map", "[v]",
+            "-c:v", "libx264", "-crf", "18", "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p", "-an", output
+        ]
 
     def _validate(self, path: str) -> bool:
         if not path or not os.path.exists(path): return False
