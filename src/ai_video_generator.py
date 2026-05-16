@@ -226,7 +226,7 @@ class AIVideoGenerator:
             f"perspective=x0=0:y0=h/2:x1=w:y1=h/2:x2=-w:y2=h:x3=2*w:y3=h:interpolation=linear[grid];"
             f"[bg][grid]overlay=format=auto,"
             f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/4:shadowcolor=black@0.8:shadowx=5:shadowy=5,"
-            f"hue=h={p['hue_shift']}:s=1.2"
+            f"hue=h={p['hue_shift']}:s=1.2[v]"
         )
         return self._run_ffmpeg(vf, out)
 
@@ -236,7 +236,7 @@ class AIVideoGenerator:
             f"color=c={bg}:s=1080x1920,mandelbrot=s=1080x1920:maxiter=50,"
             f"rotate='T*{p['speed']}*0.5':fillcolor={bg}:ow=iw:oh=ih,"
             f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2:shadowcolor=black:shadowx=4:shadowy=4,"
-            f"hue=h={p['hue_shift']}:s=1.5"
+            f"hue=h={p['hue_shift']}:s=1.5[v]"
         )
         return self._run_ffmpeg(vf, out)
 
@@ -247,7 +247,7 @@ class AIVideoGenerator:
             f"color=c={acc}:s=1080x1920,geq=lum='if(lt(abs(hypot(X-W/2,Y-H/2)-mod(T*{p['speed']}*300,1200)),{p['thickness']}*5), 255, 0)':cb=128:cr=128[pulse];"
             f"[bg][pulse]overlay=format=auto,boxblur=5:1,"
             f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2-100,"
-            f"hue=h={p['hue_shift']}:s=1.5"
+            f"hue=h={p['hue_shift']}:s=1.5[v]"
         )
         return self._run_ffmpeg(vf, out)
 
@@ -257,31 +257,32 @@ class AIVideoGenerator:
             f"color=c={bg}:s=1080x1920,geq=lum='if(gt(random(1),{1-p['density']/100.0}), 255, 0)':cb=128:cr=128,"
             f"scroll=horizontal={p['speed']*0.1},"
             f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2,"
-            f"hue=h={p['hue_shift']}:s=1.5"
+            f"hue=h={p['hue_shift']}:s=1.5[v]"
         )
         return self._run_ffmpeg(vf, out)
 
     def _gen_tunnel(self, t1, bg, acc, p, out):
         """3D Tunnel travel effect."""
         vf = (
-            f"zoompan=z='zoom+0.002':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=150:s=1080x1920,"
+            f"testsrc2=s=1080x1920:r=30:d=5,zoompan=z='zoom+0.002':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=150:s=1080x1920,"
             f"hue=h={p['hue_shift']}:s=0.5,"
-            f"drawtext=text='{t1}':fontsize=120:fontcolor={acc}:x=(w-tw)/2:y=h/2:shadowcolor=black:shadowx=10:shadowy=10"
+            f"drawtext=text='{t1}':fontsize=120:fontcolor={acc}:x=(w-tw)/2:y=h/2:shadowcolor=black:shadowx=10:shadowy=10[v]"
         )
-        return self._run_ffmpeg(vf, out, source="testsrc2=s=1080x1920:r=30:d=5")
+        return self._run_ffmpeg(vf, out)
 
-    def _run_ffmpeg(self, vf, out, source=None):
+    def _run_ffmpeg(self, vf, out):
         try:
-            if not source:
-                source = "nullsrc=s=1080x1920:d=5"
+            # Switch to -filter_complex for robust multi-source chains
             cmd = [
-                "ffmpeg", "-y", "-f", "lavfi", "-r", "30", "-i", source,
-                "-vf", vf, "-c:v", "libx264", "-crf", "18", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an", out
+                "ffmpeg", "-y", "-t", "5",
+                "-filter_complex", vf,
+                "-map", "[v]",
+                "-c:v", "libx264", "-crf", "18", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an", out
             ]
             res = subprocess.run(cmd, capture_output=True, text=True, check=True)
             return out
         except subprocess.CalledProcessError as e:
-            logger.error(f"[AIVideo] FFmpeg Generative Error: {e.stderr}")
+            logger.error(f"[AIVideo] FFmpeg Complex Error: {e.stderr}")
             return None
         except Exception as e:
             logger.error(f"[AIVideo] Generative Error: {e}")
