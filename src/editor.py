@@ -100,7 +100,7 @@ class AutoEditor:
             return False
 
     def _build_subtitles(self, text: str, duration: float, W: int, H: int, is_short: bool) -> list:
-        """Word-level subtitle burn-in filters."""
+        """Word-level subtitle burn-in — strict non-overlapping time slices."""
         clean = re.sub(r"[^A-Z0-9 .,!?%\-']", "", text.upper()).strip()
         words = clean.split()
         if not words:
@@ -108,12 +108,14 @@ class AutoEditor:
 
         font_size = 68 if is_short else 52
         y_pos     = H - 180 if is_short else H - 120
-        wps = max(len(words) / max(duration, 1), 0.5)
+
+        # Equal slice per word, no +0.3 tail that caused stacking
+        word_dur = duration / len(words)
 
         filters = []
         for i, w in enumerate(words):
-            t0 = round(i / wps, 2)
-            t1 = round((i+1) / wps + 0.3, 2)
+            t0 = round(i * word_dur, 3)
+            t1 = round((i + 1) * word_dur - 0.04, 3)  # 40ms gap = no overlap
             safe_w = w.replace("'", "\\'")
             filters.append(
                 f"drawtext=text='{safe_w}'"
