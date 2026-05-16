@@ -1,114 +1,173 @@
 import os
+import re
+import requests
 import logging
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+import textwrap
 from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 
 logger = logging.getLogger("ThumbnailGenerator")
 
-# Evcarix Brand Colors
 ACCENT_COLORS = {
-    "electric_vehicle": "#00D4FF",
+    "electric_vehicle":        "#00D4FF",
     "artificial_intelligence": "#8B00FF",
-    "robotics": "#00FF88",
-    "battery_tech": "#FF6B00",
-    "future_tech": "#FF00FF",
-    "default": "#00D4FF"
+    "robotics":                "#00FF88",
+    "battery_tech":            "#FF6B00",
+    "future_tech":             "#FF00FF",
+    "default":                 "#00D4FF",
 }
+
+TOPIC_QUERIES = {
+    "electric_vehicle":        "electric car highway",
+    "artificial_intelligence": "artificial intelligence technology",
+    "robotics":                "industrial robot factory",
+    "battery_tech":            "battery electric charging",
+    "future_tech":             "futuristic city technology",
+    "default":                 "electric vehicle road",
+}
+
+FONT_PATH = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+if not os.path.exists(FONT_PATH):
+    FONT_PATH = None
+
 
 class ThumbnailGenerator:
     def __init__(self):
-        # GitHub Actions Ubuntu font path - LiberationSans is standard
-        self.font_path = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
-        if not os.path.exists(self.font_path):
-            # Fallback to local assets if exists
-            self.font_path = "assets/fonts/LiberationSans-Bold.ttf"
-            if not os.path.exists(self.font_path):
-                self.font_path = None # PIL will use default
+        self.pexels_key = os.getenv("PEXELS_API_KEY")
 
-    def create(self, title: str, topic: str, output_path: str, is_short: bool = True) -> str:
-        """
-        Main method called by Editor.
-        Creates 1280x720 thumbnail (long) or 1080x1920 (shorts).
-        """
+    def create(self, title: str, topic: str = "default", stat: str = "",
+               category: str = "default", output_path: str = "thumbnail.jpg",
+               is_short: bool = False) -> str:
+        """Create 1280x720 thumbnail with real background image + title overlay."""
+        W, H = (1080, 1920) if is_short else (1280, 720)
+        os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
+
+        topic_key = topic.lower().replace(" ", "_")
+        accent    = ACCENT_COLORS.get(topic_key, ACCENT_COLORS["default"])
+        query     = TOPIC_QUERIES.get(topic_key, TOPIC_QUERIES["default"])
+
+        # 1. Try to fetch a real background image
+        bg = self._fetch_pexels_image(query, W, H)
+        if bg is None:
+            bg = self._gradient_bg(W, H, accent)
+
+        # 2. Darken + blur bottom half for text readability
+        bg = self._add_text_bg(bg, W, H)
+
+        # 3. Draw text
+        draw = ImageDraw.Draw(bg)
+        self._draw_title(draw, title, accent, W, H)
+        self._draw_branding(draw, accent, W, H)
+
+        bg.save(output_path, "JPEG", quality=92)
+        logger.info(f"[Thumbnail] ✅ Saved: {output_path}")
+        return output_path
+
+    # ── Background ─────────────────────────────────────────────────────────
+
+    def _fetch_pexels_image(self, query: str, W: int, H: int):
+        if not self.pexels_key:
+            return None
         try:
-            if is_short:
-                return self.create_shorts(title, topic, output_path)
-            else:
-                return self.create_horizontal(title, topic, output_path)
+            url = (f"https://api.pexels.com/v1/search?query={query}"
+                   f"&per_page=5&orientation={'portrait' if H > W else 'landscape'}")
+            r = requests.get(url, headers={"Authorization": self.pexels_key}, timeout=10)
+            photos = r.json().get("photos", [])
+            if not photos:
+                return None
+            import random
+            photo = random.choice(photos[:3])
+            img_url = photo["src"]["large2x"] if H <= W else photo["src"]["portrait"]
+            img_data = requests.get(img_url, timeout=20).content
+            from io import BytesIO
+            img = Image.open(BytesIO(img_data)).convert("RGB")
+            # Center-crop to target ratio
+            img = self._center_crop(img, W, H)
+            return img
         except Exception as e:
-            logger.error(f"[ThumbnailGenerator] Create error: {e}")
-            # Generate a solid color emergency thumb
-            img = Image.new("RGB", (1080, 1920) if is_short else (1280, 720), "#0A0A0F")
-            img.save(output_path)
-            return output_path
+            logger.warning(f"[Thumbnail] Pexels fetch failed: {e}")
+            return None
 
-    def _get_base_canvas(self, width: int, height: int):
-        # Dark Gradient Background #0A0A0F -> #001833
-        base = Image.new("RGB", (width, height), "#0A0A0F")
-        draw = ImageDraw.Draw(base)
-        for y in range(height):
-            # Simple linear gradient simulation
-            r = int(10 - (10 * y / height))
-            g = int(10 + (14 * y / height))
-            b = int(15 + (36 * y / height))
-            draw.line([(0, y), (width, y)], fill=(r, g, b))
-        return base
+    def _center_crop(self, img: Image.Image, W: int, H: int) -> Image.Image:
+        iw, ih = img.size
+        target_ratio = W / H
+        current_ratio = iw / ih
+        if current_ratio > target_ratio:
+            new_w = int(ih * target_ratio)
+            left = (iw - new_w) // 2
+            img = img.crop((left, 0, left + new_w, ih))
+        else:
+            new_h = int(iw / target_ratio)
+            top = (ih - new_h) // 2
+            img = img.crop((0, top, iw, top + new_h))
+        return img.resize((W, H), Image.LANCZOS)
 
-    def create_shorts(self, title: str, topic: str, output_path: str) -> str:
-        width, height = 1080, 1920
-        img = self._get_base_canvas(width, height)
-        self._draw_elements(img, title, topic, width, height)
-        img.save(output_path, "JPEG", quality=90)
-        return output_path
-
-    def create_horizontal(self, title: str, topic: str, output_path: str) -> str:
-        width, height = 1280, 720
-        img = self._get_base_canvas(width, height)
-        self._draw_elements(img, title, topic, width, height)
-        img.save(output_path, "JPEG", quality=90)
-        return output_path
-
-    def _draw_elements(self, img, title, topic, w, h):
+    def _gradient_bg(self, W: int, H: int, accent: str) -> Image.Image:
+        img = Image.new("RGB", (W, H))
         draw = ImageDraw.Draw(img)
-        # Match topic to color
-        clean_topic = topic.lower().replace(" ", "_")
-        accent = ACCENT_COLORS.get(clean_topic, ACCENT_COLORS["default"])
-        
-        # 1. Left Edge Accent Stripe (6px)
-        draw.rectangle([0, 0, 6, h], fill=accent)
-        
-        # 2. Text Logic
-        font_size = int(w * 0.11)
-        try:
-            if self.font_path:
-                font = ImageFont.truetype(self.font_path, font_size)
-            else:
-                font = ImageFont.load_default()
-        except:
-            font = ImageFont.load_default()
-        
-        # Split title into lines (max 2 words per line)
-        words = title.upper().split()
-        lines = [" ".join(words[i:i+2]) for i in range(0, len(words), 2)]
-        
-        y_cursor = h // 3
-        for line in lines[:5]:
-            # Glow effect: Draw blurred text behind
-            glow_offset = 2
-            for ox in [-glow_offset, glow_offset]:
-                for oy in [-glow_offset, glow_offset]:
-                    draw.text((w//2 + ox, y_cursor + oy), line, font=font, fill=accent, anchor="mm")
-            
-            # Main white text
-            draw.text((w//2, y_cursor), line, font=font, fill="white", anchor="mm")
-            y_cursor += font_size + 30
+        ar, ag, ab = int(accent[1:3],16), int(accent[3:5],16), int(accent[5:7],16)
+        for y in range(H):
+            t = y / H
+            r = int(10 + ar * t * 0.3)
+            g = int(10 + ag * t * 0.3)
+            b = int(20 + ab * t * 0.4)
+            draw.line([(0, y), (W, y)], fill=(min(r,255), min(g,255), min(b,255)))
+        return img
 
-        # 3. Bottom Branding Bar
-        brand_font_size = int(w * 0.06)
+    def _add_text_bg(self, img: Image.Image, W: int, H: int) -> Image.Image:
+        """Add dark gradient overlay on bottom 60% for text readability."""
+        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+        zone_start = int(H * 0.35)
+        for y in range(zone_start, H):
+            alpha = int(200 * (y - zone_start) / (H - zone_start))
+            draw.line([(0, y), (W, y)], fill=(0, 0, 15, alpha))
+        img = img.convert("RGBA")
+        img = Image.alpha_composite(img, overlay)
+        return img.convert("RGB")
+
+    # ── Text ───────────────────────────────────────────────────────────────
+
+    def _get_font(self, size: int):
         try:
-            brand_font = ImageFont.truetype(self.font_path, brand_font_size) if self.font_path else ImageFont.load_default()
+            if FONT_PATH and os.path.exists(FONT_PATH):
+                return ImageFont.truetype(FONT_PATH, size)
         except:
-            brand_font = ImageFont.load_default()
-            
-        draw.text((w//2, h - 150), "⚡ EVCARIX", font=brand_font, fill=accent, anchor="mm")
-        draw.text((w//2, h - 80), "THE WORLD'S LEAD EV DATA AUTHORITY", font=brand_font, fill="white", anchor="mm")
+            pass
+        return ImageFont.load_default()
+
+    def _draw_title(self, draw: ImageDraw.Draw, title: str, accent: str,
+                    W: int, H: int):
+        # Clean & wrap
+        clean = re.sub(r"[^\w\s\-:,.!?%$]", "", title).upper()
+        font_size = int(W * 0.072)
+        font = self._get_font(font_size)
+        wrap_w = 22 if W >= 1280 else 18
+        lines = textwrap.wrap(clean, width=wrap_w)[:4]
+
+        line_h   = font_size + 14
+        total_h  = len(lines) * line_h
+        y_start  = H - total_h - 120
+
+        ar, ag, ab = int(accent[1:3],16), int(accent[3:5],16), int(accent[5:7],16)
+
+        for i, line in enumerate(lines):
+            y = y_start + i * line_h
+            # Glow
+            for ox, oy in [(-2,-2),(2,-2),(-2,2),(2,2)]:
+                draw.text((W//2 + ox, y + oy), line, font=font,
+                          fill=(ar//2, ag//2, ab//2), anchor="mt")
+            # Main
+            draw.text((W//2, y), line, font=font, fill="white", anchor="mt")
+
+        # Accent underline
+        y_line = y_start + total_h + 8
+        draw.rectangle([W//2 - 120, y_line, W//2 + 120, y_line + 4],
+                       fill=accent)
+
+    def _draw_branding(self, draw: ImageDraw.Draw, accent: str, W: int, H: int):
+        """Evcarix logo bar top-left."""
+        font = self._get_font(int(W * 0.042))
+        # Background pill
+        draw.rectangle([20, 20, 220, 68], fill=(0, 0, 0, 180))
+        draw.text((30, 26), "⚡ EVCARIX", font=font, fill=accent)
