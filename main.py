@@ -47,10 +47,10 @@ class EvcarixOrchestrator:
             log("MediaEngine loaded successfully.")
             
             log("Loading New Split-Screen Engine Components...")
-            from src.footage_fetcher import FootageFetcher
+            from src.footage_library import FootageLibrary
             from src.bottom_panel import generate_bottom_panel
             from src.compositor import VideoCompositor
-            self.footage_fetcher = FootageFetcher()
+            self.footage_library = FootageLibrary()
             self.compositor = VideoCompositor()
             log("New Production Engine components loaded successfully.")
 
@@ -184,7 +184,9 @@ class EvcarixOrchestrator:
                 topic_key = v
                 break
 
-        top_video = self.footage_fetcher.get_footage(topic_key, full_topic, format="shorts")
+        top_video_list = self.footage_library.get_fresh_clips(topic_key, full_topic, format="shorts")
+        top_video = top_video_list[0] if top_video_list else None
+        
         if not top_video:
             print("      ⚠️ Hiç klip bulunamadı, fallback üretiliyor...", flush=True)
             from src.utils.fallback import generate_fallback_video
@@ -321,7 +323,9 @@ class EvcarixOrchestrator:
                 topic_key = v
                 break
 
-        top_video = self.footage_fetcher.get_footage(topic_key, full_topic, format="long")
+        top_video_list = self.footage_library.get_fresh_clips(topic_key, full_topic, format="long")
+        top_video = top_video_list[0] if top_video_list else None
+        
         if not top_video:
              print("      ⚠️ Klip bulunamadı, fallback üretiliyor...", flush=True)
              from src.utils.fallback import generate_fallback_video
