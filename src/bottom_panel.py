@@ -81,11 +81,11 @@ def generate_bottom_panel(
         # User asked for "scrolling subtitles", but the snippet showed fixed position.
         # I'll keep them centered but let them stay as requested.
         subtitle_filters.append(
-            f"drawtext=text='{safe_word}':fontsize=52:fontcolor=white:x=(w-tw)/2:y=H*0.4+{i*5}:enable='between(t,{t_start:.1f},{t_end:.1f})':shadowcolor=black@0.9:shadowx=3:shadowy=3"
+            f"drawtext=text='{safe_word}':fontsize=52:fontcolor=white:x=(w-tw)/2:y={int(H*0.4)+i*5}:enable='between(t,{t_start:.1f},{t_end:.1f})':shadowcolor=black@0.9:shadowx=3:shadowy=3"
         )
     
-    progress = f"drawbox=x=0:y=H-10:w='iw*t/{duration}':h=10:color={acc_color}:t=fill"
-    brand = f"drawtext=text='⚡ EVCARIX':fontsize=32:fontcolor={acc_color}@0.7:x=30:y=H-60"
+    progress = f"drawbox=x=0:y={H-10}:w='iw*t/{duration}':h=10:color={acc_color}:t=fill"
+    brand = f"drawtext=text='EVCARIX':fontsize=32:fontcolor={acc_color}@0.7:x=30:y={H-60}"
     
     # FFmpeg command — geq must be used as a filter, not as a lavfi input source
     filter_graph = (
