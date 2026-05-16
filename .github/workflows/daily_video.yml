@@ -137,7 +137,26 @@ jobs:
           YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
         run: python3 src/setup_secrets.py
 
-      # ── 10. Video Üretimi ─────────────────────────────────────────────────────
+      # ── 10. Content Mode Belirle ──────────────────────────────────────────────
+      - name: Set Content Mode
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "CONTENT_MODE=${{ github.event.inputs.content_mode }}" >> $GITHUB_ENV
+            echo "VIDEO_TYPE=${{ github.event.inputs.video_type }}" >> $GITHUB_ENV
+          elif [ "${{ github.event.schedule }}" == "0 7 * * *" ]; then
+            echo "CONTENT_MODE=trend" >> $GITHUB_ENV
+            echo "VIDEO_TYPE=short" >> $GITHUB_ENV
+          elif [ "${{ github.event.schedule }}" == "0 5 * * 0" ]; then
+            echo "CONTENT_MODE=auto" >> $GITHUB_ENV
+            echo "VIDEO_TYPE=long" >> $GITHUB_ENV
+          else
+            echo "CONTENT_MODE=auto" >> $GITHUB_ENV
+            echo "VIDEO_TYPE=short" >> $GITHUB_ENV
+          fi
+          echo "✅ Content Mode: $CONTENT_MODE"
+          echo "✅ Video Type: $VIDEO_TYPE"
+
+      # ── 11. Video Üretimi ─────────────────────────────────────────────────────
       - name: ⚡ Production Run (Auto-Monitor)
         timeout-minutes: 50
         env:
@@ -172,9 +191,6 @@ jobs:
           KLING_API_KEY: ${{ secrets.KLING_API_KEY }}
           LUMA_API_KEY: ${{ secrets.LUMA_API_KEY }}
           RUNWAY_API_KEY: ${{ secrets.RUNWAY_API_KEY }}
-          # Routing
-          CONTENT_MODE: ${{ github.event.inputs.content_mode || (github.event.schedule == '0 7 * * *' && 'trend' || 'auto') }}
-          VIDEO_TYPE: ${{ github.event.inputs.video_type || (github.event.schedule == '0 5 * * 0' && 'long' || 'short') }}
           UPLOAD_SLOT: ${{ matrix.slot == 1 && 'evening' || 'night' }}
           USE_BG_MUSIC: ${{ github.event.inputs.use_bg_music || 'true' }}
           # GitHub Actions flag
@@ -187,7 +203,7 @@ jobs:
           echo "BG Music   : $USE_BG_MUSIC"
           python3 main.py
 
-      # ── 11. Geçmiş Cache Kaydet ───────────────────────────────────────────────
+      # ── 12. Geçmiş Cache Kaydet ───────────────────────────────────────────────
       - name: Save History Cache
         if: always()
         uses: actions/cache/save@v4.2.0
@@ -201,7 +217,7 @@ jobs:
             license_log.json
           key: evcarix-history-v2-${{ github.run_id }}
 
-      # ── 12. Ses Cache Kaydet ──────────────────────────────────────────────────
+      # ── 13. Ses Cache Kaydet ──────────────────────────────────────────────────
       - name: Save Audio Cache
         if: always()
         uses: actions/cache/save@v4.2.0
@@ -209,7 +225,7 @@ jobs:
           path: assets/audio_cache
           key: audio-cache-${{ runner.os }}-v1
 
-      # ── 13. Artifact Yükle ────────────────────────────────────────────────────
+      # ── 14. Artifact Yükle ────────────────────────────────────────────────────
       - name: Upload Artifacts
         if: always()
         uses: actions/upload-artifact@v4.4.0
@@ -220,7 +236,7 @@ jobs:
             license_log.json
           retention-days: 7
 
-      # ── 14. Temizlik Özeti ────────────────────────────────────────────────────
+      # ── 15. Temizlik Özeti ────────────────────────────────────────────────────
       - name: Pipeline Summary
         if: always()
         run: |

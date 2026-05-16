@@ -170,18 +170,111 @@ class AIVideoGenerator:
         return None
 
     def _ffmpeg_animated(self, prompt: str, idx: int) -> str:
-        out = os.path.join(OUTPUT_DIR, f"ffmpeg_{idx}.mp4")
+        """Sınırsız ve her seferinde farklı 3D-benzeri procedural animasyon üretir."""
+        out = os.path.join(OUTPUT_DIR, f"gen_{idx}_{int(time.time()) % 1000}.mp4")
+        
+        # 1. Prompt'a göre 'Seed' ve 'Tema' belirle
+        seed = int(hashlib.md5(prompt.encode()).hexdigest(), 16) % 10000
+        random.seed(seed)
+        
         theme = _pick_theme(prompt)
         bg, acc = theme["bg"], theme["acc"]
         t1, t2 = _pick_titles(prompt)
-        sub = " ".join(w.upper() for w in prompt.split()[4:8]) if len(prompt.split()) > 4 else "AI ANALYSIS"
         
+        # 2. Archetype Seçimi (Rastgele ama prompt'tan etkilenen)
+        archetypes = ["grid", "vortex", "pulse", "stream", "rain", "polygons", "tunnel"]
+        pl = prompt.lower()
+        
+        # Keyword-based bias
+        if "data" in pl or "stats" in pl: arch = "grid"
+        elif "energy" in pl or "flow" in pl: arch = "stream"
+        elif "battery" in pl or "charge" in pl: arch = "pulse"
+        elif "ai" in pl or "neural" in pl: arch = "vortex"
+        elif "city" in pl or "urban" in pl: arch = "grid"
+        elif "speed" in pl or "fast" in pl: arch = "tunnel"
+        else: arch = random.choice(archetypes)
+        
+        logger.info(f"[AIVideo] Generative 3D: Arch={arch}, Seed={seed}")
+        
+        # 3. Parametreleri Rastgeleleştir (Sınırsız varyasyon için)
+        params = {
+            "speed": random.uniform(0.5, 3.0),
+            "thickness": random.randint(1, 10),
+            "density": random.randint(5, 20),
+            "zoom": random.uniform(1.1, 1.5),
+            "rotation": random.uniform(-10, 10),
+            "opacity": random.uniform(0.2, 0.8),
+            "hue_shift": random.randint(0, 360)
+        }
+        
+        # 4. Archetype'a göre üret
+        if arch == "grid": return self._gen_grid(t1, bg, acc, params, out)
+        if arch == "vortex": return self._gen_vortex(t1, bg, acc, params, out)
+        if arch == "pulse": return self._gen_pulse(t1, bg, acc, params, out)
+        if arch == "stream": return self._gen_stream(t1, bg, acc, params, out)
+        if arch == "tunnel": return self._gen_tunnel(t1, bg, acc, params, out)
+        
+        # Fallback to general procedural
+        return self._gen_grid(t1, bg, acc, params, out)
+
+    def _gen_grid(self, t1, bg, acc, p, out):
+        """3D Perspective Grid Animation."""
+        vf = (
+            f"color=c={bg}:s=1080x1920,"
+            f"geq=lum='if(mod(X,80)<2 | mod(Y+T*{p['speed']}*50,120)<2, 255, 0)':cb=128:cr=128,"
+            f"perspective=x0=0:y0=h/4:x1=w:y1=h/4:x2=0:y2=h:x3=w:y3=h:interpolation=linear,"
+            f"colorkey=black:0.1:0.1,overlay=0:0:format=rgb,"
+            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2-200:shadowcolor=black@0.8:shadowx=5:shadowy=5,"
+            f"hue=h={p['hue_shift']}:s=1.2"
+        )
+        return self._run_ffmpeg(vf, out)
+
+    def _gen_vortex(self, t1, bg, acc, p, out):
+        """Spiral / Vortex motion."""
+        vf = (
+            f"color=c={bg}:s=1080x1920,"
+            f"mandelbrot=s=1080x1920:maxiter=50:inner=black:outer=black,"
+            f"rotate='T*{p['speed']}*0.5':fillcolor={bg}:ow=iw:oh=ih,"
+            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2:shadowcolor=black:shadowx=4:shadowy=4,"
+            f"hue=h={p['hue_shift']}:s=1.5"
+        )
+        return self._run_ffmpeg(vf, out)
+
+    def _gen_pulse(self, t1, bg, acc, p, out):
+        """Pulsing energy rings."""
+        vf = (
+            f"color=c={bg}:s=1080x1920,"
+            f"geq=lum='if(abs(hypot(X-w/2,Y-h/2)-mod(T*{p['speed']}*200,800))<{p['thickness']}*2, 255, 0)':cb=128:cr=128,"
+            f"boxblur=5:1,"
+            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2-100,"
+            f"hue=h={p['hue_shift']}:s=1.5"
+        )
+        return self._run_ffmpeg(vf, out)
+
+    def _gen_stream(self, t1, bg, acc, p, out):
+        """Horizontal particle streams."""
+        vf = (
+            f"color=c={bg}:s=1080x1920,geq=lum='if(random(1)>{1-p['density']/100.0}, 255, 0)':cb=128:cr=128,"
+            f"scroll=horizontal={p['speed']*0.1},"
+            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2,"
+            f"hue=h={p['hue_shift']}:s=1.5"
+        )
+        return self._run_ffmpeg(vf, out)
+
+    def _gen_tunnel(self, t1, bg, acc, p, out):
+        """3D Tunnel travel effect."""
+        vf = (
+            f"color=c={bg}:s=1080x1920,testsrc2=s=1080x1920:r=30,"
+            f"zoompan=z='zoom+0.005':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=150:s=1080x1920,"
+            f"hue=h={p['hue_shift']}:s=0.5,"
+            f"drawtext=text='{t1}':fontsize=120:fontcolor={acc}:x=(w-tw)/2:y=h/2:shadowcolor=black:shadowx=10:shadowy=10"
+        )
+        return self._run_ffmpeg(vf, out)
+
+    def _run_ffmpeg(self, vf, out):
         cmd = [
-            "ffmpeg", "-y", "-f", "lavfi", "-r", "30",
-            "-i", f"color=c={bg}:size=1080x1920:rate=30",
-            "-vf", _build_vf(t1, t2, sub, bg, acc),
-            "-t", "5", "-c:v", "libx264", "-crf", "18", "-preset", "fast",
-            "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-r", "30", "-an", out
+            "ffmpeg", "-y", "-f", "lavfi", "-r", "30", "-i", "nullsrc=s=1080x1920:d=5",
+            "-vf", vf, "-c:v", "libx264", "-crf", "18", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an", out
         ]
         subprocess.run(cmd, capture_output=True)
         return out

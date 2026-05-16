@@ -30,41 +30,57 @@ class MediaEngine:
             json.dump(list(self.used_hashes), f)
 
     async def download_stock_videos(self, topic: str, target_clip_count: int = 6, plan=None, **kwargs) -> list:
-        logger.info(f"[MediaEngine] '{topic}' için akıllı medya aranıyor...")
-        final_clips = []
+        logger.info(f"[MediaEngine] '{topic}' için hibrit (Gerçek + Animasyon) medya stratejisi uygulanıyor...")
         
-        # 1. Akıllı Arama Terimleri Üret (LLM ile)
+        real_clips = []
+        anim_clips = []
+        
+        # 1. Arama Terimleri
         queries = self._generate_search_queries(topic)
-        logger.info(f"[MediaEngine] Arama Terimleri: {queries}")
-
-        # 2. Pexels & Pixabay Denemesi (Tüm terimler için)
+        
+        # 2. Gerçek Videoları Topla (Hedefin yarısı kadar)
+        target_real = (target_clip_count + 1) // 2
         for query in queries:
-            if len(final_clips) >= target_clip_count: break
-            
-            needed = target_clip_count - len(final_clips)
+            if len(real_clips) >= target_real: break
             if self.pexels_api_key:
-                final_clips.extend(self._download_pexels_videos(query, 2)) # Her terimden 2 tane
-            
-            if len(final_clips) < target_clip_count and self.pixabay_api_key:
-                needed = target_clip_count - len(final_clips)
-                final_clips.extend(self._download_pixabay_videos(query, 1))
+                real_clips.extend(self._download_pexels_videos(query, target_real - len(real_clips)))
+            if len(real_clips) < target_real and self.pixabay_api_key:
+                real_clips.extend(self._download_pixabay_videos(query, target_real - len(real_clips)))
+        
+        # 3. Animasyonları Üret (Hedefin kalanı kadar)
+        target_anim = target_clip_count - len(real_clips)
+        from src.ai_video_generator import AIVideoGenerator
+        ai_gen = AIVideoGenerator()
+        
+        # Animasyon konuları için script'ten veya topic'ten ilham al
+        anim_prompts = [
+            f"{topic} battery charging technology",
+            f"{topic} energy flow pulse",
+            f"{topic} data analysis statistics",
+            f"{topic} futuristic electric grid"
+        ]
+        
+        for i in range(target_anim):
+            prompt = anim_prompts[i % len(anim_prompts)]
+            path = ai_gen._ffmpeg_animated(prompt, i)
+            if path: anim_clips.append(path)
 
-        # 3. AI Video & Fallback (Eksik varsa)
+        # 4. Harmanla (Interleave)
+        # Sahne 1: Gerçek, Sahne 2: Animasyon, Sahne 3: Gerçek...
+        final_clips = []
+        for i in range(target_clip_count):
+            if i % 2 == 0 and real_clips:
+                final_clips.append(real_clips.pop(0))
+            elif anim_clips:
+                final_clips.append(anim_clips.pop(0))
+            elif real_clips: # Fallback if anims failed
+                final_clips.append(real_clips.pop(0))
+        
+        # Eğer hala eksik varsa fallback
         if len(final_clips) < target_clip_count:
             needed = target_clip_count - len(final_clips)
-            from src.ai_video_generator import AIVideoGenerator
-            ai_gen = AIVideoGenerator()
-            script = plan.get("script", "") if plan and isinstance(plan, dict) else topic
-            from src.prompt_generator import generate_scene_prompts
-            prompts = generate_scene_prompts(topic, script, needed)
-            final_clips.extend(ai_gen.generate_clips(prompts))
-
-        if len(final_clips) < target_clip_count:
-            needed = target_clip_count - len(final_clips)
-            from src.ai_video_generator import AIVideoGenerator
-            ai_gen = AIVideoGenerator()
-            for i in range(len(final_clips), target_clip_count):
-                final_clips.append(ai_gen._ffmpeg_animated(topic, i))
+            for i in range(needed):
+                final_clips.append(ai_gen._ffmpeg_animated(f"{topic} fallback", 100+i))
 
         self._save_used_hashes()
         return final_clips
