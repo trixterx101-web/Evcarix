@@ -46,6 +46,14 @@ class EvcarixOrchestrator:
             self.media_engine = MediaEngine()
             log("MediaEngine loaded successfully.")
             
+            log("Loading New Split-Screen Engine Components...")
+            from src.footage_fetcher import FootageFetcher
+            from src.bottom_panel import generate_bottom_panel
+            from src.compositor import VideoCompositor
+            self.footage_fetcher = FootageFetcher()
+            self.compositor = VideoCompositor()
+            log("New Production Engine components loaded successfully.")
+
             log("Loading Editor (from src.editor)...")
             from src.editor import AutoEditor
             log("Initializing Editor...")
@@ -162,23 +170,30 @@ class EvcarixOrchestrator:
                 print(f"{'='*60}\n")
                 return
 
-        # ── 2. Medya Toplama ──────────────────────────────────────
-        print("\n[2/6] Stok videolar indiriliyor...", flush=True)
-        video_paths = await self.media_engine.download_stock_videos(
-            plan=plan,
-            target_clip_count=clip_count,
-            topic=full_topic
-        )
-        if not video_paths:
+        # ── 2. Medya Toplama (Split-Screen için Ana Görüntü) ────────
+        print("\n[2/6] Footage toplanıyor (YouTube CC / Pexels)...", flush=True)
+        # Konu anahtar kelimesine göre kategori belirle (FootageFetcher uyumu için)
+        cat_map = {
+            "battery": "battery_tech", "electric": "electric_vehicle", "ev": "electric_vehicle",
+            "ai": "artificial_intelligence", "neural": "artificial_intelligence",
+            "robot": "robotics", "future": "future_tech", "quantum": "future_tech"
+        }
+        topic_key = "default"
+        for k, v in cat_map.items():
+            if k in full_topic.lower():
+                topic_key = v
+                break
+
+        top_video = self.footage_fetcher.get_footage(topic_key, full_topic, format="shorts")
+        if not top_video:
             print("      ⚠️ Hiç klip bulunamadı, fallback üretiliyor...", flush=True)
             from src.utils.fallback import generate_fallback_video
-            f_path = f"assets/footage/fallback_{ts}.mp4"
+            top_video = f"assets/footage/fallback_{ts}.mp4"
             os.makedirs("assets/footage", exist_ok=True)
-            generate_fallback_video(30, topic, f_path)
-            video_paths = [f_path]
+            generate_fallback_video(30, topic, top_video)
 
         # ── 3. Ses Üretimi ────────────────────────────────────────────────────
-        print("\n[3/6] Ses ve zamanlama üretiliyor...", flush=True)
+        print("\n[3/6] Ses üretiliyor...", flush=True)
         audio_output = f"assets/audio/{ts}.mp3"
         voice_data = await self.media_engine.voice_engine.generate_voice(
             text=script,
@@ -190,44 +205,41 @@ class EvcarixOrchestrator:
              raise RuntimeError("[Main] TTS üretimi başarısız oldu.")
              
         audio_path = safe_path(voice_data["audio_path"], "TTS Audio")
-        word_timings = voice_data.get("word_timings", [])
+        
+        # Süre hesapla
+        from moviepy.editor import AudioFileClip
+        audio_clip = AudioFileClip(audio_path)
+        duration = audio_clip.duration
+        audio_clip.close()
 
-        # ── 3b. Arka Plan Müziği ───────────────────────
-        if os.getenv("USE_BG_MUSIC", "true").lower() == "true":
-            try:
-                from src.music_fetcher import MusicFetcher
-                from src.audio_mixer import mix_audio
-                mf = MusicFetcher()
-                bg_track_path = mf.get_track(mood="tech_upbeat")
-                
-                if bg_track_path:
-                    mixed_path = audio_output.replace(".mp3", "_mixed.mp3")
-                    result_path = mix_audio(audio_path, bg_track_path, mixed_path)
-                    if result_path and result_path != audio_path:
-                        audio_path = result_path
-                        print(f"      🎵 Sesler karıştırıldı (AudioMixer).", flush=True)
-                    else:
-                        print(f"      ⚠️ AudioMixer mix başarısız, orijinal TTS kullanılıyor.", flush=True)
-            except Exception as e:
-                print(f"      ⚠️ Ses miksaj hatası (atlanıyor): {e}", flush=True)
+        # ── 4. Alt Panel & Montaj (Split-Screen) ──────────────────────
+        print("\n[4/6] Split-Screen Video üretiliyor (3D Panel + Subtitles)...", flush=True)
+        
+        from src.bottom_panel import generate_bottom_panel
+        bottom_panel_path = f"assets/panels/bottom_{ts}.mp4"
+        bottom_res = generate_bottom_panel(
+            topic=topic_key,
+            subtitle_text=script,
+            duration=duration,
+            output_path=bottom_panel_path,
+            panel_size=(1080, 635)
+        )
+        
+        if not bottom_res:
+             raise RuntimeError("[Main] Alt panel üretilemedi.")
 
-        # ── 4. Montaj ─────────────────────────────────────────────
-        print("\n[4/6] Video montajlanıyor...", flush=True)
         output_filename = f"evcarix_shorts_{ts}.mp4"
-        final_video_path = self.editor.assemble(
-            clips_paths=video_paths,
+        final_video_path = self.compositor.compose_split_screen(
+            top_video=top_video,
+            bottom_panel=bottom_res,
             audio_path=audio_path,
-            title=title,
-            topic=topic,
-            words_with_times=word_timings,
-            is_short=True,
-            output_path=output_filename
+            output_filename=output_filename,
+            video_format="shorts"
         )
 
-        # assemble() hiçbir zaman None döndürmemeli ama yine de kontrol et
         if not final_video_path or not os.path.exists(final_video_path):
-            raise RuntimeError(f"[Main] Montaj çıktısı bulunamadı: {final_video_path}")
-        print(f"      ✅ Video hazır: {final_video_path}", flush=True)
+            raise RuntimeError(f"[Main] Montaj çıktısı bulunamadı.")
+        print(f"      ✅ Split-Screen Video hazır: {final_video_path}", flush=True)
 
         # ── 5. Kapak (Thumbnail) İptal Edildi ─────────────────────
         print("\n[5/6] Thumbnail üretimi manuel yükleme için atlandı.", flush=True)
@@ -296,16 +308,27 @@ class EvcarixOrchestrator:
         print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}", flush=True)
         print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
 
-        # ── 2. Medya Toplama ──────────────────────────────────────
-        print(f"\n[2/7] {clip_count} adet stok video indiriliyor (16:9)...", flush=True)
-        video_paths = await self.media_engine.download_stock_videos(
-            plan=plan,
-            target_clip_count=clip_count,
-            topic=full_topic
-        )
+        # ── 2. Medya Toplama (Split-Screen için Ana Görüntü) ────────
+        print(f"\n[2/7] Footage toplanıyor (16:9 CC / Pexels)...", flush=True)
+        cat_map = {
+            "battery": "battery_tech", "electric": "electric_vehicle", "ev": "electric_vehicle",
+            "ai": "artificial_intelligence", "neural": "artificial_intelligence",
+            "robot": "robotics", "future": "future_tech", "quantum": "future_tech"
+        }
+        topic_key = "default"
+        for k, v in cat_map.items():
+            if k in full_topic.lower():
+                topic_key = v
+                break
+
+        top_video = self.footage_fetcher.get_footage(topic_key, full_topic, format="long")
+        if not top_video:
+             print("      ⚠️ Klip bulunamadı, fallback üretiliyor...", flush=True)
+             from src.utils.fallback import generate_fallback_video
+             top_video = f"assets/footage/fallback_long_{ts}.mp4"
+             generate_fallback_video(60, topic, top_video)
 
         # ── 3. Ses Üretimi ────────────────────────────────────────
-        # Not: Uzun videolarda script daha uzun olacağı için TTS süresi artar
         print("\n[3/7] Uzun format ses üretiliyor...", flush=True)
         audio_output = f"assets/audio/long_{ts}.mp3"
         voice_data = await self.media_engine.voice_engine.generate_voice(
@@ -314,37 +337,36 @@ class EvcarixOrchestrator:
             voice_type=plan.get("voice", "female")
         )
         audio_path = voice_data["audio_path"]
-
-        # ── 3b. Arka Plan Müziği (uzun video — daha düşük volume) ─────────────
-        if os.getenv("USE_BG_MUSIC", "true").lower() == "true":
-            try:
-                from src.audio_bg_engine import AudioBgEngine
-                bg_engine = AudioBgEngine()
-                mood = plan.get("category", "science")
-                bg_track = bg_engine.get_background_music(mood=mood)
-                if bg_track:
-                    mixed_path = audio_output.replace(".mp3", "_mixed.mp3")
-                    audio_path = bg_engine.mix_bg_music_with_voice(
-                        audio_path, bg_track["path"], mixed_path,
-                        music_volume=0.08  # Uzun videolarda daha sessiz
-                    )
-                    print(f"      🎵 BG Müzik: {bg_track['title']} ({bg_track.get('license','CC-BY')})",
-                          flush=True)
-            except Exception as e:
-                print(f"      ⚠️ BG Müzik hatası (atlanıyor): {e}", flush=True)
-
-        # ── 4. Montaj (Ağır İşlem) ────────────────────────────────
-        print("\n[4/7] Video montajlanıyor (16:9 format)...", flush=True)
-        gc.collect() # Bellek temizliği
-        output_filename = f"evcarix_weekly_{ts}.mp4"
         
-        # assemble_weekly_long_video: 16:9 formatında, title/outro kartlı premium montaj
-        final_video_path = self.editor.assemble_weekly_long_video(
-            video_clips=video_paths,
+        from moviepy.editor import AudioFileClip
+        audio_clip = AudioFileClip(audio_path)
+        duration = audio_clip.duration
+        audio_clip.close()
+
+        # ── 4. Alt Panel & Montaj (Split-Screen) ──────────────────
+        print("\n[4/7] Split-Screen Video üretiliyor (Side-by-Side 16:9)...", flush=True)
+        gc.collect()
+        
+        from src.bottom_panel import generate_bottom_panel
+        side_panel_path = f"assets/panels/side_{ts}.mp4"
+        side_res = generate_bottom_panel(
+            topic=topic_key,
+            subtitle_text=script,
+            duration=duration,
+            output_path=side_panel_path,
+            panel_size=(768, 1080) # Side panel for long
+        )
+        
+        if not side_res:
+             raise RuntimeError("[Main] Yan panel üretilemedi.")
+
+        output_filename = f"evcarix_weekly_{ts}.mp4"
+        final_video_path = self.compositor.compose_split_screen(
+            top_video=top_video,
+            bottom_panel=side_res,
             audio_path=audio_path,
-            title=title,
-            target_duration=target_duration,
-            output_path=output_filename
+            output_filename=output_filename,
+            video_format="long"
         )
         gc.collect()
 
