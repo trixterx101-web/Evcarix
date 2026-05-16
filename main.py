@@ -184,7 +184,7 @@ class EvcarixOrchestrator:
                 topic_key = v
                 break
 
-        top_video_list = self.footage_library.get_fresh_clips(topic=topic_key, count=1, format="shorts")
+        top_video_list = self.footage_library.get_fresh_clips(topic=topic_key, count=6, format="shorts")
         top_video = top_video_list[0] if top_video_list else None
         
         if not top_video:
@@ -230,9 +230,19 @@ class EvcarixOrchestrator:
         if not bottom_res:
              raise RuntimeError("[Main] Alt panel üretilemedi.")
 
+        # Assemble multi-clip top video with subtitles
+        top_assembled = f"assets/footage/top_assembled_{ts}.mp4"
+        self.editor.assemble(
+            clips_paths=top_video_list,
+            audio_path=audio_path,
+            output_path=top_assembled,
+            is_short=True,
+            title=script,
+        )
+
         output_filename = f"evcarix_shorts_{ts}.mp4"
         final_video_path = self.compositor.compose_split_screen(
-            top_video=top_video,
+            top_video=top_assembled,
             bottom_panel=bottom_res,
             audio_path=audio_path,
             output_filename=output_filename,
@@ -323,7 +333,7 @@ class EvcarixOrchestrator:
                 topic_key = v
                 break
 
-        top_video_list = self.footage_library.get_fresh_clips(topic=topic_key, count=1, format="long")
+        top_video_list = self.footage_library.get_fresh_clips(topic=topic_key, count=clip_count, format="long")
         top_video = top_video_list[0] if top_video_list else None
         
         if not top_video:
@@ -347,31 +357,24 @@ class EvcarixOrchestrator:
         duration = audio_clip.duration
         audio_clip.close()
 
-        # ── 4. Alt Panel & Montaj (Split-Screen) ──────────────────
-        print("\n[4/7] Split-Screen Video üretiliyor (Side-by-Side 16:9)...", flush=True)
+        # ── 4. Tam 16:9 Video (multi-clip + altyazı, yan panel yok) ──────────
+        print("\n[4/7] Full 16:9 Video üretiliyor (multi-clip + altyazı)...", flush=True)
         gc.collect()
-        
-        from src.bottom_panel import generate_bottom_panel
-        side_panel_path = f"assets/panels/side_{ts}.mp4"
-        side_res = generate_bottom_panel(
-            topic=topic_key,
-            subtitle_text=script,
-            duration=duration,
-            output_path=side_panel_path,
-            panel_size=(768, 1080) # Side panel for long
-        )
-        
-        if not side_res:
-             raise RuntimeError("[Main] Yan panel üretilemedi.")
 
         output_filename = f"evcarix_weekly_{ts}.mp4"
-        final_video_path = self.compositor.compose_split_screen(
-            top_video=top_video,
-            bottom_panel=side_res,
+        final_video_path = os.path.join("output", output_filename)
+        os.makedirs("output", exist_ok=True)
+
+        assembled = self.editor.assemble(
+            clips_paths=top_video_list,
             audio_path=audio_path,
-            output_filename=output_filename,
-            video_format="long"
+            output_path=final_video_path,
+            is_short=False,
+            title=script,
         )
+        if not assembled or not os.path.exists(final_video_path):
+            raise RuntimeError("[Main] Montaj çıktısı bulunamadı.")
+        print(f"      ✅ Video hazır: {final_video_path}", flush=True)
         gc.collect()
 
         # ── 5. Kapak (Thumbnail) — Uzun video için profesyonel üret ─────────
