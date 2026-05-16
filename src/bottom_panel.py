@@ -87,14 +87,17 @@ def generate_bottom_panel(
     progress = f"drawbox=x=0:y=H-10:w='iw*t/{duration}':h=10:color={acc_color}:t=fill"
     brand = f"drawtext=text='⚡ EVCARIX':fontsize=32:fontcolor={acc_color}@0.7:x=30:y=H-60"
     
-    # FFmpeg command
+    # FFmpeg command — geq must be used as a filter, not as a lavfi input source
+    filter_graph = (
+        f"[0:v]{effect_formula},format=yuv420p[fx];"
+        f"[0:v]format=yuv420p[bg];"
+        f"[bg][fx]blend=all_mode=screen[out];"
+        f"[out]{','.join([progress, *subtitle_filters, brand])}[v]"
+    )
     cmd = [
         "ffmpeg", "-y",
         "-f", "lavfi", "-i", f"color=c={bg_color}:size={W}x{H}:rate=30",
-        "-f", "lavfi", "-i", f"{effect_formula}:size={W}x{H}:rate=30",
-        "-filter_complex",
-        f"[0:v][1:v]blend=all_mode=screen[bg];"
-        f"[bg]{','.join([progress, *subtitle_filters, brand])}[v]",
+        "-filter_complex", filter_graph,
         "-map", "[v]",
         "-t", str(duration),
         "-c:v", "libx264", "-crf", "18", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an",
