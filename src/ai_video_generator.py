@@ -223,7 +223,7 @@ class AIVideoGenerator:
         vf = (
             f"color=c={bg}:s=1080x1920[bg];"
             f"color=c={acc}:s=1080x1920,geq=lum='if(lt(mod(X,100),3)+lt(mod(Y+T*{p['speed']}*100,150),3), 255, 0)':cb=128:cr=128,"
-            f"perspective=x0=0:y0=h/2:x1=w:y1=h/2:x2=-w:y2=h:x3=2*w:y3=h:interpolation=linear[grid];"
+            f"perspective=x0=0:y0=H/2:x1=W:y1=H/2:x2=-W:y2=H:x3=2*W:y3=H:interpolation=linear[grid];"
             f"[bg][grid]overlay=format=auto,"
             f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/4:shadowcolor=black@0.8:shadowx=5:shadowy=5,"
             f"hue=h={p['hue_shift']}:s=1.2[v]"
@@ -234,7 +234,7 @@ class AIVideoGenerator:
         """Spiral / Vortex motion."""
         vf = (
             f"color=c={bg}:s=1080x1920,mandelbrot=s=1080x1920:maxiter=50,"
-            f"rotate='T*{p['speed']}*0.5':fillcolor={bg}:ow=iw:oh=ih,"
+            f"rotate='t*{p['speed']}*0.5':fillcolor={bg}:ow=iw:oh=ih,"
             f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2:shadowcolor=black:shadowx=4:shadowy=4,"
             f"hue=h={p['hue_shift']}:s=1.5[v]"
         )
@@ -255,7 +255,7 @@ class AIVideoGenerator:
         """Horizontal particle streams."""
         vf = (
             f"color=c={bg}:s=1080x1920,geq=lum='if(gt(random(1),{1-p['density']/100.0}), 255, 0)':cb=128:cr=128,"
-            f"scroll=horizontal={p['speed']*0.1},"
+            f"scroll=horizontal=t*{p['speed']}*0.1,"
             f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2,"
             f"hue=h={p['hue_shift']}:s=1.5[v]"
         )
