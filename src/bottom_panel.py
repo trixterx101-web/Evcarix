@@ -89,9 +89,10 @@ def generate_bottom_panel(
     
     # FFmpeg command — geq must be used as a filter, not as a lavfi input source
     filter_graph = (
-        f"[0:v]{effect_formula},format=yuv420p[fx];"
-        f"[0:v]format=yuv420p[bg];"
-        f"[bg][fx]blend=all_mode=screen[out];"
+        f"[0:v]split[bg][tmp];"
+        f"[tmp]{effect_formula},format=yuv420p[fx];"
+        f"[bg]format=yuv420p[bgf];"
+        f"[bgf][fx]blend=all_mode=screen[out];"
         f"[out]{','.join([progress, *subtitle_filters, brand])}[v]"
     )
     cmd = [
