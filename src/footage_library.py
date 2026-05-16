@@ -180,9 +180,13 @@ class FootageLibrary:
                 # Get files list
                 f_url = f"https://archive.org/metadata/{ident}"
                 fr = requests.get(f_url, timeout=10).json()
-                mp4s = [f for f in fr.get("files", []) if f["name"].endswith(".mp4") and int(f.get("size") or 0) < 50000000]
+                def _safe_size(f):
+                    s = f.get("size") or 0
+                    try: return int(s)
+                    except (ValueError, TypeError): return 0
+                mp4s = [f for f in fr.get("files", []) if f["name"].endswith(".mp4") and _safe_size(f) < 50000000]
                 if mp4s:
-                    best = sorted(mp4s, key=lambda x: int(x.get("size") or 0), reverse=True)[0]
+                    best = sorted(mp4s, key=lambda x: _safe_size(x), reverse=True)[0]
                     dl_url = f"https://archive.org/download/{ident}/{best['name']}"
                     out = os.path.join(self.output_dir, f"archive_{ident}.mp4")
                     if self._download_direct(dl_url, out):
@@ -220,7 +224,10 @@ class FootageLibrary:
             videos = r.json().get("videos", [])
             results = []
             for v in videos:
-                files = [f for f in v["video_files"] if int(f.get("width", 0) or 0) >= 720]
+                def _safe_width(f):
+                    try: return int(f.get("width") or 0)
+                    except (ValueError, TypeError): return 0
+                files = [f for f in v["video_files"] if _safe_width(f) >= 720]
                 if files:
                     out = os.path.join(self.output_dir, f"pexels_{v['id']}.mp4")
                     if self._download_direct(files[0]["link"], out):
