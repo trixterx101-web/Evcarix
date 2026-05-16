@@ -284,8 +284,14 @@ class CreativeWriter:
             f"{' '.join(['#' + t.replace(' ', '') for t in final_tags[:12]])}"
         )
         
+        title = (
+            meta.get("title")
+            or meta.get("title_a")
+            or meta.get("title_b")
+            or f"{topic} — EV Data Deep Dive"
+        )
         return {
-            "title": meta['title'],
+            "title": title,
             "script": script_data["script"],
             "voice": "male",
             "tags": final_tags,
