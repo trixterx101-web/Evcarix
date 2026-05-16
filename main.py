@@ -184,7 +184,7 @@ class EvcarixOrchestrator:
                 topic_key = v
                 break
 
-        top_video_list = self.footage_library.get_fresh_clips(topic_key, full_topic, format="shorts")
+        top_video_list = self.footage_library.get_fresh_clips(topic=topic_key, count=1, format="shorts")
         top_video = top_video_list[0] if top_video_list else None
         
         if not top_video:
@@ -323,7 +323,7 @@ class EvcarixOrchestrator:
                 topic_key = v
                 break
 
-        top_video_list = self.footage_library.get_fresh_clips(topic_key, full_topic, format="long")
+        top_video_list = self.footage_library.get_fresh_clips(topic=topic_key, count=1, format="long")
         top_video = top_video_list[0] if top_video_list else None
         
         if not top_video:
