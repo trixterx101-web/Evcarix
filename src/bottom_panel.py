@@ -3,36 +3,21 @@ import random
 import subprocess
 import logging
 import re
-from pathlib import Path
 
 logger = logging.getLogger("BottomPanel")
 
-EFFECTS = {
-    "tunnel": "geq=r='128+127*sin(hypot(X-W/2+{cx},Y-H/2+{cy})/{f1}-T*{s1})':g='128+127*sin(hypot(X-W/2,Y-H/2)/{f2}-T*{s2})':b='200+55*cos(T*{s3})'",
-    "plasma": "geq=r='128+{r}*sin(2*PI*(X/W+T/{s1}))':g='128+{g}*cos(2*PI*(Y/H+T/{s2}))':b='200+55*sin(2*PI*(X/W+Y/H+T/{s3}))'",
-    "wave":   "geq=r='128+{r}*sin(X/{f1}+T*{s1})*cos(Y/{f2}+T*{s2})':g='128+{g}*cos(X/{f2}-T*{s2})':b='200+55*sin((X+Y)/{f3}+T*{s3})'",
-    "spiral": "geq=r='128+{r}*sin(10*atan2(Y-H/2+0.001,X-W/2+0.001)+hypot(X-W/2,Y-H/2+0.001)/{f1}-T*{s1})':g='128+{g}*cos(8*atan2(Y-H/2+0.001,X-W/2+0.001)-T*{s2})':b='200+55*sin(T*{s3})'",
-    "grid":   "geq=r='200*lt(mod(X+T*{s1}*30,{grid}),3)':g='255*lt(mod(Y+T*{s2}*20,{grid}),3)':b='255*(lt(mod(X,{grid}),3)+lt(mod(Y,{grid}),3))'",
-    "stars":  "geq=lum='255*gt(sin(X*{f1}+Y*{f2}+T*{s1})*cos(X*{f3}-Y*{f1}),0.97)':cb=128:cr=128",
-    "matrix": "geq=lum='255*gt(sin(floor(X/{grid})*{f1}+T*{s1}*10),0.96)':cb='100':cr='80'",
-    "neon":   "geq=r='255*gt(sin(X/{f1}+T*{s1}),0.97)+128*sin(Y/{f2}+T*{s2})':g='200*gt(cos(Y/{f2}+T*{s2}),0.97)':b='255*sin(X/{f3}+T*{s3})'"
-}
-
-TOPIC_EFFECTS = {
-    "electric_vehicle": ["tunnel", "wave", "neon"],
-    "artificial_intelligence": ["matrix", "grid", "stars"],
-    "robotics": ["grid", "neon", "wave"],
-    "battery_tech": ["plasma", "tunnel", "neon"],
-    "future_tech": ["stars", "spiral", "plasma"]
-}
-
 THEME_COLORS = {
-    "electric_vehicle": ("0x001833", "0x00D4FF"),
+    "electric_vehicle":        ("0x001833", "0x00D4FF"),
     "artificial_intelligence": ("0x0D001A", "0x8B00FF"),
-    "robotics": ("0x001A00", "0x00FF88"),
-    "battery_tech": ("0x1A0800", "0xFF6B00"),
-    "future_tech": ("0x0A0A1E", "0xFF00FF"),
+    "robotics":                ("0x001A00", "0x00FF88"),
+    "battery_tech":            ("0x1A0800", "0xFF6B00"),
+    "future_tech":             ("0x0A0A1E", "0xFF00FF"),
+    "default":                 ("0x001020", "0x00AAFF"),
 }
+
+def _hex_to_rgb(h: str):
+    h = h.replace("0x","").replace("#","")
+    return int(h[0:2],16), int(h[2:4],16), int(h[4:6],16)
 
 def generate_bottom_panel(
     topic: str,
@@ -41,76 +26,87 @@ def generate_bottom_panel(
     output_path: str,
     panel_size: tuple = (1080, 635)
 ) -> str | None:
-    """Generate animated bottom panel with 3D effect + subtitle text."""
     W, H = panel_size
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
-    # Random parameters
-    p = {
-        "r": random.randint(80, 127),
-        "g": random.randint(60, 110),
-        "f1": round(random.uniform(20, 60), 1),
-        "f2": round(random.uniform(25, 70), 1),
-        "f3": round(random.uniform(15, 45), 1),
-        "s1": round(random.uniform(1.5, 4.0), 2),
-        "s2": round(random.uniform(2.0, 5.0), 2),
-        "s3": round(random.uniform(1.0, 3.0), 2),
-        "cx": random.randint(-100, 100),
-        "cy": random.randint(-50, 50),
-        "grid": random.choice([30, 40, 50, 60, 80]),
-    }
-    
-    effect_name = random.choice(TOPIC_EFFECTS.get(topic, ["plasma", "tunnel", "wave"]))
-    effect_formula = EFFECTS[effect_name].format(**p)
-    bg_color, acc_color = THEME_COLORS.get(topic, ("0x001833", "0x00D4FF"))
-    
-    # Subtitle animation logic
-    words = subtitle_text.upper().split()
-    subtitle_filters = []
-    words_per_sec = max(len(words) / max(duration, 1), 0.5)
-    
-    # We use a limited window of words to avoid overcrowding, or just let them stay
-    for i, word in enumerate(words[:15]): # Limit to 15 words for visibility
-        t_start = i / words_per_sec
-        t_end = duration # Accumulate words as they are spoken
-        safe_word = re.sub(r"[^A-Z0-9 .,!?%]", "", word)[:15]
-        if not safe_word: continue
-        
-        # Shift Y position slightly for each word to create a "scrolling" feel if they accumulate
-        # Or just keep them in the center if they replace each other.
-        # User asked for "scrolling subtitles", but the snippet showed fixed position.
-        # I'll keep them centered but let them stay as requested.
-        subtitle_filters.append(
-            f"drawtext=text='{safe_word}':fontsize=52:fontcolor=white:x=(w-tw)/2:y={int(H*0.4)+i*5}:enable='between(t,{t_start:.1f},{t_end:.1f})':shadowcolor=black@0.9:shadowx=3:shadowy=3"
+
+    bg_color, acc_color = THEME_COLORS.get(topic, THEME_COLORS["default"])
+    ar, ag, ab = _hex_to_rgb(acc_color)
+    fg_r = min(255, ar + 40)
+    fg_g = min(255, ag + 40)
+    fg_b = min(255, ab + 40)
+
+    acc_ff = "#%02x%02x%02x" % _hex_to_rgb(acc_color)
+    bg_ff  = "#%02x%02x%02x" % _hex_to_rgb(bg_color)
+    fg_ff  = "#%02x%02x%02x" % (fg_r, fg_g, fg_b)
+
+    # Subtitle: wrap into max 2 lines
+    words = re.sub(r"[^A-Z0-9 .,!?%\-]", "", subtitle_text.upper()).split()
+    line1_words, line2_words = [], []
+    for w in words:
+        if sum(len(x)+1 for x in line1_words) + len(w) <= 36:
+            line1_words.append(w)
+        elif sum(len(x)+1 for x in line2_words) + len(w) <= 36:
+            line2_words.append(w)
+    line1 = " ".join(line1_words)
+    line2 = " ".join(line2_words)
+
+    y_center = int(H * 0.42)
+    y_line1  = y_center - (28 if line2 else 0)
+    y_line2  = y_center + 38
+    y_brand  = H - 55
+    y_bar    = H - 12
+
+    dt_filters = []
+    if line1:
+        dt_filters.append(
+            f"drawtext=text='{line1}':fontsize=46:fontcolor=white"
+            f":x=(w-tw)/2:y={y_line1}"
+            f":shadowcolor=black@0.8:shadowx=2:shadowy=2"
         )
-    
-    progress = f"drawbox=x=0:y={H-10}:w='iw*t/{duration}':h=10:color={acc_color}:t=fill"
-    brand = f"drawtext=text='EVCARIX':fontsize=32:fontcolor={acc_color}@0.7:x=30:y={H-60}"
-    
-    # FFmpeg command — geq must be used as a filter, not as a lavfi input source
-    filter_graph = (
-        f"[0:v]split[bg][tmp];"
-        f"[tmp]{effect_formula},format=yuv420p[fx];"
-        f"[bg]format=yuv420p[bgf];"
-        f"[bgf][fx]blend=all_mode=screen[out];"
-        f"[out]{','.join([progress, *subtitle_filters, brand])}[v]"
+    if line2:
+        dt_filters.append(
+            f"drawtext=text='{line2}':fontsize=46:fontcolor=white"
+            f":x=(w-tw)/2:y={y_line2}"
+            f":shadowcolor=black@0.8:shadowx=2:shadowy=2"
+        )
+    dt_filters.append(
+        f"drawtext=text='EVCARIX':fontsize=26:fontcolor={acc_ff}@0.8:x=28:y={y_brand}"
     )
+    dt_filters.append(
+        f"drawbox=x=0:y={y_bar}:w='iw*min(t\\/{duration},1)':h=8:color={acc_ff}:t=fill"
+    )
+
+    all_filters = ",".join(dt_filters)
+
+    filter_graph = (
+        f"[0:v]format=yuv420p[base];"
+        f"[1:v]format=yuv420p[accent];"
+        f"[base][accent]blend=all_mode=multiply:all_opacity=0.3[blended];"
+        f"[blended]{all_filters}[v]"
+    )
+
     cmd = [
         "ffmpeg", "-y",
-        "-f", "lavfi", "-i", f"color=c={bg_color}:size={W}x{H}:rate=30",
+        "-f", "lavfi", "-i", f"color=c={bg_ff}:size={W}x{H}:rate=24",
+        "-f", "lavfi", "-i", f"color=c={fg_ff}:size={W}x{H}:rate=24",
         "-filter_complex", filter_graph,
         "-map", "[v]",
-        "-t", str(duration),
-        "-c:v", "libx264", "-crf", "18", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an",
+        "-t", str(round(duration, 2)),
+        "-c:v", "libx264", "-crf", "23", "-preset", "ultrafast",
+        "-pix_fmt", "yuv420p", "-an",
+        "-threads", "2",
         output_path
     ]
-    
+
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode == 0 and os.path.exists(output_path):
+            logger.info(f"[BottomPanel] Generated: {output_path}")
             return output_path
-        logger.error(f"[BottomPanel] FFmpeg error: {result.stderr[-300:]}")
+        logger.error(f"[BottomPanel] FFmpeg error: {result.stderr[-500:]}")
+    except subprocess.TimeoutExpired:
+        logger.error("[BottomPanel] Timeout after 300s")
     except Exception as e:
-        logger.error(f"[BottomPanel] Generation failed: {e}")
-    
+        logger.error(f"[BottomPanel] Failed: {e}")
+
     return None
