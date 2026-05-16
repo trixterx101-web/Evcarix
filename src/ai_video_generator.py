@@ -221,12 +221,13 @@ class AIVideoGenerator:
 
     def _gen_grid(self, t1, bg, acc, p, out):
         """3D Perspective Grid Animation."""
+        # Fix: Proper multi-input chain for overlay
         vf = (
-            f"color=c={bg}:s=1080x1920,"
-            f"geq=lum='if(mod(X,80)<2 | mod(Y+T*{p['speed']}*50,120)<2, 255, 0)':cb=128:cr=128,"
-            f"perspective=x0=0:y0=h/4:x1=w:y1=h/4:x2=0:y2=h:x3=w:y3=h:interpolation=linear,"
-            f"colorkey=black:0.1:0.1,overlay=0:0:format=rgb,"
-            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2-200:shadowcolor=black@0.8:shadowx=5:shadowy=5,"
+            f"color=c={bg}:s=1080x1920[bg];"
+            f"color=c={acc}:s=1080x1920,geq=lum='if(mod(X,100)<3 | mod(Y+T*{p['speed']}*100,150)<3, 255, 0)':cb=128:cr=128,"
+            f"perspective=x0=0:y0=h/2:x1=w:y1=h/2:x2=-w:y2=h:x3=2*w:y3=h:interpolation=linear[grid];"
+            f"[bg][grid]overlay=format=auto,"
+            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/4:shadowcolor=black@0.8:shadowx=5:shadowy=5,"
             f"hue=h={p['hue_shift']}:s=1.2"
         )
         return self._run_ffmpeg(vf, out)
@@ -234,8 +235,7 @@ class AIVideoGenerator:
     def _gen_vortex(self, t1, bg, acc, p, out):
         """Spiral / Vortex motion."""
         vf = (
-            f"color=c={bg}:s=1080x1920,"
-            f"mandelbrot=s=1080x1920:maxiter=50:inner=black:outer=black,"
+            f"color=c={bg}:s=1080x1920,mandelbrot=s=1080x1920:maxiter=50:inner=black:outer=black,"
             f"rotate='T*{p['speed']}*0.5':fillcolor={bg}:ow=iw:oh=ih,"
             f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2:shadowcolor=black:shadowx=4:shadowy=4,"
             f"hue=h={p['hue_shift']}:s=1.5"
@@ -245,9 +245,9 @@ class AIVideoGenerator:
     def _gen_pulse(self, t1, bg, acc, p, out):
         """Pulsing energy rings."""
         vf = (
-            f"color=c={bg}:s=1080x1920,"
-            f"geq=lum='if(abs(hypot(X-w/2,Y-h/2)-mod(T*{p['speed']}*200,800))<{p['thickness']}*2, 255, 0)':cb=128:cr=128,"
-            f"boxblur=5:1,"
+            f"color=c={bg}:s=1080x1920[bg];"
+            f"color=c={acc}:s=1080x1920,geq=lum='if(abs(hypot(X-w/2,Y-h/2)-mod(T*{p['speed']}*300,1200))<{p['thickness']}*5, 255, 0)':cb=128:cr=128[pulse];"
+            f"[bg][pulse]overlay=format=auto,boxblur=5:1,"
             f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=h/2-100,"
             f"hue=h={p['hue_shift']}:s=1.5"
         )
@@ -266,20 +266,27 @@ class AIVideoGenerator:
     def _gen_tunnel(self, t1, bg, acc, p, out):
         """3D Tunnel travel effect."""
         vf = (
-            f"color=c={bg}:s=1080x1920,testsrc2=s=1080x1920:r=30,"
-            f"zoompan=z='zoom+0.005':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=150:s=1080x1920,"
+            f"testsrc2=s=1080x1920:r=30:d=5,"
+            f"zoompan=z='zoom+0.002':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=150:s=1080x1920,"
             f"hue=h={p['hue_shift']}:s=0.5,"
             f"drawtext=text='{t1}':fontsize=120:fontcolor={acc}:x=(w-tw)/2:y=h/2:shadowcolor=black:shadowx=10:shadowy=10"
         )
         return self._run_ffmpeg(vf, out)
 
     def _run_ffmpeg(self, vf, out):
-        cmd = [
-            "ffmpeg", "-y", "-f", "lavfi", "-r", "30", "-i", "nullsrc=s=1080x1920:d=5",
-            "-vf", vf, "-c:v", "libx264", "-crf", "18", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an", out
-        ]
-        subprocess.run(cmd, capture_output=True)
-        return out
+        try:
+            cmd = [
+                "ffmpeg", "-y", "-f", "lavfi", "-r", "30", "-i", "nullsrc=s=1080x1920:d=5",
+                "-vf", vf, "-c:v", "libx264", "-crf", "18", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an", out
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            return out
+        except subprocess.CalledProcessError as e:
+            logger.error(f"[AIVideo] FFmpeg Generative Error: {e.stderr}")
+            return None
+        except Exception as e:
+            logger.error(f"[AIVideo] Generative Error: {e}")
+            return None
 
     def _validate(self, path: str) -> bool:
         if not path or not os.path.exists(path): return False
