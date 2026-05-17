@@ -101,11 +101,11 @@ def _draw_frame(topic: str, speaking_text: str, W: int, H: int,
     draw.text((18, 12), "NOW SPEAKING", font=label_fnt,
               fill=tuple(max(0, int(c * 0.55)) for c in acc_rgb))
 
-    lines    = textwrap.wrap(speaking_text, width=18)[:3]
-    text_fnt = _fnt(int(left_w * 0.078), bold=True)
-    line_gap = int(left_w * 0.092)
+    lines    = textwrap.wrap(speaking_text, width=14)[:3]
+    text_fnt = _fnt(int(left_w * 0.058), bold=True)
+    line_gap = int(left_w * 0.072)
     total_h  = len(lines) * line_gap
-    y_text   = max(40, (body_h - total_h) // 2)
+    y_text   = max(48, (body_h - total_h) // 2 + 4)
 
     for i, line in enumerate(lines):
         y = y_text + i * line_gap
