@@ -221,7 +221,7 @@ class EvcarixOrchestrator:
             subtitle_text=script,
             duration=duration,
             output_path=bottom_panel_path,
-            panel_size=(1080, 635)
+            panel_size=(1080, 480)
         )
         
         if not bottom_res:
