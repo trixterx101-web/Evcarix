@@ -99,14 +99,16 @@ class AutoEditor:
 
     def _build_subtitles(self, text: str, duration: float, W: int, H: int) -> list:
         """Sentence-level subtitle burn-in for long video only."""
-        clean = re.sub(r"[^A-Z0-9 .,!?%\-']", "", text.upper()).strip()
-        # Split into chunks of ~6 words
-        words    = clean.split()
-        chunks   = []
-        chunk    = []
+        # Strip ALL special chars that break FFmpeg drawtext
+        clean = re.sub(r"[^A-Z0-9 ]", " ", text.upper()).strip()
+        clean = re.sub(r" +", " ", clean)
+
+        words  = clean.split()
+        chunks = []
+        chunk  = []
         for w in words:
             chunk.append(w)
-            if len(chunk) >= 6 or w.endswith(('.', '!', '?')):
+            if len(chunk) >= 6:
                 chunks.append(" ".join(chunk))
                 chunk = []
         if chunk:
@@ -121,9 +123,10 @@ class AutoEditor:
 
         filters = []
         for i, chunk_text in enumerate(chunks):
-            t0 = round(i * chunk_dur, 3)
-            t1 = round((i + 1) * chunk_dur - 0.08, 3)
-            safe = chunk_text.replace("'", "\\'")
+            t0   = round(i * chunk_dur, 3)
+            t1   = round((i + 1) * chunk_dur - 0.08, 3)
+            # Only alphanumeric + space — fully safe for FFmpeg
+            safe = chunk_text[:40]  # max length guard
             filters.append(
                 f"drawtext=text='{safe}'"
                 f":fontsize={font_size}:fontcolor=white"
