@@ -62,8 +62,6 @@ def _fnt(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
         return ImageFont.load_default()
 
 
-<<<<<<< HEAD
-=======
 def _auto_font(draw, text: str, max_w: int, start_size: int, bold: bool = True):
     """max_w piksel içine sığana kadar font boyutunu küçültür (min 18)."""
     size = start_size
@@ -86,8 +84,6 @@ def _block_top(total_h: int, area_top: int, area_bot: int) -> int:
     avail = area_bot - area_top
     return area_top + max(0, (avail - total_h) // 2)
 
-
->>>>>>> 4352c2a (feat: thumbnail - 10 unique layouts, auto-fit text, vertical centering, Windows font support)
 def _hex(h: str) -> tuple:
     h = h.lstrip("#")
     return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
@@ -184,13 +180,8 @@ TOPIC_STYLES = {
         ],
     },
 }
-
-<<<<<<< HEAD
-LAYOUTS = ["split", "versus", "shock", "data"]
-=======
 LAYOUTS = ["split", "versus", "shock", "data",
            "neon", "minimal", "alert", "cinematic", "grid", "bold"]
->>>>>>> 4352c2a (feat: thumbnail - 10 unique layouts, auto-fit text, vertical centering, Windows font support)
 
 
 def _safe(text: str, max_len: int = 25) -> str:
@@ -299,35 +290,6 @@ def _layout_split(W, H, lines, st):
     draw.rectangle([W - rtw - 36, 16, W - 14, 54], fill=(0, 180, 220))
     draw.text((W - rtw - 20, 20), rt, font=rf, fill=(0, 0, 10))
 
-<<<<<<< HEAD
-    # Big L1 colored
-    f1 = _fnt(int(H * 0.26))
-    x_l = 30
-    y1 = int(H * 0.10)
-    for ox, oy in [(-3, 0), (3, 0), (0, -3), (0, 3)]:
-        draw.text((x_l + ox, y1 + oy), lines[0], font=f1,
-                  fill=tuple(c // 2 for c in a1))
-    draw.text((x_l, y1), lines[0], font=f1, fill=a1)
-
-    # L2 white
-    f2 = _fnt(int(H * 0.14))
-    y2 = y1 + int(H * 0.29)
-    draw.text((x_l, y2), lines[1], font=f2, fill=(255, 255, 255))
-
-    # Strike through L2
-    strike_y = y2 + int(H * 0.095)
-    draw.rectangle(
-        [x_l - 10, strike_y - 6,
-         x_l + int(draw.textlength(lines[1], font=f2)) + 10, strike_y + 6],
-        fill=a1,
-    )
-
-    # Sub-line
-    if lines[2]:
-        f3 = _fnt(int(H * 0.065), False)
-        y3 = y2 + int(H * 0.175)
-        draw.text((x_l, y3), lines[2][:40], font=f3, fill=(185, 185, 185))
-=======
     # L1 – auto-fit to left half width, vertically centered in usable area
     x_l, max_w = 20, W // 2 - 30
     f1 = _auto_font(draw, lines[0], max_w, 110)
@@ -353,7 +315,6 @@ def _layout_split(W, H, lines, st):
     if f3:
         y3 = sy + 10
         draw.text((x_l, y3), lines[2], font=f3, fill=(185,185,185))
->>>>>>> 4352c2a (feat: thumbnail - 10 unique layouts, auto-fit text, vertical centering, Windows font support)
 
     # Right side: "EV" big
     ev_f = _fnt(int(H * 0.38))
@@ -405,22 +366,6 @@ def _layout_versus(W, H, lines, st):
     draw.text((shock_w + 60, 18), "GAS CAR OWNERS MUST SEE THIS",
               font=_fnt(20, False), fill=(200, 200, 200))
 
-<<<<<<< HEAD
-    # Left content
-    draw.text((38, 92), "THE", font=_fnt(38), fill=(140, 185, 220))
-    mf = _fnt(int((H - 78) * 0.32))
-    y_m = 140
-    for line in [lines[0], lines[1]]:
-        if not line:
-            continue
-        for ox, oy in [(-3, 0), (3, 0), (0, -3), (0, 3)]:
-            draw.text((38 + ox, y_m + oy), line, font=mf,
-                      fill=tuple(c // 3 for c in a1))
-        draw.text((38, y_m), line, font=mf, fill=a1)
-        y_m += int((H - 78) * 0.33)
-    if lines[2]:
-        draw.text((42, y_m + 8), f"!! {lines[2]}", font=_fnt(28), fill=a2)
-=======
     # Left content – vertically centered
     vx_tmp = W - 348
     max_w_v = vx_tmp - 55
@@ -441,7 +386,6 @@ def _layout_versus(W, H, lines, st):
     if lines[2] and y_m < H - 85:
         f3 = _auto_font(draw, f"!! {lines[2]}", max_w_v, 26)
         draw.text((42, y_m + 4), f"!! {lines[2]}", font=f3, fill=a2)
->>>>>>> 4352c2a (feat: thumbnail - 10 unique layouts, auto-fit text, vertical centering, Windows font support)
 
     # Vertical divider
     vx = W - 348
@@ -536,24 +480,6 @@ def _layout_data(W, H, lines, st):
     ico_f = _fnt(60)
     draw.text((W - 90, 20), st["icon"], font=ico_f, fill=a1)
 
-<<<<<<< HEAD
-    # Main text
-    f1 = _fnt(int(H * 0.24))
-    y1 = 84
-    for ox, oy in [(-3, 0), (3, 0), (0, -3), (0, 3)]:
-        draw.text((36 + ox, y1 + oy), lines[0], font=f1,
-                  fill=tuple(c // 3 for c in a1))
-    draw.text((36, y1), lines[0], font=f1, fill=a1)
-
-    f2 = _fnt(int(H * 0.18))
-    y2 = y1 + int(H * 0.255)
-    draw.text((36, y2), lines[1], font=f2, fill=(255, 255, 255))
-
-    if lines[2]:
-        f3 = _fnt(int(H * 0.1))
-        y3 = y2 + int(H * 0.195)
-        draw.rectangle([36, y3 - 4, 36 + 6, y3 + int(H * 0.105)], fill=a2)
-=======
     # Main text – left side, vertically centered
     max_w_d = W // 2 + 40
     f1 = _auto_font(draw, lines[0], max_w_d, 100)
@@ -573,7 +499,6 @@ def _layout_data(W, H, lines, st):
     if f3:
         y3 = y2 + _text_h(draw, lines[1], f2) + GAP
         draw.rectangle([36, y3-4, 42, y3 + _text_h(draw, lines[2], f3) + 4], fill=a2)
->>>>>>> 4352c2a (feat: thumbnail - 10 unique layouts, auto-fit text, vertical centering, Windows font support)
         draw.text((50, y3), lines[2], font=f3, fill=a2)
 
     # Stat boxes at bottom
@@ -595,8 +520,6 @@ def _layout_data(W, H, lines, st):
     return img
 
 
-<<<<<<< HEAD
-=======
 # ── LAYOUT: neon ──────────────────────────────────────────────────────────────
 def _layout_neon(W, H, lines, st):
     a1, a2 = st["accent1"], st["accent2"]
@@ -924,7 +847,7 @@ class ThumbnailGenerator:
         layout = LAYOUTS[h % len(LAYOUTS)]
 
         lines = _split_title(title)
-
+        try:
             dispatch = {
                 "split":     _layout_split,
                 "versus":    _layout_versus,
