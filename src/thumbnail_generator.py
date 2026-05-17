@@ -16,14 +16,78 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 BOLD    = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
 REGULAR = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
 
+# Windows / macOS / fallback font arama listesi
+_BOLD_CANDIDATES = [
+    BOLD,
+    "C:/Windows/Fonts/arialbd.ttf",
+    "C:/Windows/Fonts/Arial Bold.ttf",
+    "C:/Windows/Fonts/calibrib.ttf",
+    "C:/Windows/Fonts/verdanab.ttf",
+    "/Library/Fonts/Arial Bold.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+]
+_REGULAR_CANDIDATES = [
+    REGULAR,
+    "C:/Windows/Fonts/arial.ttf",
+    "C:/Windows/Fonts/Arial.ttf",
+    "C:/Windows/Fonts/calibri.ttf",
+    "C:/Windows/Fonts/verdana.ttf",
+    "/Library/Fonts/Arial.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+]
+
+
+def _find_font(candidates):
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+_BOLD_PATH    = _find_font(_BOLD_CANDIDATES)
+_REGULAR_PATH = _find_font(_REGULAR_CANDIDATES)
+
 
 def _fnt(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
+    path = _BOLD_PATH if bold else _REGULAR_PATH
     try:
-        return ImageFont.truetype(BOLD if bold else REGULAR, size)
+        if path:
+            return ImageFont.truetype(path, size)
     except Exception:
+        pass
+    # Son çare: PIL'in load_default() fontu (PIL>=10 size parametresi alır)
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
         return ImageFont.load_default()
 
 
+<<<<<<< HEAD
+=======
+def _auto_font(draw, text: str, max_w: int, start_size: int, bold: bool = True):
+    """max_w piksel içine sığana kadar font boyutunu küçültür (min 18)."""
+    size = start_size
+    while size > 18:
+        f = _fnt(size, bold)
+        if draw.textlength(text, font=f) <= max_w:
+            return f
+        size -= 4
+    return _fnt(18, bold)
+
+
+def _text_h(draw, text: str, font) -> int:
+    """Gerçek pixel yüksekliğini (textbbox tabanlı) döndürür."""
+    bb = draw.textbbox((0, 0), text, font=font)
+    return bb[3] - bb[1]
+
+
+def _block_top(total_h: int, area_top: int, area_bot: int) -> int:
+    """Metin bloğunu area_top..area_bot arasında dikey ortalar."""
+    avail = area_bot - area_top
+    return area_top + max(0, (avail - total_h) // 2)
+
+
+>>>>>>> 4352c2a (feat: thumbnail - 10 unique layouts, auto-fit text, vertical centering, Windows font support)
 def _hex(h: str) -> tuple:
     h = h.lstrip("#")
     return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
@@ -121,7 +185,12 @@ TOPIC_STYLES = {
     },
 }
 
+<<<<<<< HEAD
 LAYOUTS = ["split", "versus", "shock", "data"]
+=======
+LAYOUTS = ["split", "versus", "shock", "data",
+           "neon", "minimal", "alert", "cinematic", "grid", "bold"]
+>>>>>>> 4352c2a (feat: thumbnail - 10 unique layouts, auto-fit text, vertical centering, Windows font support)
 
 
 def _safe(text: str, max_len: int = 25) -> str:
@@ -230,6 +299,7 @@ def _layout_split(W, H, lines, st):
     draw.rectangle([W - rtw - 36, 16, W - 14, 54], fill=(0, 180, 220))
     draw.text((W - rtw - 20, 20), rt, font=rf, fill=(0, 0, 10))
 
+<<<<<<< HEAD
     # Big L1 colored
     f1 = _fnt(int(H * 0.26))
     x_l = 30
@@ -257,6 +327,33 @@ def _layout_split(W, H, lines, st):
         f3 = _fnt(int(H * 0.065), False)
         y3 = y2 + int(H * 0.175)
         draw.text((x_l, y3), lines[2][:40], font=f3, fill=(185, 185, 185))
+=======
+    # L1 – auto-fit to left half width, vertically centered in usable area
+    x_l, max_w = 20, W // 2 - 30
+    f1 = _auto_font(draw, lines[0], max_w, 110)
+    f2 = _auto_font(draw, lines[1], max_w, 80)
+    f3 = _auto_font(draw, lines[2], max_w, 52, False) if lines[2] else None
+    GAP = 14
+    total_h = (_text_h(draw, lines[0], f1) + GAP
+               + _text_h(draw, lines[1], f2) + GAP
+               + (_text_h(draw, lines[2], f3) + GAP if f3 else 0))
+    y1 = _block_top(total_h, 60, H - 72)
+    for ox, oy in [(-2,0),(2,0),(0,-2),(0,2)]:
+        draw.text((x_l+ox, y1+oy), lines[0], font=f1, fill=tuple(c//2 for c in a1))
+    draw.text((x_l, y1), lines[0], font=f1, fill=a1)
+
+    h1 = _text_h(draw, lines[0], f1)
+    y2 = y1 + h1 + GAP
+    draw.text((x_l, y2), lines[1], font=f2, fill=(255, 255, 255))
+
+    h2 = _text_h(draw, lines[1], f2)
+    sy = y2 + h2 + 6
+    draw.rectangle([x_l-8, sy-3, x_l+int(draw.textlength(lines[1],font=f2))+8, sy+3], fill=a1)
+
+    if f3:
+        y3 = sy + 10
+        draw.text((x_l, y3), lines[2], font=f3, fill=(185,185,185))
+>>>>>>> 4352c2a (feat: thumbnail - 10 unique layouts, auto-fit text, vertical centering, Windows font support)
 
     # Right side: "EV" big
     ev_f = _fnt(int(H * 0.38))
@@ -308,6 +405,7 @@ def _layout_versus(W, H, lines, st):
     draw.text((shock_w + 60, 18), "GAS CAR OWNERS MUST SEE THIS",
               font=_fnt(20, False), fill=(200, 200, 200))
 
+<<<<<<< HEAD
     # Left content
     draw.text((38, 92), "THE", font=_fnt(38), fill=(140, 185, 220))
     mf = _fnt(int((H - 78) * 0.32))
@@ -322,6 +420,28 @@ def _layout_versus(W, H, lines, st):
         y_m += int((H - 78) * 0.33)
     if lines[2]:
         draw.text((42, y_m + 8), f"!! {lines[2]}", font=_fnt(28), fill=a2)
+=======
+    # Left content – vertically centered
+    vx_tmp = W - 348
+    max_w_v = vx_tmp - 55
+    draw.text((38, 95), "THE", font=_fnt(32), fill=(140, 185, 220))
+    f_l1 = _auto_font(draw, lines[0], max_w_v, 100)
+    f_l2 = _auto_font(draw, lines[1], max_w_v, 100)
+    GAP = 12
+    total_h = (_text_h(draw, lines[0], f_l1) + GAP
+               + _text_h(draw, lines[1], f_l2))
+    y_m = _block_top(total_h, 135, H - 72)
+    for line, mf in [(lines[0], f_l1), (lines[1], f_l2)]:
+        if not line:
+            continue
+        for ox, oy in [(-2,0),(2,0),(0,-2),(0,2)]:
+            draw.text((38+ox, y_m+oy), line, font=mf, fill=tuple(c//3 for c in a1))
+        draw.text((38, y_m), line, font=mf, fill=a1)
+        y_m += _text_h(draw, line, mf) + GAP
+    if lines[2] and y_m < H - 85:
+        f3 = _auto_font(draw, f"!! {lines[2]}", max_w_v, 26)
+        draw.text((42, y_m + 4), f"!! {lines[2]}", font=f3, fill=a2)
+>>>>>>> 4352c2a (feat: thumbnail - 10 unique layouts, auto-fit text, vertical centering, Windows font support)
 
     # Vertical divider
     vx = W - 348
@@ -365,26 +485,28 @@ def _layout_shock(W, H, lines, st):
     iw = int(draw.textlength(st["icon"], font=ico_f))
     draw.text((W // 2 - iw // 2, int(H * 0.06)), st["icon"],
               font=ico_f, fill=(255, 220, 0))
-
-    # Main text lines
-    f1 = _fnt(int(H * 0.28))
+    # Main text – centered, vertically centered in usable area
+    max_w_s = W - 80
+    f1 = _auto_font(draw, lines[0], max_w_s, 100)
+    f2 = _auto_font(draw, lines[1], max_w_s, 72)
+    f3 = _auto_font(draw, lines[2], max_w_s, 52) if lines[2] else None
+    GAP = 14
+    total_h = (_text_h(draw, lines[0], f1) + GAP
+               + _text_h(draw, lines[1], f2)
+               + (GAP + _text_h(draw, lines[2], f3) if f3 else 0))
+    y1 = _block_top(total_h, int(H * 0.24), H - 72)
     lw = int(draw.textlength(lines[0], font=f1))
-    y1 = int(H * 0.22)
-    for ox, oy in [(-4, 0), (4, 0), (0, -4), (0, 4)]:
-        draw.text((W // 2 - lw // 2 + ox, y1 + oy), lines[0], font=f1,
-                  fill=tuple(c // 2 for c in a1))
-    draw.text((W // 2 - lw // 2, y1), lines[0], font=f1, fill=a1)
-
-    f2 = _fnt(int(H * 0.17))
+    for ox, oy in [(-3,0),(3,0),(0,-3),(0,3)]:
+        draw.text((W//2-lw//2+ox, y1+oy), lines[0], font=f1, fill=tuple(c//2 for c in a1))
+    draw.text((W//2-lw//2, y1), lines[0], font=f1, fill=a1)
+    y2 = y1 + _text_h(draw, lines[0], f1) + GAP
     lw2 = int(draw.textlength(lines[1], font=f2))
-    y2 = y1 + int(H * 0.30)
-    draw.text((W // 2 - lw2 // 2, y2), lines[1], font=f2, fill=(255, 255, 255))
-
-    if lines[2]:
-        f3 = _fnt(int(H * 0.09))
+    draw.text((W//2-lw2//2, y2), lines[1], font=f2, fill=(255, 255, 255))
+    if f3:
+        y3 = y2 + _text_h(draw, lines[1], f2) + GAP
         lw3 = int(draw.textlength(lines[2], font=f3))
-        y3 = y2 + int(H * 0.20)
-        draw.text((W // 2 - lw3 // 2, y3), lines[2], font=f3, fill=a2)
+        draw.text((W//2-lw3//2, y3), lines[2], font=f3, fill=a2)
+
 
     _brand_bar(draw, W, H, a1, a2, st["label"])
     _corners(draw, a1, a2)
@@ -414,6 +536,7 @@ def _layout_data(W, H, lines, st):
     ico_f = _fnt(60)
     draw.text((W - 90, 20), st["icon"], font=ico_f, fill=a1)
 
+<<<<<<< HEAD
     # Main text
     f1 = _fnt(int(H * 0.24))
     y1 = 84
@@ -430,6 +553,27 @@ def _layout_data(W, H, lines, st):
         f3 = _fnt(int(H * 0.1))
         y3 = y2 + int(H * 0.195)
         draw.rectangle([36, y3 - 4, 36 + 6, y3 + int(H * 0.105)], fill=a2)
+=======
+    # Main text – left side, vertically centered
+    max_w_d = W // 2 + 40
+    f1 = _auto_font(draw, lines[0], max_w_d, 100)
+    f2 = _auto_font(draw, lines[1], max_w_d, 72)
+    f3 = _auto_font(draw, lines[2], max_w_d, 52) if lines[2] else None
+    GAP = 14
+    total_h = (_text_h(draw, lines[0], f1) + GAP
+               + _text_h(draw, lines[1], f2)
+               + (GAP + _text_h(draw, lines[2], f3) if f3 else 0))
+    # clamp so we don't enter stat box area (H-148)
+    y1 = _block_top(total_h, 82, H - 148 - 10)
+    for ox, oy in [(-2,0),(2,0),(0,-2),(0,2)]:
+        draw.text((36+ox, y1+oy), lines[0], font=f1, fill=tuple(c//3 for c in a1))
+    draw.text((36, y1), lines[0], font=f1, fill=a1)
+    y2 = y1 + _text_h(draw, lines[0], f1) + GAP
+    draw.text((36, y2), lines[1], font=f2, fill=(255, 255, 255))
+    if f3:
+        y3 = y2 + _text_h(draw, lines[1], f2) + GAP
+        draw.rectangle([36, y3-4, 42, y3 + _text_h(draw, lines[2], f3) + 4], fill=a2)
+>>>>>>> 4352c2a (feat: thumbnail - 10 unique layouts, auto-fit text, vertical centering, Windows font support)
         draw.text((50, y3), lines[2], font=f3, fill=a2)
 
     # Stat boxes at bottom
@@ -446,6 +590,309 @@ def _layout_data(W, H, lines, st):
         draw.text((x + 12, by_s + 10), val,          font=_fnt(36),       fill=col)
         draw.text((x + 12, by_s + 48), lbl_text[:14], font=_fnt(14, False), fill=(150, 165, 178))
 
+    _brand_bar(draw, W, H, a1, a2, st["label"])
+    _corners(draw, a1, a2)
+    return img
+
+
+<<<<<<< HEAD
+=======
+# ── LAYOUT: neon ──────────────────────────────────────────────────────────────
+def _layout_neon(W, H, lines, st):
+    a1, a2 = st["accent1"], st["accent2"]
+    img = Image.new("RGB", (W, H), (4, 0, 20))
+    draw = ImageDraw.Draw(img)
+    for i, y in enumerate(range(0, H, 36)):
+        intensity = 8 if i % 3 == 0 else 3
+        draw.line([(0, y), (W, y)], fill=(intensity, 0, intensity * 2))
+    img = _radial_glow(img, W // 2, H // 2, 600, a1, 0.5)
+    img = _radial_glow(img, W // 2, H // 2, 350, a2, 0.3)
+    draw = ImageDraw.Draw(img)
+    for offset in range(0, 18, 6):
+        c = max(0, 255 - offset * 10)
+        col = tuple(min(255, int(a1[i] * c / 255)) for i in range(3))
+        draw.rectangle([offset, offset, W - offset, H - 75 - offset], outline=col, width=1)
+    draw.rectangle([0, 0, W, 50], fill=(0, 0, 0))
+    lbl_txt = f"[ {st['label']} REPORT ]"
+    lf = _fnt(26)
+    lw = int(draw.textlength(lbl_txt, font=lf))
+    draw.text((W // 2 - lw // 2, 12), lbl_txt, font=lf, fill=a2)
+    max_w_n = W - 60
+    f1 = _auto_font(draw, lines[0], max_w_n, 90)
+    f2 = _auto_font(draw, lines[1], max_w_n, 68)
+    f3 = _auto_font(draw, lines[2], max_w_n, 50, False) if lines[2] else None
+    GAP = 16
+    h1 = _text_h(draw, lines[0], f1)
+    total_h = h1 + 9 + GAP + _text_h(draw, lines[1], f2) + (GAP + _text_h(draw, lines[2], f3) if f3 else 0)
+    y1 = _block_top(total_h, 52, H - 72)
+    tw1 = int(draw.textlength(lines[0], font=f1))
+    for ox, oy in [(-4,0),(4,0),(0,-4),(0,4)]:
+        draw.text((W//2-tw1//2+ox, y1+oy), lines[0], font=f1, fill=tuple(min(255,c*2) for c in a1))
+    draw.text((W//2-tw1//2, y1), lines[0], font=f1, fill=(255,255,255))
+    draw.rectangle([W//2-tw1//2-8, y1+h1+4, W//2+tw1//2+8, y1+h1+9], fill=a1)
+    y2 = y1 + h1 + 9 + GAP
+    tw2 = int(draw.textlength(lines[1], font=f2))
+    draw.text((W//2-tw2//2, y2), lines[1], font=f2, fill=a1)
+    if f3:
+        y3 = y2 + _text_h(draw, lines[1], f2) + GAP
+        tw3 = int(draw.textlength(lines[2], font=f3))
+        draw.text((W//2-tw3//2, y3), lines[2], font=f3, fill=a2)
+    for offset in range(3):
+        draw.line([(8 + offset * 4, 50), (8 + offset * 4, H - 75)], fill=a1, width=2)
+        draw.line([(W - 8 - offset * 4, 50), (W - 8 - offset * 4, H - 75)], fill=a2, width=2)
+    _brand_bar(draw, W, H, a1, a2, st["label"])
+    return img
+
+
+# ── LAYOUT: minimal ───────────────────────────────────────────────────────────
+def _layout_minimal(W, H, lines, st):
+    a1, a2 = st["accent1"], st["accent2"]
+    img = Image.new("RGB", (W, H), (8, 8, 12))
+    draw = ImageDraw.Draw(img)
+    for x in range(W):
+        draw.line([(x, 0), (x, H)], fill=_mix((8, 8, 12), st["right_bg"], x / W * 0.15))
+    draw.rectangle([0, 0, 16, H], fill=a1)
+    draw.rectangle([0, 0, W, 6], fill=a1)
+    draw.text((30, 20), f"EVCARIX  //  {st['label']}", font=_fnt(20, False), fill=(100, 110, 125))
+    # Left text zone: x=20..W//2-20  Right zone: W//2+10..W-20 (big stat)
+    max_w_m = W // 2 - 40
+    f1 = _auto_font(draw, lines[0], max_w_m, 90)
+    f2 = _auto_font(draw, lines[1], max_w_m, 65)
+    f3 = _auto_font(draw, lines[2], max_w_m, 46, False) if lines[2] else None
+    GAP = 14
+    h1 = _text_h(draw, lines[0], f1)
+    total_h = h1 + 7 + GAP + _text_h(draw, lines[1], f2) + (GAP + _text_h(draw, lines[2], f3) if f3 else 0)
+    y1 = _block_top(total_h, 36, H - 72)
+    draw.text((30, y1), lines[0], font=f1, fill=(240,240,240))
+    line_y = y1 + h1 + 4
+    draw.rectangle([30, line_y, 30+int(draw.textlength(lines[0],font=f1)), line_y+7], fill=a1)
+    y2 = line_y + 7 + GAP
+    draw.text((30, y2), lines[1], font=f2, fill=a2)
+    if f3:
+        y3 = y2 + _text_h(draw, lines[1], f2) + GAP
+        draw.text((30, y3), lines[2], font=f3, fill=(160,165,175))
+    # Big stat — strictly right half, no overlap
+    big_txt = st["stats"][0][0] if st.get("stats") else st["icon"]
+    big_zone_w = W // 2 - 30
+    big_f = _auto_font(draw, big_txt, big_zone_w, 200)
+    bw_px = int(draw.textlength(big_txt, font=big_f))
+    bx = W - bw_px - 30
+    by = int(H * 0.18)
+    draw.text((bx+3, by+3), big_txt, font=big_f, fill=tuple(c//6 for c in a1))
+    draw.text((bx, by), big_txt, font=big_f, fill=a1)
+    if st.get("stats"):
+        desc = st["stats"][0][1]
+        sf = _fnt(18, False)
+        sw_px = int(draw.textlength(desc, font=sf))
+        draw.text((W-sw_px-30, by+_text_h(draw,big_txt,big_f)+8), desc, font=sf, fill=(130,140,150))
+    draw.rectangle([0, H - 72, W, H - 69], fill=a1)
+    draw.text((30, H - 58), "* EVCARIX", font=_fnt(30), fill=(255, 255, 255))
+    draw.text((W - 200, H - 52), st["label"], font=_fnt(22, False), fill=(80, 90, 100))
+    return img
+
+
+# ── LAYOUT: alert ─────────────────────────────────────────────────────────────
+def _layout_alert(W, H, lines, st):
+    a1, a2 = st["accent1"], st["accent2"]
+    dark1 = tuple(min(20, c // 4) for c in a1)
+    img = Image.new("RGB", (W, H), (0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    _gradient(draw, W, H, dark1, (0, 0, 0))
+    img = _radial_glow(img, W // 4, H // 2, 600, a1, 0.45)
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, 22, H], fill=a1)
+    draw.rectangle([22, 0, W, 68], fill=a1)
+    af = _fnt(38)
+    draw.text((36, 14), ">> ALERT:", font=af, fill=(0, 0, 0))
+    sub_x = 36 + int(draw.textlength(">> ALERT:", font=af)) + 20
+    draw.text((sub_x, 20), st["label"], font=_fnt(28, False), fill=(0, 0, 0))
+    draw.rectangle([W - 180, 0, W, 68], fill=(0, 0, 0))
+    draw.text((W - 165, 16), st["icon"], font=_fnt(36), fill=a1)
+    # Left zone: x=36..W-320 (stat cards start at W-320)
+    max_w_a = W - 340 - 36
+    f1 = _auto_font(draw, lines[0], max_w_a, 90)
+    f2 = _auto_font(draw, lines[1], max_w_a, 68)
+    f3 = _auto_font(draw, lines[2], max_w_a, 50, False) if lines[2] else None
+    GAP = 14
+    h1 = _text_h(draw, lines[0], f1)
+    total_h = h1 + 7 + GAP + _text_h(draw, lines[1], f2) + (GAP + _text_h(draw, lines[2], f3) if f3 else 0)
+    y1 = _block_top(total_h, 74, H - 72)
+    draw.text((36, y1), lines[0], font=f1, fill=(255,255,255))
+    draw.rectangle([36, y1+h1+2, 36+int(draw.textlength(lines[0],font=f1)), y1+h1+9], fill=a2)
+    y2 = y1 + h1 + 9 + GAP
+    draw.text((36, y2), lines[1], font=f2, fill=a2)
+    if f3:
+        y3 = y2 + _text_h(draw, lines[1], f2) + GAP
+        draw.text((36, y3), lines[2], font=f3, fill=(200,200,200))
+    rx, ry = W - 320, 80
+    for val, lbl_text, col in st.get("stats", []):
+        cr, cg, cb = col
+        draw.rectangle([rx, ry, rx + 300, ry + 88],
+                       fill=(max(0, cr // 9), max(0, cg // 9), max(0, cb // 9 + 4)))
+        draw.rectangle([rx, ry, rx + 8, ry + 88], fill=col)
+        draw.text((rx + 18, ry + 8),  val,      font=_fnt(42),        fill=col)
+        draw.text((rx + 18, ry + 56), lbl_text, font=_fnt(16, False), fill=(160, 175, 185))
+        ry += 100
+    _brand_bar(draw, W, H, a1, a2, st["label"])
+    return img
+
+
+# ── LAYOUT: cinematic ─────────────────────────────────────────────────────────
+def _layout_cinematic(W, H, lines, st):
+    a1, a2 = st["accent1"], st["accent2"]
+    img = Image.new("RGB", (W, H), (2, 2, 6))
+    draw = ImageDraw.Draw(img)
+    img = _radial_glow(img, W // 2, H // 2, 700, a1, 0.38)
+    img = _radial_glow(img, W // 2, H // 2, 400, a2, 0.18)
+    draw = ImageDraw.Draw(img)
+    bar_h = int(H * 0.13)
+    draw.rectangle([0, 0, W, bar_h], fill=(0, 0, 0))
+    draw.rectangle([0, H - bar_h, W, H], fill=(0, 0, 0))
+    draw.text((40, H - bar_h + 14), "* EVCARIX", font=_fnt(26), fill=(200, 200, 200))
+    tag = f"{st['label']} & INSIGHTS"
+    tw_tag = int(draw.textlength(tag, font=_fnt(18, False)))
+    draw.text((W - tw_tag - 40, H - bar_h + 18), tag, font=_fnt(18, False), fill=(90, 100, 110))
+    lbl_txt = f"[ {st['label']} ]"
+    lf = _fnt(22)
+    lw = int(draw.textlength(lbl_txt, font=lf))
+    draw.text((W // 2 - lw // 2, bar_h // 2 - 12), lbl_txt, font=lf, fill=a2)
+    mid_y = H // 2
+    draw.rectangle([60, mid_y - 3, W - 60, mid_y + 3], fill=a1)
+    # Text above center line
+    max_w_c = W - 140
+    f1 = _auto_font(draw, lines[0], max_w_c, 85)
+    f2 = _auto_font(draw, lines[1], max_w_c, 65)
+    f3 = _auto_font(draw, lines[2], max_w_c, 50, False) if lines[2] else None
+    GAP = 12
+    h1 = _text_h(draw, lines[0], f1)
+    total_h = h1 + GAP + _text_h(draw, lines[1], f2) + (GAP + _text_h(draw, lines[2], f3) if f3 else 0)
+    # center text block between bar_h and mid_y (above the center divider line)
+    y1 = _block_top(total_h, bar_h + 12, mid_y - 8)
+    tw1 = int(draw.textlength(lines[0], font=f1))
+    for ox, oy in [(-3,0),(3,0)]:
+        draw.text((W//2-tw1//2+ox, y1+oy), lines[0], font=f1, fill=tuple(c//3 for c in a1))
+    draw.text((W//2-tw1//2, y1), lines[0], font=f1, fill=(240,240,240))
+    y2 = y1 + h1 + GAP
+    tw2 = int(draw.textlength(lines[1], font=f2))
+    draw.text((W//2-tw2//2, y2), lines[1], font=f2, fill=a1)
+    if f3:
+        y3 = y2 + _text_h(draw, lines[1], f2) + GAP
+        tw3 = int(draw.textlength(lines[2], font=f3))
+        if y3 + _text_h(draw, lines[2], f3) < mid_y:
+            draw.text((W//2-tw3//2, y3), lines[2], font=f3, fill=a2)
+    for offset in [60, 68, 76]:
+        draw.line([(offset, bar_h), (offset, H - bar_h)], fill=a1, width=1)
+        draw.line([(W - offset, bar_h), (W - offset, H - bar_h)], fill=a2, width=1)
+    return img
+
+
+# ── LAYOUT: grid ──────────────────────────────────────────────────────────────
+def _layout_grid(W, H, lines, st):
+    a1, a2 = st["accent1"], st["accent2"]
+    img = Image.new("RGB", (W, H), (0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    for x in range(0, W, 60):
+        draw.line([(x, 0), (x, H)], fill=(12, 12, 18), width=1)
+    for y in range(0, H, 60):
+        draw.line([(0, y), (W, y)], fill=(12, 12, 18), width=1)
+    _gradient(draw, W, H, st["left_bg"], (0, 0, 0))
+    img = _radial_glow(img, 200, H // 2, 550, a1, 0.35)
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, 20, H], fill=a1)
+    draw.rectangle([0, 0, W // 2 + 20, 6], fill=a1)
+    ef = _fnt(22)
+    ew = int(draw.textlength(st["label"], font=ef))
+    draw.rectangle([30, 18, ew + 58, 54], fill=a1)
+    draw.text((38, 22), st["label"], font=ef, fill=(0, 0, 0))
+    # Left text zone: x=30..gx-10
+    max_w_g = W // 2 - 30
+    f1 = _auto_font(draw, lines[0], max_w_g, 90)
+    f2 = _auto_font(draw, lines[1], max_w_g, 68)
+    f3 = _auto_font(draw, lines[2], max_w_g, 46, False) if lines[2] else None
+    GAP = 14
+    h1 = _text_h(draw, lines[0], f1)
+    h2 = _text_h(draw, lines[1], f2)
+    total_h = h1 + GAP + h2 + 9 + (GAP + _text_h(draw, lines[2], f3) if f3 else 0)
+    y1 = _block_top(total_h, 60, H - 72)
+    for ox, oy in [(-2,0),(2,0)]:
+        draw.text((30+ox, y1+oy), lines[0], font=f1, fill=tuple(c//3 for c in a1))
+    draw.text((30, y1), lines[0], font=f1, fill=a1)
+    y2 = y1 + h1 + GAP
+    draw.text((30, y2), lines[1], font=f2, fill=(230,230,230))
+    draw.rectangle([30, y2+h2+4, 30+int(draw.textlength(lines[1],font=f2)), y2+h2+9], fill=a2)
+    if f3:
+        y3 = y2 + h2 + 9 + GAP
+        draw.text((30, y3), lines[2], font=f3, fill=(155,165,175))
+    gx = W // 2 + 30
+    gy = 20
+    gw = W - gx - 30
+    for i, (val, lbl_text, col) in enumerate(st.get("stats", [])):
+        card_h = (H - 100) // 3 - 8
+        cy_card = gy + i * (card_h + 10)
+        cr, cg, cb = col
+        draw.rectangle([gx, cy_card, gx + gw, cy_card + card_h],
+                       fill=(max(0, cr // 9), max(0, cg // 9), max(0, cb // 9 + 6)))
+        draw.rectangle([gx, cy_card, gx + 10, cy_card + card_h], fill=col)
+        vf = _fnt(int(card_h * 0.60))
+        draw.text((gx + 22, cy_card + 4), val, font=vf, fill=col)
+        draw.text((gx + 22, cy_card + card_h - 26), lbl_text, font=_fnt(16, False), fill=(155, 170, 185))
+    _brand_bar(draw, W, H, a1, a2, st["label"])
+    _corners(draw, a1, a2)
+    return img
+
+
+# ── LAYOUT: bold ──────────────────────────────────────────────────────────────
+def _layout_bold(W, H, lines, st):
+    a1, a2 = st["accent1"], st["accent2"]
+    img = Image.new("RGB", (W, H), (0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    tri_pts = [(W // 2, 0), (W, 0), (W, H), (W // 2 + 80, H)]
+    draw.polygon(tri_pts, fill=tuple(c // 5 for c in a1))
+    for i in range(12):
+        x_start = W // 2 - 40 + i * 30
+        draw.line([(x_start, 0), (x_start + 200, H)], fill=tuple(c // 3 for c in a1), width=2)
+    img = _radial_glow(img, W // 4, H // 2, 580, a1, 0.42)
+    img = _radial_glow(img, W - 100, H // 4, 400, a2, 0.30)
+    draw = ImageDraw.Draw(img)
+    for i, w in enumerate([20, 6, 3]):
+        x = [0, 28, 40][i]
+        draw.rectangle([x, 0, x + w, H], fill=a1 if i == 0 else tuple(c // 2 for c in a1))
+    draw.rectangle([0, 0, W, 58], fill=(0, 0, 0))
+    draw.rectangle([0, 55, W, 58], fill=a1)
+    draw.text((54, 15), f"EVCARIX  |  {st['label']} SERIES", font=_fnt(24), fill=(200, 200, 200))
+    # Left text zone: x=50..W//2
+    max_w_b = W // 2 - 20
+    f1 = _auto_font(draw, lines[0], max_w_b, 95)
+    f2 = _auto_font(draw, lines[1], max_w_b, 68)
+    f3 = _auto_font(draw, lines[2], max_w_b, 50, False) if lines[2] else None
+    GAP = 14
+    h1 = _text_h(draw, lines[0], f1)
+    h2 = _text_h(draw, lines[1], f2)
+    total_h = h1 + GAP + h2 + (GAP + _text_h(draw, lines[2], f3) if f3 else 0)
+    y1 = _block_top(total_h, 70, H - 72)
+    draw.text((50, y1+4), lines[0], font=f1, fill=tuple(c//5 for c in a1))
+    draw.text((50, y1), lines[0], font=f1, fill=(255,255,255))
+    y2 = y1 + h1 + GAP
+    draw.text((50, y2), lines[1], font=f2, fill=a1)
+    lw2 = int(draw.textlength(lines[1], font=f2))
+    draw.rectangle([50, y2+h2+4, 50+lw2, y2+h2+11], fill=a2)
+    if f3:
+        y3 = y2 + h2 + GAP
+        draw.text((50, y3), lines[2], font=f3, fill=(170,180,190))
+    # Big stat — strictly right half
+    big_val = st["stats"][0][0] if st.get("stats") else st["icon"]
+    big_zone_w = W // 2 - 30
+    big_f = _auto_font(draw, big_val, big_zone_w, 200)
+    bw_px = int(draw.textlength(big_val, font=big_f))
+    bx = W - bw_px - 40
+    by = int(H * 0.12)
+    draw.text((bx+4, by+4), big_val, font=big_f, fill=tuple(c//6 for c in a2))
+    draw.text((bx, by), big_val, font=big_f, fill=a2)
+    if st.get("stats"):
+        desc = st["stats"][0][1]
+        sf = _fnt(20, False)
+        sw_px = int(draw.textlength(desc, font=sf))
+        draw.text((W-sw_px-40, by+_text_h(draw,big_val,big_f)+8), desc, font=sf, fill=(120,130,140))
     _brand_bar(draw, W, H, a1, a2, st["label"])
     _corners(draw, a1, a2)
     return img
@@ -478,15 +925,19 @@ class ThumbnailGenerator:
 
         lines = _split_title(title)
 
-        try:
-            if layout == "split":
-                img = _layout_split(W, H, lines, st)
-            elif layout == "versus":
-                img = _layout_versus(W, H, lines, st)
-            elif layout == "shock":
-                img = _layout_shock(W, H, lines, st)
-            else:
-                img = _layout_data(W, H, lines, st)
+            dispatch = {
+                "split":     _layout_split,
+                "versus":    _layout_versus,
+                "shock":     _layout_shock,
+                "data":      _layout_data,
+                "neon":      _layout_neon,
+                "minimal":   _layout_minimal,
+                "alert":     _layout_alert,
+                "cinematic": _layout_cinematic,
+                "grid":      _layout_grid,
+                "bold":      _layout_bold,
+            }
+            img = dispatch[layout](W, H, lines, st)
 
             if not output_path:
                 safe_t = re.sub(r"[^\w]", "_", title[:30])
