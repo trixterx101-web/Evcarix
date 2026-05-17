@@ -98,7 +98,10 @@ def _draw_frame(topic: str, speaking_text: str, W: int, H: int,
 
     # ── LEFT: NOW SPEAKING + animated text ───────────────────────────────────
     label_fnt = _fnt(18, bold=True)
-    draw.text((48, 12), "NOW SPEAKING", font=label_fnt,
+    # Center "NOW SPEAKING" label in left panel
+    lbl_w = int(draw.textlength("NOW SPEAKING", font=label_fnt))
+    lbl_x = (left_w - lbl_w) // 2
+    draw.text((lbl_x, 12), "NOW SPEAKING", font=label_fnt,
               fill=tuple(max(0, int(c * 0.55)) for c in acc_rgb))
 
     lines    = textwrap.wrap(speaking_text, width=14)[:3]
@@ -109,8 +112,11 @@ def _draw_frame(topic: str, speaking_text: str, W: int, H: int,
 
     for i, line in enumerate(lines):
         y = y_text + i * line_gap
-        draw.text((48, y + 2), line, font=text_fnt, fill=(0, 0, 0))   # shadow
-        draw.text((46, y),     line, font=text_fnt, fill=(255, 255, 255))
+        # Center each line in left panel
+        lw = int(draw.textlength(line, font=text_fnt))
+        lx = max(8, (left_w - lw) // 2)
+        draw.text((lx + 2, y + 2), line, font=text_fnt, fill=(0, 0, 0))   # shadow
+        draw.text((lx, y),         line, font=text_fnt, fill=(255, 255, 255))
 
     # Subtle vertical divider
     mid_y = body_h // 2
