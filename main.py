@@ -6,10 +6,8 @@ import random
 import asyncio
 from dotenv import load_dotenv
 
-# ABSOLUTE TOP LEVEL PRINT - Hiçbir kütüphane yüklenmeden önce
 print(">>> [SYSTEM] Python interpreter started main.py v2", flush=True)
 
-# Add project root to sys.path for robust imports
 project_root = os.path.dirname(os.path.abspath(__file__))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -17,11 +15,9 @@ if project_root not in sys.path:
 load_dotenv()
 
 def log(message: str) -> None:
-    """Flush-guaranteed print helper used throughout the orchestrator."""
     print(message, flush=True)
 
 def safe_path(path, label="file") -> str:
-    """Path'in None olmadığını ve dosyanın var olduğunu doğrular."""
     if path is None:
         raise ValueError(f"[Main] {label} path is None")
     if not os.path.exists(path):
@@ -89,33 +85,10 @@ class EvcarixOrchestrator:
                 log("[Uploader] ⚠️ UYARI: Video üretilecek ancak otomatik yükleme yapılmayacak.")
                 self.uploader = None
 
-    def _upload_thumbnail(self, video_id: str, title: str, topic: str,
-                          thumb_path: str = None, is_short: bool = False) -> None:
-        """Thumbnail üretir ve YouTube'a yükler. Hata olursa sessizce geçer."""
-        if not video_id:
-            return
-        try:
-            from src.thumbnail_generator import ThumbnailGenerator
-            tg = ThumbnailGenerator()
-            if not thumb_path or not os.path.exists(thumb_path):
-                out_dir = "output"
-                os.makedirs(out_dir, exist_ok=True)
-                thumb_path = os.path.join(out_dir, f"thumbnail_{video_id}.jpg")
-                tg.create(title=title, topic=topic, output_path=thumb_path, is_short=is_short)
-            if os.path.exists(thumb_path) and self.uploader and self.uploader.youtube:
-                self.uploader.youtube.thumbnails().set(
-                    videoId=video_id,
-                    media_body=thumb_path
-                ).execute()
-                log(f"      ✅ Thumbnail yüklendi: {thumb_path}")
-        except Exception as e:
-            log(f"      ⚠️ Thumbnail yükleme atlandı: {e}")
-
     async def run_daily_shorts_workflow(self):
-        # ── Zaman damgası & slot bilgisi ──────────────────────────
-        now = datetime.datetime.now()
+        now  = datetime.datetime.now()
         slot = os.getenv("UPLOAD_SLOT", "evening")
-        ts = now.strftime("%Y%m%d_%H%M%S")
+        ts   = now.strftime("%Y%m%d_%H%M%S")
 
         target_duration = random.randint(self.config_module.SHORT_VIDEO_DURATION_MIN, self.config_module.SHORT_VIDEO_DURATION_MAX)
         clip_count = max(6, math.ceil(target_duration / 4))
@@ -126,11 +99,10 @@ class EvcarixOrchestrator:
         print(f"  Slot: {slot.upper()}", flush=True)
         print(f"{'='*60}\n", flush=True)
 
-        # ── 1. Plan ───────────────────────────────────────────────
         content_mode = os.getenv("CONTENT_MODE", "auto")
         slot = os.getenv("UPLOAD_SLOT", "evening")
         
-        plan = self.brain.create_daily_plan(slot=slot, video_type="short")
+        plan        = self.brain.create_daily_plan(slot=slot, video_type="short")
         script      = plan['script']
         topic       = plan['topic']
         full_topic  = plan['full_topic']
@@ -148,7 +120,6 @@ class EvcarixOrchestrator:
         print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}", flush=True)
         print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}", flush=True)
 
-        # ── Lip-Sync Mode Check ───────────────────────────────────────
         if self.use_lip_sync and os.path.exists(self.character_image):
             print(f"\n⚡ Lip-Sync Mode aktif - Karakter konuşan video oluşturuluyor...", flush=True)
             print(f"      Karakter: {self.character_image}", flush=True)
@@ -176,11 +147,22 @@ class EvcarixOrchestrator:
                             playlist_name="Short Video",
                             thumbnail_path=thumbnail_path if os.path.exists(thumbnail_path) else None
                         )
-                        log(f"      ✅ Yüklendi! Video ID: {video_id}")
-                        log(f"      🔗 https://www.youtube.com/watch?v={video_id}")
-                        # ── Thumbnail yükle ──────────────────────────────────
-                        self._upload_thumbnail(video_id, title, topic,
-                                               thumb_path=thumbnail_path, is_short=True)
+                        print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
+                        print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
+
+                        # ── OTOMATİK THUMBNAIL (Lip-Sync) ──────────────
+                        try:
+                            from src.thumbnail_generator import generate_and_upload
+                            topic_key = plan.get("topic_key", "electric_vehicle")
+                            generate_and_upload(
+                                video_id=video_id,
+                                title=title,
+                                topic=topic_key
+                            )
+                        except Exception as te:
+                            print(f"      ⚠️ Thumbnail hatası: {te}", flush=True)
+                        # ───────────────────────────────────────────────
+
                     except Exception as e:
                         print(f"      ❌ YouTube yükleme hatası: {e}")
                 
@@ -190,14 +172,13 @@ class EvcarixOrchestrator:
                 print(f"{'='*60}\n")
                 return
 
-        # ── 2. Medya Toplama ─────────────────────────────────────
         print("\n[2/6] Footage toplanıyor (YouTube CC / Pexels)...", flush=True)
         cat_map = {
             "battery": "battery_tech", "electric": "electric_vehicle", "ev": "electric_vehicle",
             "ai": "artificial_intelligence", "neural": "artificial_intelligence",
             "robot": "robotics", "future": "future_tech", "quantum": "future_tech"
         }
-        topic_key = "default"
+        topic_key = "electric_vehicle"
         for k, v in cat_map.items():
             if k in full_topic.lower():
                 topic_key = v
@@ -212,9 +193,7 @@ class EvcarixOrchestrator:
             top_video = f"assets/footage/fallback_{ts}.mp4"
             os.makedirs("assets/footage", exist_ok=True)
             generate_fallback_video(30, topic, top_video)
-            top_video_list = [top_video]
 
-        # ── 3. Ses Üretimi ────────────────────────────────────────
         print("\n[3/6] Ses üretiliyor...", flush=True)
         audio_output = f"assets/audio/{ts}.mp3"
         voice_data = await self.media_engine.voice_engine.generate_voice(
@@ -233,7 +212,6 @@ class EvcarixOrchestrator:
         duration = audio_clip.duration
         audio_clip.close()
 
-        # ── 4. Alt Panel & Montaj ─────────────────────────────────
         print("\n[4/6] Split-Screen Video üretiliyor (3D Panel + Subtitles)...", flush=True)
         
         from src.bottom_panel import generate_bottom_panel
@@ -258,7 +236,7 @@ class EvcarixOrchestrator:
             title=script,
         )
 
-        output_filename = f"evcarix_shorts_{ts}.mp4"
+        output_filename  = f"evcarix_shorts_{ts}.mp4"
         final_video_path = self.compositor.compose_split_screen(
             top_video=top_assembled,
             bottom_panel=bottom_res,
@@ -271,27 +249,9 @@ class EvcarixOrchestrator:
             raise RuntimeError(f"[Main] Montaj çıktısı bulunamadı.")
         print(f"      ✅ Split-Screen Video hazır: {final_video_path}", flush=True)
 
-        # ── 5. Thumbnail ──────────────────────────────────────────
-        print("\n[5/6] Thumbnail üretiliyor...", flush=True)
-        thumbnail_path = None
-        try:
-            from src.thumbnail_generator import ThumbnailGenerator
-            tg = ThumbnailGenerator()
-            thumb_out = os.path.join("output", f"thumbnail_{ts}.jpg")
-            os.makedirs("output", exist_ok=True)
-            thumbnail_path = tg.create(
-                title=title, topic=topic_key,
-                output_path=thumb_out, is_short=True
-            )
-            if thumbnail_path and os.path.exists(thumbnail_path):
-                print(f"      ✅ Thumbnail hazır: {thumbnail_path}", flush=True)
-            else:
-                thumbnail_path = None
-        except Exception as e:
-            print(f"      ⚠️ Thumbnail hatası: {e}", flush=True)
-            thumbnail_path = None
+        print("\n[5/6] Thumbnail atlanıyor...", flush=True)
 
-        # ── 6. YouTube Yükleme ────────────────────────────────────
+        # ── 6. YouTube Yükleme ─────────────────────────────────────
         if self.uploader and self.uploader.youtube and os.path.exists(final_video_path):
             print("\n[6/6] YouTube'a yükleniyor...", flush=True)
             try:
@@ -301,13 +261,28 @@ class EvcarixOrchestrator:
                     description=description,
                     tags=tags,
                     playlist_name="Short Video",
-                    thumbnail_path=None   # upload_video'ya verme, aşağıda ayrıca yüklüyoruz
+                    thumbnail_path=None
                 )
-                log(f"      ✅ Yüklendi! Video ID: {video_id}")
-                log(f"      🔗 https://www.youtube.com/watch?v={video_id}")
-                # ── Thumbnail YouTube'a yükle ────────────────────────
-                self._upload_thumbnail(video_id, title, topic_key,
-                                       thumb_path=thumbnail_path, is_short=True)
+                print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
+                print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
+
+                # ── OTOMATİK THUMBNAIL ─────────────────────────────
+                try:
+                    from src.thumbnail_generator import generate_and_upload
+                    print("      🎨 Thumbnail üretiliyor ve yükleniyor...", flush=True)
+                    success = generate_and_upload(
+                        video_id=video_id,
+                        title=title,
+                        topic=topic_key
+                    )
+                    if success:
+                        print("      ✅ Thumbnail YouTube'a yüklendi!", flush=True)
+                    else:
+                        print("      ⚠️ Thumbnail yüklenemedi.", flush=True)
+                except Exception as te:
+                    print(f"      ⚠️ Thumbnail hatası (video yüklendi): {te}", flush=True)
+                # ───────────────────────────────────────────────────
+
             except Exception as e:
                 print(f"      ❌ YouTube yükleme hatası: {e}", flush=True)
                 if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
@@ -322,12 +297,11 @@ class EvcarixOrchestrator:
         print(f"{'='*60}\n")
 
     async def run_weekly_long_video_workflow(self):
-        """Haftalık uzun formatlı video (1920x1080, 4-6 dakika) pipeline."""
         import gc
 
-        now = datetime.datetime.now()
+        now  = datetime.datetime.now()
         slot = "SUNDAY_LONG"
-        ts = now.strftime("%Y%m%d_%H%M%S")
+        ts   = now.strftime("%Y%m%d_%H%M%S")
 
         target_duration = random.randint(self.config_module.LONG_VIDEO_DURATION_MIN, self.config_module.LONG_VIDEO_DURATION_MAX)
         clip_count = math.ceil(target_duration / 5)
@@ -338,9 +312,8 @@ class EvcarixOrchestrator:
         print(f"  Slot: {slot}", flush=True)
         print(f"{'='*60}\n", flush=True)
 
-        # ── 1. Plan ───────────────────────────────────────────────
         print("\n[1/7] Long-form plan oluşturuluyor...", flush=True)
-        plan = self.brain.create_daily_plan(slot=slot, video_type="long")
+        plan        = self.brain.create_daily_plan(slot=slot, video_type="long")
         script      = plan['script']
         topic       = plan['topic']
         full_topic  = plan['full_topic']
@@ -351,14 +324,13 @@ class EvcarixOrchestrator:
         print(f"      Konu  : {full_topic.encode('ascii', 'ignore').decode('ascii')}", flush=True)
         print(f"      Başlık: {title.encode('ascii', 'ignore').decode('ascii')}")
 
-        # ── 2. Medya Toplama ─────────────────────────────────────
         print(f"\n[2/7] Footage toplanıyor (16:9 CC / Pexels)...", flush=True)
         cat_map = {
             "battery": "battery_tech", "electric": "electric_vehicle", "ev": "electric_vehicle",
             "ai": "artificial_intelligence", "neural": "artificial_intelligence",
             "robot": "robotics", "future": "future_tech", "quantum": "future_tech"
         }
-        topic_key = "default"
+        topic_key = "electric_vehicle"
         for k, v in cat_map.items():
             if k in full_topic.lower():
                 topic_key = v
@@ -372,9 +344,7 @@ class EvcarixOrchestrator:
             from src.utils.fallback import generate_fallback_video
             top_video = f"assets/footage/fallback_long_{ts}.mp4"
             generate_fallback_video(60, topic, top_video)
-            top_video_list = [top_video]
 
-        # ── 3. Ses Üretimi ────────────────────────────────────────
         print("\n[3/7] Uzun format ses üretiliyor...", flush=True)
         audio_output = f"assets/audio/long_{ts}.mp3"
         voice_data = await self.media_engine.voice_engine.generate_voice(
@@ -389,11 +359,10 @@ class EvcarixOrchestrator:
         duration = audio_clip.duration
         audio_clip.close()
 
-        # ── 4. Tam 16:9 Video (multi-clip + altyazı, yan panel yok) ──
         print("\n[4/7] Full 16:9 Video üretiliyor (multi-clip + altyazı)...", flush=True)
         gc.collect()
 
-        output_filename = f"evcarix_weekly_{ts}.mp4"
+        output_filename  = f"evcarix_weekly_{ts}.mp4"
         final_video_path = os.path.join("output", output_filename)
         os.makedirs("output", exist_ok=True)
 
@@ -409,45 +378,12 @@ class EvcarixOrchestrator:
         print(f"      ✅ Video hazır: {final_video_path}", flush=True)
         gc.collect()
 
-        # ── 5. Thumbnail ──────────────────────────────────────────
-        print("\n[5/7] Thumbnail üretiliyor (1280x720 professional)...", flush=True)
+        print("\n[5/7] Thumbnail üretiliyor...", flush=True)
         thumbnail_path = None
-        try:
-            from src.thumbnail_generator import ThumbnailGenerator
-            import re as _re
-            tg = ThumbnailGenerator()
-            thumb_out = os.path.join("output", f"thumbnail_{ts}.jpg")
-            _stat = ""
-            for _pat in [r'(\d+%)', r'(\d+V)', r'(\d+KM)', r'(\d+K)', r'(\$\d+[K]?)', r'(\d+YR)']:
-                _m = _re.search(_pat, title.upper())
-                if _m:
-                    _stat = _m.group(1)
-                    break
-            if not _stat and "?" in title:
-                _stat = "FACT?"
-            elif not _stat:
-                _stat = "DATA"
-            thumbnail_path = tg.create(
-                title=title,
-                topic=topic_key,
-                stat=_stat,
-                category=plan.get('category', 'default'),
-                output_path=thumb_out,
-                is_short=False
-            )
-            if thumbnail_path and os.path.exists(thumbnail_path):
-                print(f"      ✅ Thumbnail hazır: {thumbnail_path}", flush=True)
-            else:
-                thumbnail_path = None
-                print("      ⚠️ Thumbnail üretilemedi, atlanıyor.", flush=True)
-        except Exception as e:
-            print(f"      ⚠️ Thumbnail hatası: {e}", flush=True)
-            thumbnail_path = None
 
-        # ── 6. Chapters & SEO ────────────────────────────────────
-        # description içinde timestamp'ler writer.py tarafından ekleniyor
+        print("\n[6/7] SEO hazır.", flush=True)
 
-        # ── 7. YouTube Yükleme ────────────────────────────────────
+        # ── 7. YouTube Yükleme ─────────────────────────────────────
         if self.uploader and self.uploader.youtube and os.path.exists(final_video_path):
             print("\n[7/7] YouTube'a yükleniyor (Long-form)...", flush=True)
             try:
@@ -457,13 +393,28 @@ class EvcarixOrchestrator:
                     description=description,
                     tags=tags,
                     playlist_name="EV Data Reports",
-                    thumbnail_path=None   # aşağıda ayrıca yüklüyoruz
+                    thumbnail_path=None
                 )
-                log(f"      ✅ Yüklendi! Video ID: {video_id}")
-                log(f"      🔗 https://www.youtube.com/watch?v={video_id}")
-                # ── Thumbnail YouTube'a yükle ────────────────────────
-                self._upload_thumbnail(video_id, title, topic_key,
-                                       thumb_path=thumbnail_path, is_short=False)
+                print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
+                print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
+
+                # ── OTOMATİK THUMBNAIL (Long Video) ───────────────
+                try:
+                    from src.thumbnail_generator import generate_and_upload
+                    print("      🎨 Thumbnail üretiliyor ve yükleniyor...", flush=True)
+                    success = generate_and_upload(
+                        video_id=video_id,
+                        title=title,
+                        topic=topic_key
+                    )
+                    if success:
+                        print("      ✅ Thumbnail YouTube'a yüklendi!", flush=True)
+                    else:
+                        print("      ⚠️ Thumbnail yüklenemedi.", flush=True)
+                except Exception as te:
+                    print(f"      ⚠️ Thumbnail hatası (video yüklendi): {te}", flush=True)
+                # ───────────────────────────────────────────────────
+
             except Exception as e:
                 print(f"      ❌ YouTube yükleme hatası: {e}", flush=True)
                 if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
@@ -482,10 +433,9 @@ class EvcarixOrchestrator:
 if __name__ == "__main__":
     orchestrator = EvcarixOrchestrator()
     
-    video_type = os.environ.get("VIDEO_TYPE", "short").strip().lower()
+    video_type  = os.environ.get("VIDEO_TYPE", "short").strip().lower()
     upload_slot = os.environ.get("UPLOAD_SLOT", "evening").strip()
-
-    is_long = video_type == "long" or upload_slot == "SUNDAY_LONG"
+    is_long     = video_type == "long" or upload_slot == "SUNDAY_LONG"
 
     try:
         if is_long:
