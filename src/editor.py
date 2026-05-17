@@ -1,315 +1,347 @@
 import os
-import re
 import json
-import subprocess
-import logging
+import random
+import datetime
+import pandas as pd
+from src.trend_engine import TrendEngine
+from src.writer import CreativeWriter
 
-logger = logging.getLogger("Editor")
+try:
+    from src.content_discovery import ContentDiscovery
+    _discovery = ContentDiscovery()
+except Exception as e:
+    print(f"[Brain] ContentDiscovery yüklenemedi: {e}")
+    _discovery = None
+
+HISTORY_FILE = "used_topics.json"
+HISTORY_LIMIT = 100
+
+MANUAL_MODE_TOPICS = {
+    "electric vehicles":      ["Future of electric vehicles", "EV adoption trends", "Electric car technology 2026", "Best electric vehicles 2026"],
+    "artificial intelligence":["AI in electric vehicles", "Machine learning for EVs", "AI autonomous driving", "Neural networks in cars"],
+    "robotics":               ["Robot electric vehicles", "Autonomous EV robots", "Future robotics transport", "Self-driving robot cars"],
+    "new technologies":       ["New EV technology 2026", "Future car innovations", "Next gen electric vehicles", "EV tech breakthroughs"],
+    "battery systems":        ["EV battery technology", "Solid state battery EVs", "Battery range improvement", "Lithium battery future"],
+    "smart cities":           ["Smart city EV charging", "Urban electric transport", "City EV infrastructure", "Smart grid electric cars"],
+    "devices of the future":  ["Future EV devices", "Next gen car technology", "Smart EV gadgets 2026", "Electric vehicle innovation"],
+}
+
+# ── Profesyonel başlık formülleri ─────────────────────────────
+TITLE_FORMULAS = [
+    "Nobody Is Talking About This {topic} Secret in 2026",
+    "Your {topic} Is Lying to You — Here's the Real Data",
+    "I Tested {topic} for 30 Days — The Results Are Shocking",
+    "Why Every {topic} Expert Is Wrong About This",
+    "The {topic} Truth They Don't Want You to Know",
+    "{topic}: The 2026 Data That Changes Everything",
+    "Warning: What {topic} Really Costs in 2026",
+    "This {topic} Mistake Is Costing You Thousands",
+    "The Real Reason {topic} Is Better Than You Think",
+    "What Happens When You Push {topic} to Its Limit",
+    "{topic} vs Reality: We Ran the Numbers",
+    "Why {topic} Will Look Different in 12 Months",
+    "The {topic} Breakdown Nobody Shows You",
+    "Is {topic} Worth It? 2026 Data Answers",
+    "We Ranked Every {topic} — The Winner Shocked Us",
+]
+
+# ── Konu → Anahtar kelime eşleştirmesi ───────────────────────
+TOPIC_KEYWORDS = {
+    "battery":          ["EV Battery", "Battery Pack", "Battery Tech"],
+    "charge":           ["EV Charging", "Fast Charging", "Charging Speed"],
+    "range":            ["EV Range", "Range Loss", "Real Range"],
+    "winter":           ["Winter EV", "Cold Weather", "Winter Range"],
+    "heat pump":        ["Heat Pump", "EV Heating", "Winter Efficiency"],
+    "lfp":              ["LFP Battery", "LFP vs NMC", "Iron Battery"],
+    "solid state":      ["Solid State Battery", "Next Gen Battery", "Future Battery"],
+    "tesla":            ["Tesla", "Tesla Model", "Tesla vs"],
+    "byd":              ["BYD", "BYD vs Tesla", "Chinese EV"],
+    "autonomous":       ["Self Driving", "Autonomous EV", "FSD"],
+    "motor":            ["EV Motor", "Electric Motor", "Motor Tech"],
+    "v2g":              ["V2G Charging", "Bi-Directional", "Vehicle to Grid"],
+    "thermal":          ["Thermal Management", "Battery Cooling", "EV Heat"],
+    "degradation":      ["Battery Degradation", "Battery Health", "Cell Aging"],
+    "400v":             ["400V vs 800V", "Charging Architecture", "Voltage System"],
+    "800v":             ["800V EV", "Ultra Fast Charging", "High Voltage EV"],
+    "ai":               ["AI in EV", "Machine Learning", "Neural Network"],
+    "robot":            ["Robotics", "Autonomous Robot", "EV Robot"],
+    "future":           ["Future Tech", "EV Future", "Next Gen EV"],
+    "cost":             ["EV Cost", "EV Price", "Total Cost"],
+    "efficiency":       ["EV Efficiency", "Energy Use", "Real MPGe"],
+}
 
 
-def _get_word_timings_whisper(audio_path: str) -> list:
+def _improve_title_with_gemini(topic: str, raw_title: str) -> str:
     """
-    Whisper ile ses dosyasını analiz et, her kelimenin
-    başlangıç ve bitiş zamanını döndür.
-    Returns: [{"word": "HELLO", "start": 0.0, "end": 0.5}, ...]
+    Gemini ile başlığı profesyonel formüle göre iyileştir.
+    raw_title zayıfsa Gemini yeniden üretir.
     """
     try:
-        import whisper
-        model = whisper.load_model("tiny")  # En hızlı model
-        result = model.transcribe(
-            audio_path,
-            word_timestamps=True,
-            language="en"
-        )
+        import google.generativeai as genai
 
-        timings = []
-        for segment in result.get("segments", []):
-            for word_data in segment.get("words", []):
-                word  = word_data.get("word", "").strip().upper()
-                start = float(word_data.get("start", 0))
-                end   = float(word_data.get("end", 0))
-                if word:
-                    timings.append({
-                        "word":  word,
-                        "start": round(start, 3),
-                        "end":   round(end, 3)
-                    })
+        keys = [k for k in [
+            os.getenv("GEMINI_API_KEY"),
+            os.getenv("GEMINI_API_KEY_2"),
+            os.getenv("GEMINI_API_KEY_3"),
+            os.getenv("GEMINI_API_KEY_4"),
+            os.getenv("GEMINI_API_KEY_5"),
+        ] if k]
 
-        logger.info(f"[Editor] Whisper: {len(timings)} kelime zamanlandı")
-        return timings
+        if not keys:
+            return raw_title
 
-    except ImportError:
-        logger.warning("[Editor] Whisper kurulu değil, pip install openai-whisper")
-        return []
+        prompt = f"""You are a YouTube title expert for the channel "Evcarix" covering EV, AI, Battery, Robotics, Future Tech.
+
+Topic: {topic}
+Current title: {raw_title}
+
+Generate ONE viral YouTube title following these rules:
+1. Maximum 70 characters
+2. Creates curiosity or shock
+3. Contains a specific number, fact, or question when possible
+4. No clickbait lies — must be relevant to topic
+5. English only
+6. Use one of these proven formulas:
+   - "Nobody Is Talking About [X] — But They Should Be"
+   - "I Tested [X] — The Results Are Shocking"
+   - "Why [X] Will Change Everything in 2026"
+   - "The [X] Truth That Nobody Shows You"
+   - "[Number] [X] Facts That Will Blow Your Mind"
+   - "Warning: What [X] Really Does to Your [Y]"
+   - "[X] vs Reality: The 2026 Data"
+
+Return ONLY the title. No quotes. No explanation."""
+
+        # Tüm key'leri dene, quota aşılırsa sıradakine geç
+        response = None
+        for key in keys:
+            try:
+                genai.configure(api_key=key)
+                model    = genai.GenerativeModel("gemini-2.0-flash-lite")
+                response = model.generate_content(prompt)
+                break  # Başarılıysa dur
+            except Exception as key_err:
+                err_str = str(key_err)
+                if "429" in err_str or "quota" in err_str.lower():
+                    print(f"[Brain] Key kota aşıldı, sıradaki deneniyor...")
+                    continue
+                raise key_err
+
+        if not response:
+            return raw_title
+
+        new_title = response.text.strip().strip('"').strip("'")
+
+        # Kalite kontrolü
+        if len(new_title) < 20 or len(new_title) > 100:
+            return raw_title
+        if new_title.lower() == raw_title.lower():
+            return raw_title
+
+        print(f"[Brain] 📝 Başlık iyileştirildi: {new_title}")
+        return new_title
+
     except Exception as e:
-        logger.warning(f"[Editor] Whisper hatası: {e}")
+        print(f"[Brain] Başlık iyileştirme hatası: {e}")
+        return raw_title
+
+
+def _generate_fallback_title(topic: str) -> str:
+    """Gemini olmadan formül tabanlı güçlü başlık üret."""
+    topic_lower = topic.lower()
+
+    # Konu kelimesiyle eşleş
+    keyword = topic
+    for k, v in TOPIC_KEYWORDS.items():
+        if k in topic_lower:
+            keyword = random.choice(v)
+            break
+
+    formula = random.choice(TITLE_FORMULAS)
+    title = formula.replace("{topic}", keyword)
+    return title
+
+
+def _validate_title(title: str) -> bool:
+    """Başlığın kalite standartlarını karşılayıp karşılamadığını kontrol et."""
+    if not title:
+        return False
+    if len(title) < 15:
+        return False
+    if len(title) > 100:
+        return False
+
+    # Zayıf başlık kalıpları
+    weak_patterns = [
+        "ev tech:", "ev future:", "ev data:", "evcarix:",
+        "short:", "video:", "daily:", "update:"
+    ]
+    title_lower = title.lower()
+    for pattern in weak_patterns:
+        if title_lower.startswith(pattern):
+            return False
+
+    return True
+
+
+class EvcarixBrain:
+    def __init__(self):
+        self.trend_engine = TrendEngine()
+        self.writer = CreativeWriter()
+
+    def _load_history(self):
+        if os.path.exists(HISTORY_FILE):
+            try:
+                with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except:
+                return []
         return []
 
+    def _save_history(self, topic):
+        history = self._load_history()
+        history.append(topic)
+        if len(history) > HISTORY_LIMIT:
+            history = history[-HISTORY_LIMIT:]
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
 
-def _fallback_timings(text: str, duration: float) -> list:
-    """
-    Whisper yoksa eşit zaman dilimiyle fallback timing üret.
-    """
-    clean = re.sub(r"[^A-Z0-9 .,!?%\-']", "", text.upper()).strip()
-    words = clean.split()
-    if not words:
-        return []
+    def select_strategic_topic(self, video_type="short"):
+        content_mode = os.getenv("CONTENT_MODE", "auto").strip().lower()
+        print(f"[Brain] 📌 Content Mode: {content_mode}")
 
-    word_dur = duration / len(words)
-    timings  = []
-    for i, w in enumerate(words):
-        timings.append({
-            "word":  w,
-            "start": round(i * word_dur, 3),
-            "end":   round((i + 1) * word_dur - 0.04, 3)
-        })
-    return timings
+        # ── 1. Trend Modu ─────────────────────────────────────────
+        if content_mode == "trend" and video_type == "short":
+            try:
+                trend_plan = self.trend_engine.trigger_from_youtube_trend(hours_back=48)
+                if trend_plan:
+                    print(f"[Brain] 🔥 Trend modu aktif: {trend_plan['title']}")
+                    return trend_plan['full_topic'], trend_plan
+                else:
+                    print("[Brain] ⚠️ Trend bulunamadı, auto moda geçiliyor.")
+            except Exception as e:
+                print(f"[Brain] Trend hatası: {e}")
 
+        # ── 2. ContentDiscovery Modları ───────────────────────────
+        discovery_modes = ["educational", "scientific", "ev_news"]
+        if content_mode in discovery_modes and _discovery:
+            try:
+                topics = _discovery.discover(strategy=content_mode, limit=10)
+                if topics:
+                    chosen = random.choice(topics)
+                    topic_title = chosen.get("title", "Future of Electric Vehicles")
+                    print(f"[Brain] 🔍 ContentDiscovery ({content_mode}): {topic_title[:60]}")
+                    print(f"        Kaynak: {chosen.get('source', '?')}")
+                    _discovery.mark_used(topic_title)
+                    return topic_title, None
+                else:
+                    print(f"[Brain] ⚠️ ContentDiscovery ({content_mode}) boş döndü, auto moda geçiliyor.")
+            except Exception as e:
+                print(f"[Brain] ContentDiscovery hatası: {e}")
 
-class AutoEditor:
-    """
-    Assembles multiple clips with word-level subtitle burn-in.
-    Short (9:16): clips stacked, subtitles at bottom.
-    Long (16:9): clips stacked full-width, subtitles at bottom.
-    Whisper kullanarak ses ile tam senkron altyazı üretir.
-    """
+        # ── 3. Manuel Konu Modları ────────────────────────────────
+        if content_mode in MANUAL_MODE_TOPICS:
+            topic_list = MANUAL_MODE_TOPICS[content_mode]
+            history = self._load_history()
+            unused = [t for t in topic_list if t not in history]
+            topic = random.choice(unused if unused else topic_list)
+            print(f"[Brain] 🎯 Manuel mod ({content_mode}): {topic}")
+            return topic, None
 
-    def assemble(self, clips_paths, audio_path, output_path,
-                 is_short=True, title=None, topic=None, words_with_times=None):
+        # ── 4. Sıralı Havuz (Auto/Default) ───────────────────────
         try:
-            logger.info(f"[Editor] {len(clips_paths)} klip birleştiriliyor, short={is_short}")
+            csv_path = os.path.join("data", "topics.csv")
+            if not os.path.exists(csv_path):
+                print(f"[Brain] ❌ {csv_path} bulunamadı!")
+                return "Future of Electric Vehicles", None
 
-            duration = self._get_audio_duration(audio_path)
-            logger.info(f"[Editor] Ses süresi: {duration:.1f}s")
+            df = pd.read_csv(csv_path, on_bad_lines='skip')
+            if df.empty:
+                return "Future of Electric Vehicles", None
 
-            # Yeterli klip yoksa döngüye al
-            clip_dur = 6
-            needed   = max(1, int(duration / clip_dur) + 1)
-            if len(clips_paths) < needed:
-                clips_paths = (clips_paths * (needed // len(clips_paths) + 1))[:needed]
+            state_file = "sequential_state.json"
+            state = {"next_index": 0}
+            if os.path.exists(state_file):
+                try:
+                    with open(state_file, "r") as f:
+                        state = json.load(f)
+                except Exception as e:
+                    print(f"[Brain] State okuma hatası: {e}")
 
-            W, H = (1080, 1920) if is_short else (1920, 1080)
+            idx = state.get("next_index", 0)
+            if idx >= len(df):
+                print(f"[Brain] 🔄 Liste sonu ({len(df)}), başa dönülüyor.")
+                idx = 0
 
-            # ── Whisper ile kelime zamanlaması ────────────────────
-            if words_with_times:
-                # Dışarıdan geçirilmişse kullan
-                timings = words_with_times
-                logger.info(f"[Editor] Dışarıdan timing alındı: {len(timings)} kelime")
-            else:
-                logger.info("[Editor] Whisper ile timing analiz ediliyor...")
-                timings = _get_word_timings_whisper(audio_path)
-                if not timings:
-                    logger.info("[Editor] Whisper yok, fallback timing kullanılıyor")
-                    timings = _fallback_timings(title or "", duration)
+            selected = df.iloc[idx]
+            topic    = selected['topic']
+            category = selected.get('category_id', 'general')
 
-            # ── Altyazı filtreleri ────────────────────────────────
-            subtitle_filters = self._build_subtitles_from_timings(
-                timings, W, H, is_short
-            )
+            state["next_index"] = idx + 1
+            with open(state_file, "w") as f:
+                json.dump(state, f)
 
-            # ── Filter complex ────────────────────────────────────
-            inputs      = []
-            scale_parts = []
-            for i, clip in enumerate(clips_paths):
-                inputs += ["-i", os.path.abspath(clip)]
-                scale_parts.append(
-                    f"[{i}:v]trim=duration={clip_dur},setpts=PTS-STARTPTS,"
-                    f"scale={W}:{H}:force_original_aspect_ratio=increase,"
-                    f"crop={W}:{H},setsar=1,fps=24[v{i}]"
-                )
-
-            concat_inputs  = "".join(f"[v{i}]" for i in range(len(clips_paths)))
-
-            # Altyazıları gruplara böl — FFmpeg komutunu kısa tut
-            subtitle_chain = self._build_subtitle_chain(subtitle_filters)
-
-            if subtitle_chain:
-                fg = (
-                    ";".join(scale_parts) + ";" +
-                    concat_inputs +
-                    f"concat=n={len(clips_paths)}:v=1:a=0[concat];" +
-                    f"[concat]{subtitle_chain}[vout]"
-                )
-            else:
-                fg = (
-                    ";".join(scale_parts) + ";" +
-                    concat_inputs +
-                    f"concat=n={len(clips_paths)}:v=1:a=0[vout]"
-                )
-
-            temp_video = f"/tmp/temp_merged_{os.getpid()}.mp4"
-
-            # Pass 1: Video + altyazı
-            cmd_v = ["ffmpeg", "-y"] + inputs + [
-                "-filter_complex", fg,
-                "-map", "[vout]",
-                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-                "-pix_fmt", "yuv420p", "-threads", "2", "-an",
-                temp_video
-            ]
-            r = subprocess.run(cmd_v, capture_output=True, text=True, timeout=600)
-            if r.returncode != 0:
-                logger.error(f"[Editor] Pass 1 failed: {r.stderr[-400:]}")
-                # Fallback: altyazısız dene
-                return self._assemble_without_subtitles(
-                    clips_paths, audio_path, output_path,
-                    duration, clip_dur, W, H
-                )
-
-            # Pass 2: Ses ekle
-            cmd_a = [
-                "ffmpeg", "-y",
-                "-i", temp_video,
-                "-i", os.path.abspath(audio_path),
-                "-map", "0:v:0", "-map", "1:a:0",
-                "-c:v", "copy",
-                "-c:a", "aac", "-b:a", "192k",
-                "-t", str(round(duration, 3)),
-                "-shortest", output_path
-            ]
-            r2 = subprocess.run(cmd_a, capture_output=True, text=True, timeout=120)
-            if r2.returncode != 0:
-                logger.error(f"[Editor] Pass 2 failed: {r2.stderr[-400:]}")
-                return False
-
-            if os.path.exists(temp_video):
-                os.remove(temp_video)
-
-            logger.info(f"[Editor] ✅ Tamamlandı: {output_path}")
-            return output_path
+            print(f"[Brain] 🔄 Sıralı seçim: [{idx+1}/{len(df)}] ({category}) -> {topic}")
+            return topic, None
 
         except Exception as e:
-            logger.error(f"[Editor] Hata: {e}")
-            return False
+            import traceback
+            print(f"[Brain] ❌ Sıralı seçim hatası: {e}")
+            traceback.print_exc()
+            return "Future of Electric Vehicles", None
 
-    def _build_subtitles_from_timings(
-        self, timings: list, W: int, H: int, is_short: bool
-    ) -> list:
-        """
-        Whisper timing'e göre kelime kelime altyazı filtresi üret.
-        Her kelime tam konuşulduğu anda ekrana gelir.
-        """
-        if not timings:
-            return []
+    def create_daily_plan(self, slot="evening", video_type="short"):
+        topic, trend_plan = self.select_strategic_topic(video_type)
 
-        font_size  = 72 if is_short else 56
-        y_pos      = H - 200 if is_short else H - 130
-        box_h      = font_size + 20
-        box_y      = y_pos - 10
+        if trend_plan:
+            self._save_history(topic)
+            trend_plan['video_type'] = video_type
 
-        filters = []
-        for item in timings:
-            word  = item.get("word", "").strip()
-            t0    = item.get("start", 0)
-            t1    = item.get("end", 0)
+            # Trend başlığını da iyileştir
+            raw_title = trend_plan.get('title', topic)
+            if not _validate_title(raw_title):
+                trend_plan['title'] = _generate_fallback_title(topic)
+            else:
+                trend_plan['title'] = _improve_title_with_gemini(topic, raw_title)
 
-            if not word or t1 <= t0:
-                continue
+            return trend_plan
 
-            # Güvenli metin
-            safe = re.sub(r"[^A-Z0-9 .,!?%\-]", "", word.upper())
-            safe = safe[:20].strip()
-            safe = safe.replace("'", "").replace(":", "").replace("\\", "")
+        if video_type == "long":
+            print(f"[Brain] Haftalık Uzun Video üretiliyor: {topic}")
+            content = self.writer.generate_long_content(topic)
+        else:
+            print(f"[Brain] Günlük Shorts üretiliyor: {topic}")
+            content = self.writer.generate_short_content(topic)
 
-            if not safe:
-                continue
+        self._save_history(topic)
 
-            # Arka plan kutusu (okunabilirlik için)
-            filters.append(
-                f"drawbox="
-                f"x=(w-tw)/2-10:y={box_y}:w=tw+20:h={box_h}:"
-                f"color=black@0.6:t=fill:"
-                f"enable='between(t\\,{t0}\\,{t1})'"
-                f",drawtext=text='{safe}'"
-                f":fontsize={font_size}"
-                f":fontcolor=white"
-                f":x=(w-tw)/2:y={y_pos}"
-                f":shadowcolor=black@0.9:shadowx=3:shadowy=3"
-                f":enable='between(t\\,{t0}\\,{t1})'"
-            )
+        # ── Başlık Kalite Kontrol & İyileştirme ──────────────────
+        raw_title = content.get('title', topic)
+        print(f"[Brain] 📋 Ham başlık: {raw_title}")
 
-        return filters
+        if not _validate_title(raw_title):
+            # Zayıf başlık → formül tabanlı yeniden üret
+            print(f"[Brain] ⚠️ Zayıf başlık tespit edildi, yeniden üretiliyor...")
+            improved_title = _generate_fallback_title(topic)
+        else:
+            # İyi başlık → Gemini ile daha da iyileştir
+            improved_title = _improve_title_with_gemini(topic, raw_title)
 
-    def _build_subtitle_chain(self, filters: list) -> str:
-        """
-        Çok fazla drawtext tek komutta patlıyor.
-        Max 30 kelimelik gruplar halinde böl,
-        her grup ayrı bir overlay katmanı olarak uygula.
-        Toplam max 60 kelime göster (uzun video için yeterli).
-        """
-        if not filters:
-            return ""
+        content['title'] = improved_title
+        print(f"[Brain] ✅ Final başlık: {improved_title}")
 
-        # Max 60 filtre al (daha fazlası FFmpeg'i patlatır)
-        filters = filters[:60]
-        return ",".join(filters)
+        tags = content.get('tags', [])
+        if len(tags) > 30:
+            tags = tags[:30]
 
-    def _assemble_without_subtitles(
-        self, clips_paths, audio_path, output_path,
-        duration, clip_dur, W, H
-    ) -> str | bool:
-        """Altyazısız fallback assembly."""
-        logger.info("[Editor] Fallback: altyazısız montaj yapılıyor")
-        try:
-            inputs      = []
-            scale_parts = []
-            for i, clip in enumerate(clips_paths):
-                inputs += ["-i", os.path.abspath(clip)]
-                scale_parts.append(
-                    f"[{i}:v]trim=duration={clip_dur},setpts=PTS-STARTPTS,"
-                    f"scale={W}:{H}:force_original_aspect_ratio=increase,"
-                    f"crop={W}:{H},setsar=1,fps=24[v{i}]"
-                )
-
-            concat_inputs = "".join(f"[v{i}]" for i in range(len(clips_paths)))
-            fg = (
-                ";".join(scale_parts) + ";" +
-                concat_inputs +
-                f"concat=n={len(clips_paths)}:v=1:a=0[vout]"
-            )
-
-            temp = f"/tmp/temp_nosub_{os.getpid()}.mp4"
-            cmd  = ["ffmpeg", "-y"] + inputs + [
-                "-filter_complex", fg,
-                "-map", "[vout]",
-                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-                "-pix_fmt", "yuv420p", "-an", temp
-            ]
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-            if r.returncode != 0:
-                return False
-
-            cmd2 = [
-                "ffmpeg", "-y",
-                "-i", temp,
-                "-i", os.path.abspath(audio_path),
-                "-map", "0:v:0", "-map", "1:a:0",
-                "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
-                "-t", str(round(duration, 3)), "-shortest",
-                output_path
-            ]
-            r2 = subprocess.run(cmd2, capture_output=True, text=True, timeout=120)
-            if os.path.exists(temp):
-                os.remove(temp)
-
-            if r2.returncode == 0:
-                logger.info(f"[Editor] ✅ Fallback tamamlandı: {output_path}")
-                return output_path
-            return False
-
-        except Exception as e:
-            logger.error(f"[Editor] Fallback hatası: {e}")
-            return False
-
-    def _get_audio_duration(self, path: str) -> float:
-        try:
-            cmd = [
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                path
-            ]
-            r = subprocess.run(cmd, capture_output=True, text=True)
-            return float(r.stdout.strip())
-        except:
-            return 45.0
+        return {
+            "topic":       topic,
+            "full_topic":  topic,
+            "script":      content['script'],
+            "title":       content['title'],
+            "description": content['description'],
+            "tags":        tags,
+            "voice":       content.get('voice', "female"),
+            "category":    content.get('category', 'general'),
+            "video_type":  video_type,
+        }
