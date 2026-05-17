@@ -89,7 +89,7 @@ def _improve_title_with_gemini(topic: str, raw_title: str) -> str:
             return raw_title
 
         genai.configure(api_key=key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
 
         prompt = f"""You are a YouTube title expert for the channel "Evcarix" covering EV, AI, Battery, Robotics, Future Tech.
 
