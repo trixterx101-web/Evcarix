@@ -79,17 +79,16 @@ def _improve_title_with_gemini(topic: str, raw_title: str) -> str:
     try:
         import google.generativeai as genai
 
-        keys = [
+        keys = [k for k in [
             os.getenv("GEMINI_API_KEY"),
             os.getenv("GEMINI_API_KEY_2"),
             os.getenv("GEMINI_API_KEY_3"),
-        ]
-        key = next((k for k in keys if k), None)
-        if not key:
-            return raw_title
+            os.getenv("GEMINI_API_KEY_4"),
+            os.getenv("GEMINI_API_KEY_5"),
+        ] if k]
 
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        if not keys:
+            return raw_title
 
         prompt = f"""You are a YouTube title expert for the channel "Evcarix" covering EV, AI, Battery, Robotics, Future Tech.
 
@@ -104,7 +103,7 @@ Generate ONE viral YouTube title following these rules:
 5. English only
 6. Use one of these proven formulas:
    - "Nobody Is Talking About [X] — But They Should Be"
-   - "I Tested [X] — The Results Are Shocking"  
+   - "I Tested [X] — The Results Are Shocking"
    - "Why [X] Will Change Everything in 2026"
    - "The [X] Truth That Nobody Shows You"
    - "[Number] [X] Facts That Will Blow Your Mind"
@@ -113,7 +112,24 @@ Generate ONE viral YouTube title following these rules:
 
 Return ONLY the title. No quotes. No explanation."""
 
-        response = model.generate_content(prompt)
+        # Tüm key'leri dene, quota aşılırsa sıradakine geç
+        response = None
+        for key in keys:
+            try:
+                genai.configure(api_key=key)
+                model    = genai.GenerativeModel("gemini-2.0-flash-lite")
+                response = model.generate_content(prompt)
+                break  # Başarılıysa dur
+            except Exception as key_err:
+                err_str = str(key_err)
+                if "429" in err_str or "quota" in err_str.lower():
+                    print(f"[Brain] Key kota aşıldı, sıradaki deneniyor...")
+                    continue
+                raise key_err
+
+        if not response:
+            return raw_title
+
         new_title = response.text.strip().strip('"').strip("'")
 
         # Kalite kontrolü
