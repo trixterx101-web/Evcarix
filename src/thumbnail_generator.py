@@ -463,17 +463,10 @@ class ThumbnailGenerator:
         output_path: str = "",
         is_short: bool = False,
     ) -> str:
-        # Short video → skip graphic thumbnail
+        # Short video → thumbnail oluşturma, hiçbir şey yapma
         if is_short:
-            if output_path:
-                os.makedirs(
-                    os.path.dirname(output_path) if os.path.dirname(output_path) else ".",
-                    exist_ok=True,
-                )
-                Image.new("RGB", (1080, 1920), (0, 0, 0)).save(
-                    output_path, "JPEG", quality=60
-                )
-            return output_path or ""
+            logger.info("[Thumbnail] Short video - thumbnail atlanıyor.")
+            return ""
 
         W, H = 1280, 720
         topic_key = topic.lower().replace(" ", "_")
