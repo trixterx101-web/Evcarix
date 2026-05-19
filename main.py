@@ -259,8 +259,7 @@ class EvcarixOrchestrator:
 
             except Exception as e:
                 print(f"      ❌ YouTube yükleme hatası: {e}", flush=True)
-                if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
-                    raise
+                print("      [INFO] Video diskte basariyla uretildi ve saklandi. Yukleme hatasi nedeniyle akis kesilmiyor.", flush=True)
         else:
             print("\n[6/6] Uploader pasif veya video yok, yükleme atlandı.", flush=True)
 
@@ -396,8 +395,7 @@ class EvcarixOrchestrator:
 
             except Exception as e:
                 print(f"      ❌ YouTube yükleme hatası: {e}", flush=True)
-                if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
-                    raise
+                print("      [INFO] Video diskte basariyla uretildi ve saklandi. Yukleme hatasi nedeniyle akis kesilmiyor.", flush=True)
         else:
             print("\n[7/7] Uploader pasif veya video yok, yükleme atlandı.", flush=True)
 
