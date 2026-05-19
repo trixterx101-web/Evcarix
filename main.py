@@ -150,18 +150,7 @@ class EvcarixOrchestrator:
                         print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
                         print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
 
-                        # ── OTOMATİK THUMBNAIL (Lip-Sync) ──────────────
-                        try:
-                            from src.thumbnail_generator import generate_and_upload
-                            topic_key = plan.get("topic_key", "electric_vehicle")
-                            generate_and_upload(
-                                video_id=video_id,
-                                title=title,
-                                topic=topic_key
-                            )
-                        except Exception as te:
-                            print(f"      ⚠️ Thumbnail hatası: {te}", flush=True)
-                        # ───────────────────────────────────────────────
+                        pass
 
                     except Exception as e:
                         print(f"      ❌ YouTube yükleme hatası: {e}")
@@ -266,22 +255,7 @@ class EvcarixOrchestrator:
                 print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
                 print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
 
-                # ── OTOMATİK THUMBNAIL ─────────────────────────────
-                try:
-                    from src.thumbnail_generator import generate_and_upload
-                    print("      🎨 Thumbnail üretiliyor ve yükleniyor...", flush=True)
-                    success = generate_and_upload(
-                        video_id=video_id,
-                        title=title,
-                        topic=topic_key
-                    )
-                    if success:
-                        print("      ✅ Thumbnail YouTube'a yüklendi!", flush=True)
-                    else:
-                        print("      ⚠️ Thumbnail yüklenemedi.", flush=True)
-                except Exception as te:
-                    print(f"      ⚠️ Thumbnail hatası (video yüklendi): {te}", flush=True)
-                # ───────────────────────────────────────────────────
+                pass
 
             except Exception as e:
                 print(f"      ❌ YouTube yükleme hatası: {e}", flush=True)
