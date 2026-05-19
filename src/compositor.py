@@ -1,10 +1,10 @@
 """
 src/compositor.py — Evcarix Auto-Studio
 =======================================
-v8.5 COMPOSITOR REFACTOR:
+v8.6 FIXED:
+  - Fixed typo in pixel format flag ("[-pix_fmt]" corrected to "-pix_fmt")
   - Upgraded preset from ultrafast to faster to remove compression pixelation
   - Fixed aspect ratio stretching bug on the bottom panel
-  - Retained strict modular structure for fail-safe rendering
 """
 
 import os
@@ -31,13 +31,10 @@ class VideoCompositor:
 
         if video_format == "shorts":
             # 1080x1920 — üst %75 video, alt %25 panel
-            # 1920 * 0.75 = 1440 (üst), 1920 * 0.25 = 480 (alt)
             W      = 1080
             top_h  = 1440  # %75
             bot_h  = 480   # %25
-            # toplam = 1920 ✅
 
-            # Alt panelin (bot) bükülüp esnememesi için en-boy oranını koruyarak kırpma (crop) mantığı eklendi
             filter_complex = (
                 f"[0:v]scale={W}:{top_h}:force_original_aspect_ratio=increase,"
                 f"crop={W}:{top_h},setsar=1[top];"
@@ -52,8 +49,8 @@ class VideoCompositor:
                 "-i", audio_path,
                 "-filter_complex", filter_complex,
                 "-map", "[v]", "-map", "2:a",
-                "-c:v", "libx264", "-crf", "22", "-preset", "faster",  # Kalite artırıldı (ultrafast -> faster)
-                "[-pix_fmt]", "yuv420p",
+                "-c:v", "libx264", "-crf", "22", "-preset", "faster",
+                "-pix_fmt", "yuv420p",  # Köşeli parantez hatası düzeltildi! ✅
                 "-c:a", "aac", "-b:a", "192k",
                 "-shortest", output_path
             ]
@@ -69,7 +66,7 @@ class VideoCompositor:
                 "-i", audio_path,
                 "-filter_complex", filter_complex,
                 "-map", "[v]", "-map", "1:a",
-                "-c:v", "libx264", "-crf", "22", "-preset", "faster",  # Kalite artırıldı (ultrafast -> faster)
+                "-c:v", "libx264", "-crf", "22", "-preset", "faster",
                 "-pix_fmt", "yuv420p",
                 "-c:a", "aac", "-b:a", "192k",
                 "-shortest", output_path
