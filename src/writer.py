@@ -39,7 +39,7 @@ def _load_keys(env_names: list[str]) -> list[str]:
     return out
 
 _GROQ_KEYS = _load_keys(["GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3"])
-_GEMINI_KEYS = _load_keys(["GEMINI_API_KEY_1", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3"])
+_GEMINI_KEYS = _load_keys(["GEMINI_API_KEY", "GEMINI_API_KEY_1", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3", "GEMINI_API_KEY_4", "GEMINI_API_KEY_5"])
 
 def _available_keys(keys: list[str]) -> list[str]:
     now = time.time()

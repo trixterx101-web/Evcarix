@@ -352,7 +352,11 @@ class EvcarixOrchestrator:
             output_path=audio_output,
             voice_type=plan.get("voice", "female")
         )
-        audio_path = voice_data["audio_path"]
+        
+        if not voice_data or not voice_data.get("audio_path"):
+            raise RuntimeError("[Main] TTS üretimi başarısız oldu.")
+             
+        audio_path = safe_path(voice_data["audio_path"], "TTS Audio")
         
         from moviepy.editor import AudioFileClip
         audio_clip = AudioFileClip(audio_path)
