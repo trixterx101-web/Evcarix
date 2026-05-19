@@ -1,3 +1,12 @@
+"""
+src/ai_video_engine.py — Evcarix Auto-Studio
+===========================================
+v8.5 ENGINE REFACTOR:
+  - Dynamic prompt-to-query translation (No more repeating stock videos)
+  - Fixed Pixabay vertical/portrait orientation bug
+  - Added micro-movements to FFmpeg fallback animation to maintain retention
+"""
+
 import os
 import time
 import random
@@ -27,19 +36,6 @@ KEYWORD_THEME = {
     "red":      ["power", "fire", "turbo", "sport", "loss", "danger"],
 }
 
-PEXELS_QUERIES = {
-    "charge":   ["electric car charging", "EV charging station"],
-    "battery":  ["EV battery", "lithium battery technology"],
-    "solar":    ["solar panels energy", "renewable energy"],
-    "range":    ["electric car driving highway", "EV road trip"],
-    "speed":    ["fast electric vehicle", "electric car speed"],
-    "cost":     ["money saving electric car", "fuel cost"],
-    "gti":      ["volkswagen car", "hot hatch driving"],
-    "vw":       ["volkswagen electric car", "VW EV"],
-    "default":  ["electric vehicle", "EV technology", "sustainable transport"],
-}
-
-
 def _pick_theme(prompt: str) -> dict:
     pl = prompt.lower()
     for name, kws in KEYWORD_THEME.items():
@@ -47,20 +43,19 @@ def _pick_theme(prompt: str) -> dict:
             return {**THEMES[name], "name": name}
     return {**THEMES["electric"], "name": "electric"}
 
-
 def _pick_pexels_query(prompt: str) -> str:
-    pl = prompt.lower()
-    for key, queries in PEXELS_QUERIES.items():
-        if key in pl:
-            return random.choice(queries)
-    return random.choice(PEXELS_QUERIES["default"])
-
+    """Prompt içindeki sanatsal kalıpları temizler ve doğrudan API'ye gönderir."""
+    import re
+    clean = prompt.lower()
+    # Gereksiz ve aramayı bozan kelimeleri ayıkla
+    clean = re.sub(r'\b(cinematic|slow motion|shot of|abstract|4k|8k|visualization|close up|extreme)\b', '', clean)
+    clean = " ".join(clean.split()).strip()
+    return clean if clean else "electric vehicle"
 
 def _safe_text(text: str, max_len: int = 20) -> str:
     import re
     text = re.sub(r"[^a-zA-Z0-9 .,!?%-]", "", text)
     return text[:max_len].strip()
-
 
 class AIVideoGenerator:
     def __init__(self):
@@ -151,6 +146,7 @@ class AIVideoGenerator:
                 "key": self.pixabay_key,
                 "q": query,
                 "video_type": "film",
+                "orientation": "vertical",  # Pixabay dikey (Shorts) filtresi eklendi!
                 "per_page": 10,
                 "safesearch": "true"
             }
@@ -186,7 +182,7 @@ class AIVideoGenerator:
         return None
 
     def _ffmpeg_anim(self, prompt: str, idx: int):
-        """Garantili FFmpeg animasyonu — sadece drawbox + drawtext kullanır."""
+        """Garantili FFmpeg animasyonu — drawtext kayma efektiyle retention korur."""
         out   = os.path.join(OUTPUT_DIR, f"anim_{idx}.mp4")
         theme = _pick_theme(prompt)
         bg    = theme["bg"]
@@ -214,13 +210,14 @@ class AIVideoGenerator:
                 f"drawbox=x={x}:y={y_bar}:w=80:h={h_bar}:color={acc}@0.3:t=fill"
             )
 
+        # Yazıların ekranda donup kalmaması için saniyede hafifçe (t*15) yukarı kayma hareketi eklendi
         vf_parts = [
             f"drawbox=x=0:y=0:w=iw:h=ih:color={bg}@1:t=fill",
             *lines,
             *bars,
-            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=700:shadowcolor=black@0.8:shadowx=4:shadowy=4",
-            f"drawtext=text='{t2}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=840:shadowcolor=black@0.8:shadowx=4:shadowy=4",
-            f"drawtext=text='{sub}':fontsize=46:fontcolor=white@0.75:x=(w-tw)/2:y=1010",
+            f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=700-(t*15):shadowcolor=black@0.8:shadowx=4:shadowy=4",
+            f"drawtext=text='{t2}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=840-(t*15):shadowcolor=black@0.8:shadowx=4:shadowy=4",
+            f"drawtext=text='{sub}':fontsize=46:fontcolor=white@0.75:x=(w-tw)/2:y=1010-(t*10)",
             f"drawtext=text='EVCARIX':fontsize=36:fontcolor={acc}@0.5:x=(w-tw)/2:y=1750",
         ]
 
