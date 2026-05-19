@@ -1,11 +1,9 @@
 """
-src/writer.py — Evcarix Auto-Studio
+src/writer.py — Evtrix Auto-Studio
 ====================================
-v8.5 OPTIMIZED FOR ALGORITHMIC SUCCESS:
-  - Groq (Primary)
-  - OpenRouter (Fallback)
-  - Gemini (DISABLED by default)
-  - Removed bot-like intros for Shorts
+v8.6 BRAND OPTIMIZED:
+  - Updated global brand name to 'Evtrix'
+  - Groq (Primary) / OpenRouter (Fallback)
   - Dynamic Title selection between Fact and Curiosity/Question
 """
 
@@ -17,7 +15,7 @@ import re
 import json
 from typing import Optional
 
-print("=== NEW WRITER LOADED AND OPTIMIZED ===", flush=True)
+print("=== WRITER RE-LOADED FOR BRAND: EVTRIX ===", flush=True)
 logger = logging.getLogger("Writer")
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -155,14 +153,14 @@ def _llm_chain(prompt: str, fallback: str = "") -> str:
     return fallback
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PUBLIC API v8.5 (SEO & CTR Optimized)
+# PUBLIC API v8.6 (Evtrix Optimized)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
     """Tek bir LLM çağrısı ile tüm SEO metadatayı (Title, Tags, Hook) üretir."""
     brand_style = (
         "Style: Data-driven, analytical, no-hype. Language: ALWAYS US ENGLISH. Tone: Global Professional. "
-        "Identity: Evcarix - The World's Lead EV Data Authority."
+        "Identity: Evtrix - The Lead Electric Vehicle Data Authority."
     )
     
     if is_long:
@@ -211,10 +209,10 @@ def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
     return {"title_a": f"{topic} - Reality Check", "title_b": f"The Truth About {topic}?", "tags": ["ev", "electric car"], "hook_a": "The truth about EVs.", "hook_b": "Shocking EV numbers."}
 
 def generate_script(topic: str, duration_s: int = 40, is_long: bool = False, **kwargs) -> dict:
-    words = int(duration_s * 2.4) # Slightly slower for clarity
+    words = int(duration_s * 2.4)
     
     if is_long:
-        tone = "Style: No hype. Just numbers. Fact-first. Language: MANDATORY US ENGLISH. Start naturally with a strong hook without saying hello. End with 'Subscribe to Evcarix for real EV data.'"
+        tone = "Style: No hype. Just numbers. Fact-first. Language: MANDATORY US ENGLISH. Start naturally with a strong hook without saying hello. End with 'Subscribe to Evtrix for real EV data.'"
         prompt = (
             f"Write a professional {duration_s}-second deep-dive script (~{words} words) about: {topic}.\n"
             f"{tone}\n"
@@ -223,8 +221,7 @@ def generate_script(topic: str, duration_s: int = 40, is_long: bool = False, **k
             "Output ONLY the script text."
         )
     else:
-        # Shorts için "Welcome to" vb tüm kalıpları yasakladık, direkt şok edici bilgiyle başlıyor.
-        tone = "Style: No hype. Just numbers. Fact-first. Language: MANDATORY US ENGLISH. CRITICAL RULE: NEVER use introduction phrases like 'Welcome to', 'In this video', or 'Hello'. Start IMMEDIATELY with a shocking number, statistic, or fact. End naturally with 'Subscribe to Evcarix for real data.'"
+        tone = "Style: No hype. Just numbers. Fact-first. Language: MANDATORY US ENGLISH. CRITICAL RULE: NEVER use introduction phrases like 'Welcome to', 'In this video', or 'Hello'. Start IMMEDIATELY with a shocking number, statistic, or fact. End naturally with 'Subscribe to Evtrix for real data.'"
         prompt = (
             f"Write a viral {duration_s}-second YouTube Shorts script (~{words} words) about: {topic}.\n"
             f"{tone}\n"
@@ -233,7 +230,7 @@ def generate_script(topic: str, duration_s: int = 40, is_long: bool = False, **k
             "Output ONLY the script text."
         )
     
-    script = _llm_chain(prompt, fallback=f"Fact check on {topic}. Real data shows surprising trends. Subscribe to Evcarix for more.")
+    script = _llm_chain(prompt, fallback=f"Fact check on {topic}. Real data shows surprising trends. Subscribe to Evtrix for more.")
     return {"script": script, "voice": "male" if is_long else "female"}
 
 class CreativeWriter:
@@ -243,17 +240,15 @@ class CreativeWriter:
         
         final_tags = self._clean_tags(meta.get("tags", ["ev", "ai", "tech"]))
         
-        # Başlık seçimini A ve B arasında rastgele yaparak tek düzeliği ve spam filtresini kırıyoruz
         chosen_title = random.choice([meta.get('title_a'), meta.get('title_b')])
         if not chosen_title:
             chosen_title = meta.get('title', topic)
         
-        # MASTER PLAN SEO TEMPLATE (Shorts)
         desc = (
             f"⚡ {meta.get('hook_a', meta.get('hook', 'Interesting data.'))}\n\n"
             f"In this video, we explore {topic} and why it matters today.\n\n"
             "🔔 Subscribe for daily tech updates & real EV data.\n"
-            "📱 Follow Evcarix for more insights.\n\n"
+            "📱 Follow Evtrix for more insights.\n\n"
             f"{' '.join(['#' + t.replace(' ', '') for t in final_tags[:8]])}"
         )
         
@@ -272,7 +267,6 @@ class CreativeWriter:
         
         final_tags = self._clean_tags(meta.get("tags", []))
         
-        # MASTER PLAN SEO TEMPLATE (Long)
         desc = (
             f"🚀 {meta.get('hook_a', meta.get('hook', 'Expert analysis.'))}\n\n"
             f"Deep-diving into {topic}. We analyze the raw data and future trends.\n\n"
@@ -284,7 +278,7 @@ class CreativeWriter:
             "0:00 Introduction & Hook\n"
             "1:15 Deep Analysis\n"
             "3:30 Final Verdict\n\n"
-            "🔔 Subscribe to Evcarix: The World's Lead EV Data Authority.\n\n"
+            "🔔 Subscribe to Evtrix: The Lead EV Data Authority.\n\n"
             f"{' '.join(['#' + t.replace(' ', '') for t in final_tags[:12]])}"
         )
         
@@ -302,8 +296,8 @@ class CreativeWriter:
         }
 
     def _clean_tags(self, tags: list) -> list:
-        """Tags limitine (500 char) ve kaliteye dikkat eder. 'Ranked' mantığı uygular."""
-        must_have = ["Evcarix", "Electric Vehicle", "EV", "Tech", "Data", "Shorts"]
+        """Tags limitine ve kaliteye dikkat eder. 'Ranked' mantığı uygular."""
+        must_have = ["Evtrix", "Electric Vehicle", "EV", "Tech", "Data", "Shorts"]
         cleaned = []
         for t in must_have:
             cleaned.append(t)
