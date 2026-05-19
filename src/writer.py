@@ -1,10 +1,12 @@
 """
 src/writer.py — Evcarix Auto-Studio
 ====================================
-v8.0 REFACTORED:
+v8.5 OPTIMIZED FOR ALGORITHMIC SUCCESS:
   - Groq (Primary)
   - OpenRouter (Fallback)
   - Gemini (DISABLED by default)
+  - Removed bot-like intros for Shorts
+  - Dynamic Title selection between Fact and Curiosity/Question
 """
 
 import os
@@ -15,7 +17,7 @@ import re
 import json
 from typing import Optional
 
-print("=== NEW WRITER LOADED ===", flush=True)
+print("=== NEW WRITER LOADED AND OPTIMIZED ===", flush=True)
 logger = logging.getLogger("Writer")
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -153,10 +155,6 @@ def _llm_chain(prompt: str, fallback: str = "") -> str:
     return fallback
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PUBLIC API
-# ─────────────────────────────────────────────────────────────────────────────
-
-# ─────────────────────────────────────────────────────────────────────────────
 # PUBLIC API v8.5 (SEO & CTR Optimized)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -172,7 +170,7 @@ def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
             f"Generate EXPERT YouTube SEO metadata for a 5-10 minute deep-dive EV video about: '{topic}'.\n"
             f"{brand_style}\n"
             "SEO RULES:\n"
-            "1. Generate TWO TITLE VERSIONS (Version A: Fact-based, Version B: Curiositiy-based).\n"
+            "1. Generate TWO TITLE VERSIONS (Version A: Fact-based, Version B: Curiosity-based).\n"
             "2. Max 70 chars per title. High-CTR. Put main keywords at the BEGINNING.\n"
             "3. TAGS: 20 ranked tags.\n"
             "4. DESCRIPTION HOOK: Two different opener lines (Hook A and Hook B).\n"
@@ -205,19 +203,18 @@ def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
             "}"
         )
 
-    
     res = _llm_chain(prompt)
     try:
         match = re.search(r'\{.*\}', res, re.DOTALL)
         if match: return json.loads(match.group(0))
     except: pass
-    return {"title": f"{topic} - Reality Check", "tags": ["ev", "electric car"], "hook": "The truth about EVs."}
+    return {"title_a": f"{topic} - Reality Check", "title_b": f"The Truth About {topic}?", "tags": ["ev", "electric car"], "hook_a": "The truth about EVs.", "hook_b": "Shocking EV numbers."}
 
 def generate_script(topic: str, duration_s: int = 40, is_long: bool = False, **kwargs) -> dict:
     words = int(duration_s * 2.4) # Slightly slower for clarity
-    tone = "Style: No hype. Just numbers. Fact-first. Language: MANDATORY US ENGLISH. Start with 'Welcome to EV-care-icks.' and end with 'Subscribe to EV-care-icks for real EV data.'"
     
     if is_long:
+        tone = "Style: No hype. Just numbers. Fact-first. Language: MANDATORY US ENGLISH. Start naturally with a strong hook without saying hello. End with 'Subscribe to Evcarix for real EV data.'"
         prompt = (
             f"Write a professional {duration_s}-second deep-dive script (~{words} words) about: {topic}.\n"
             f"{tone}\n"
@@ -226,6 +223,8 @@ def generate_script(topic: str, duration_s: int = 40, is_long: bool = False, **k
             "Output ONLY the script text."
         )
     else:
+        # Shorts için "Welcome to" vb tüm kalıpları yasakladık, direkt şok edici bilgiyle başlıyor.
+        tone = "Style: No hype. Just numbers. Fact-first. Language: MANDATORY US ENGLISH. CRITICAL RULE: NEVER use introduction phrases like 'Welcome to', 'In this video', or 'Hello'. Start IMMEDIATELY with a shocking number, statistic, or fact. End naturally with 'Subscribe to Evcarix for real data.'"
         prompt = (
             f"Write a viral {duration_s}-second YouTube Shorts script (~{words} words) about: {topic}.\n"
             f"{tone}\n"
@@ -234,7 +233,7 @@ def generate_script(topic: str, duration_s: int = 40, is_long: bool = False, **k
             "Output ONLY the script text."
         )
     
-    script = _llm_chain(prompt, fallback=f"Welcome to EV-care-icks. Today we analyze {topic}. Subscribe for real data.")
+    script = _llm_chain(prompt, fallback=f"Fact check on {topic}. Real data shows surprising trends. Subscribe to Evcarix for more.")
     return {"script": script, "voice": "male" if is_long else "female"}
 
 class CreativeWriter:
@@ -243,6 +242,11 @@ class CreativeWriter:
         script_data = generate_script(topic, duration_s=45, is_long=False)
         
         final_tags = self._clean_tags(meta.get("tags", ["ev", "ai", "tech"]))
+        
+        # Başlık seçimini A ve B arasında rastgele yaparak tek düzeliği ve spam filtresini kırıyoruz
+        chosen_title = random.choice([meta.get('title_a'), meta.get('title_b')])
+        if not chosen_title:
+            chosen_title = meta.get('title', topic)
         
         # MASTER PLAN SEO TEMPLATE (Shorts)
         desc = (
@@ -254,7 +258,7 @@ class CreativeWriter:
         )
         
         return {
-            "title": meta.get('title_a', meta.get('title', topic)),
+            "title": chosen_title,
             "script": script_data["script"],
             "voice": script_data["voice"],
             "tags": final_tags,
@@ -284,14 +288,12 @@ class CreativeWriter:
             f"{' '.join(['#' + t.replace(' ', '') for t in final_tags[:12]])}"
         )
         
-        title = (
-            meta.get("title")
-            or meta.get("title_a")
-            or meta.get("title_b")
-            or f"{topic} — EV Data Deep Dive"
-        )
+        chosen_title = random.choice([meta.get('title_a'), meta.get('title_b')])
+        if not chosen_title:
+            chosen_title = meta.get('title', f"{topic} — EV Data Deep Dive")
+            
         return {
-            "title": title,
+            "title": chosen_title,
             "script": script_data["script"],
             "voice": "male",
             "tags": final_tags,
@@ -301,19 +303,16 @@ class CreativeWriter:
 
     def _clean_tags(self, tags: list) -> list:
         """Tags limitine (500 char) ve kaliteye dikkat eder. 'Ranked' mantığı uygular."""
-        # En rütbeli/güçlü etiketler en başa
         must_have = ["Evcarix", "Electric Vehicle", "EV", "Tech", "Data", "Shorts"]
         cleaned = []
         for t in must_have:
             cleaned.append(t)
         
         current_len = sum(len(t) + 2 for t in cleaned)
-        # LLM'den gelen etiketleri temizle ve ekle
         for t in tags:
             tag = re.sub(r'[^a-zA-Z0-9\s]', '', str(t)).strip()
             if len(tag) < 2 or tag.lower() in [c.lower() for c in cleaned]:
                 continue
-            # Gereksiz boşlukları temizle
             tag = " ".join(tag.split())
             if current_len + len(tag) + 2 < 480:
                 cleaned.append(tag)
