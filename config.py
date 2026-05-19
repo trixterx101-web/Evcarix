@@ -96,25 +96,25 @@ def validate_config():
     issues = []
 
     if not GEMINI_API_KEYS:
-        issues.append("❌ Gemini: Hiç geçerli key yok (GEMINI_API_KEY_1..5 veya GEMINI_API_KEY)")
+        issues.append("[ERROR] Gemini: Hic gecerli key yok (GEMINI_API_KEY_1..5 veya GEMINI_API_KEY)")
     else:
-        print(f"✅ Gemini: {len(GEMINI_API_KEYS)} key yüklendi")
+        print(f"[SUCCESS] Gemini: {len(GEMINI_API_KEYS)} key yuklendi")
 
     if not GROQ_API_KEY:
-        issues.append("⚠️  GROQ_API_KEY eksik")
+        issues.append("[WARNING] GROQ_API_KEY eksik")
     else:
         groq_count = sum(1 for k in [GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3] if k)
-        print(f"✅ Groq: {groq_count} key yüklendi")
+        print(f"[SUCCESS] Groq: {groq_count} key yuklendi")
 
     if not PEXELS_API_KEY:
-        issues.append("❌ PEXELS_API_KEY eksik (stok video için gerekli)")
+        issues.append("[ERROR] PEXELS_API_KEY eksik (stok video icin gerekli)")
     else:
-        print("✅ Pexels: key yüklendi")
+        print("[SUCCESS] Pexels: key yuklendi")
 
     for msg in issues:
         print(msg)
 
-    return len([i for i in issues if i.startswith("❌")]) == 0
+    return len([i for i in issues if i.startswith("[ERROR]")]) == 0
 
 
 if __name__ == "__main__":
