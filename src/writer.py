@@ -157,7 +157,7 @@ def _llm_chain(prompt: str, fallback: str = "") -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
-    """Tek bir LLM çağrısı ile tüm SEO metadatayı (Title, Tags, Hook) üretir."""
+    """Tek bir LLM çağrısı ile tüm SEO metadatayı (Title, Tags, Hook, SEO Description) üretir."""
     brand_style = (
         "Style: Data-driven, analytical, no-hype. Language: ALWAYS US ENGLISH. Tone: Global Professional. "
         "Identity: Evtrix - The Lead Electric Vehicle Data Authority."
@@ -169,9 +169,10 @@ def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
             f"{brand_style}\n"
             "SEO RULES:\n"
             "1. Generate TWO TITLE VERSIONS (Version A: Fact-based, Version B: Curiosity-based).\n"
-            "2. Max 70 chars per title. High-CTR. Put main keywords at the BEGINNING.\n"
-            "3. TAGS: 20 ranked tags.\n"
+            "2. Max 70 chars per title. High-CTR. Put main search keywords at the absolute BEGINNING.\n"
+            "3. TAGS: 20 high-ranking tags including broad and specific search terms.\n"
             "4. DESCRIPTION HOOK: Two different opener lines (Hook A and Hook B).\n"
+            "5. SEO DESCRIPTION: A detailed, keyword-rich description paragraph (3-4 sentences) that naturaly describes the topic for search algorithm indexation.\n"
             "Return ONLY JSON:\n"
             "{\n"
             "  \"title_a\": \"[FACT TITLE]\",\n"
@@ -179,7 +180,8 @@ def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
             "  \"tags\": [\"tag1\", \"tag2\", ...],\n"
             "  \"hook_a\": \"[HOOK VERSION A]\",\n"
             "  \"hook_b\": \"[HOOK VERSION B]\",\n"
-            "  \"keywords\": [\"kw1\", \"kw2\", ...]\n"
+            "  \"keywords\": [\"kw1\", \"kw2\", ...],\n"
+            "  \"seo_description\": \"[Detailed SEO Description Paragraph]\"\n"
             "}"
         )
     else:
@@ -188,16 +190,18 @@ def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
             f"{brand_style}\n"
             "SEO RULES:\n"
             "1. Generate TWO TITLE VERSIONS (Version A: Number-heavy, Version B: Question-based).\n"
-            "2. Max 55 chars per title. Viral style. Use numbers (%, $, Miles).\n"
-            "3. TAGS: 15 high-velocity trending tags.\n"
+            "2. Max 55 chars per title. High-CTR viral style. Use numbers (%, $, Miles).\n"
+            "3. TAGS: 15 high-velocity trending tags including viral short-form tags.\n"
             "4. HOOK: Two punchy, keyword-rich opening sentences (Hook A and Hook B).\n"
+            "5. SEO SUMMARY: A short 2-sentence punchy summary filled with search terms.\n"
             "Return ONLY JSON:\n"
             "{\n"
             "  \"title_a\": \"[NUMBER TITLE]\",\n"
             "  \"title_b\": \"[QUESTION TITLE]\",\n"
             "  \"tags\": [\"tag1\", \"tag2\", ...],\n"
             "  \"hook_a\": \"[PUNCHY HOOK A]\",\n"
-            "  \"hook_b\": \"[PUNCHY HOOK B]\"\n"
+            "  \"hook_b\": \"[PUNCHY HOOK B]\",\n"
+            "  \"seo_description\": \"[Short SEO Summary]\"\n"
             "}"
         )
 
@@ -206,7 +210,14 @@ def generate_seo_metadata(topic: str, is_long: bool = False) -> dict:
         match = re.search(r'\{.*\}', res, re.DOTALL)
         if match: return json.loads(match.group(0))
     except: pass
-    return {"title_a": f"{topic} - Reality Check", "title_b": f"The Truth About {topic}?", "tags": ["ev", "electric car"], "hook_a": "The truth about EVs.", "hook_b": "Shocking EV numbers."}
+    return {
+        "title_a": f"{topic.upper()} - Reality Check", 
+        "title_b": f"The Truth About {topic}?", 
+        "tags": ["ev", "electric car", "evtrix"], 
+        "hook_a": "The truth about EVs.", 
+        "hook_b": "Shocking EV numbers.",
+        "seo_description": f"Exploring the latest data and trends behind {topic}. We break down the key numbers and what they mean for the future."
+    }
 
 def generate_script(topic: str, duration_s: int = 40, is_long: bool = False, **kwargs) -> dict:
     words = int(duration_s * 2.4)
@@ -246,7 +257,7 @@ class CreativeWriter:
         
         desc = (
             f"⚡ {meta.get('hook_a', meta.get('hook', 'Interesting data.'))}\n\n"
-            f"In this video, we explore {topic} and why it matters today.\n\n"
+            f"{meta.get('seo_description', 'Exploring the latest news and facts.')}\n\n"
             "🔔 Subscribe for daily tech updates & real EV data.\n"
             "📱 Follow Evtrix for more insights.\n\n"
             f"{' '.join(['#' + t.replace(' ', '') for t in final_tags[:8]])}"
@@ -269,7 +280,7 @@ class CreativeWriter:
         
         desc = (
             f"🚀 {meta.get('hook_a', meta.get('hook', 'Expert analysis.'))}\n\n"
-            f"Deep-diving into {topic}. We analyze the raw data and future trends.\n\n"
+            f"{meta.get('seo_description', 'Deep-diving into the raw data and trends.')}\n\n"
             "⚡ Key points covered:\n"
             "- Industry-leading data analysis\n"
             "- Technical specifications & performance\n"

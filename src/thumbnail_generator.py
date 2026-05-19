@@ -3,6 +3,8 @@ import re
 import json
 import logging
 import hashlib
+import random
+import subprocess
 from PIL import Image, ImageDraw, ImageFont
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -93,7 +95,7 @@ def _mix(c1, c2, t):
     return tuple(int(c1[i] * (1 - t) + c2[i] * t) for i in range(3))
 
 
-# ── Topic styles ──────────────────────────────────────────────────────────────
+# ── Topic styles with expanded random stats pools ─────────────────────────────
 TOPIC_STYLES = {
     "electric_vehicle": {
         "bg":       (0, 0, 0),
@@ -107,6 +109,13 @@ TOPIC_STYLES = {
             ("+300%", "EV SALES GROWTH",      (255, 34, 0)),
             ("$0",    "GAS CAR FUTURE VALUE",  (0, 212, 255)),
             ("500MI", "NEW EV RANGE RECORD",   (255, 204, 0)),
+            ("800V",  "ULTRA FAST CHARGING",   (0, 255, 136)),
+            ("2.1s",  "0-60 MPH TIME RECORD",  (255, 0, 128)),
+            ("150K+", "EV CHARGERS PLANNED",   (0, 212, 255)),
+            ("-45%",  "BATTERY COST REDUCTION", (0, 255, 136)),
+            ("350KW", "MAX CHARGING SPEED",    (255, 107, 0)),
+            ("10 MIN", "CHARGE TIME TARGET",   (0, 212, 255)),
+            ("99%",   "MOTOR EFFICIENCY",      (255, 204, 0))
         ],
     },
     "battery_tech": {
@@ -121,6 +130,11 @@ TOPIC_STYLES = {
             ("1M KM",  "LFP LIFESPAN",        (255, 107, 0)),
             ("10 MIN", "FUTURE CHARGE TIME",   (0, 212, 255)),
             ("-45%",   "WINTER RANGE LOSS",    (0, 255, 136)),
+            ("500 WH", "SOLID STATE DENSITY",  (255, 204, 0)),
+            ("92%",    "RECYCLING EFFICIENCY", (0, 212, 255)),
+            ("15 YRS", "BATTERY DEGRADATION",  (255, 107, 0)),
+            ("SODIUM", "NEXT-GEN CELL TECH",   (0, 255, 136)),
+            ("$60/KWH", "CELL COST TARGET",     (255, 204, 0))
         ],
     },
     "artificial_intelligence": {
@@ -135,6 +149,10 @@ TOPIC_STYLES = {
             ("10x",  "SPEED VS HUMAN",  (139, 0, 255)),
             ("2030", "AGI PREDICTION",  (0, 212, 255)),
             ("$1T",  "AI MARKET SIZE",  (255, 204, 0)),
+            ("100T", "PARAMETERS SIZE", (0, 255, 136)),
+            ("98.4%", "ACCURACY RECORD", (255, 0, 128)),
+            ("1 SEC", "REALTIME TRANSLATION", (0, 212, 255)),
+            ("GPT-5", "NEXT-GEN MODEL RUN",  (255, 107, 0))
         ],
     },
     "robotics": {
@@ -149,6 +167,9 @@ TOPIC_STYLES = {
             ("40%",   "JOBS AUTOMATED",  (0, 255, 136)),
             ("$1.5T", "ROBOTICS MARKET", (0, 212, 255)),
             ("24/7",  "ROBOT UPTIME",    (255, 204, 0)),
+            ("0.5s",  "REACTION DELAY",  (255, 0, 128)),
+            ("HUMAN", "DEXTERITY LEVEL", (255, 255, 255)),
+            ("TESLA", "OPTIMUS GEN 2",   (0, 255, 136))
         ],
     },
     "future_tech": {
@@ -163,6 +184,9 @@ TOPIC_STYLES = {
             ("+300%", "EV SALES GROWTH",      (0, 212, 255)),
             ("$0",    "GAS CAR FUTURE VALUE",  (255, 180, 0)),
             ("500MI", "NEW EV RANGE RECORD",   (0, 255, 136)),
+            ("FUSION", "NET ENERGY GAIN",     (255, 0, 255)),
+            ("QUANTUM", "COMPUTING ADVANCE",  (0, 212, 255)),
+            ("SPACE", "ORBITAL SOLAR POWER",  (255, 204, 0))
         ],
     },
     "default": {
@@ -177,11 +201,42 @@ TOPIC_STYLES = {
             ("+300%", "EV SALES GROWTH",      (255, 34, 0)),
             ("$0",    "GAS CAR FUTURE VALUE",  (0, 212, 255)),
             ("500MI", "NEW EV RANGE RECORD",   (255, 204, 0)),
+            ("800V",  "ULTRA FAST CHARGING",   (0, 255, 136)),
+            ("2.1s",  "0-60 MPH TIME RECORD",  (255, 0, 128))
         ],
     },
 }
+
 LAYOUTS = ["split", "versus", "shock", "data",
            "neon", "minimal", "alert", "cinematic", "grid", "bold"]
+
+
+def _extract_video_frame(video_path: str, output_image_path: str) -> bool:
+    """FFmpeg kullanarak videonun 2. saniyesinden 1 adet kare cikarir."""
+    try:
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", "00:00:02",
+            "-i", video_path,
+            "-vframes", "1",
+            "-q:v", "2",
+            output_image_path
+        ]
+        res = subprocess.run(cmd, capture_output=True, timeout=15)
+        return res.returncode == 0 and os.path.exists(output_image_path)
+    except Exception as e:
+        logger.error(f"[Thumbnail] Frame extraction failed: {e}")
+        return False
+
+
+def _get_base_image(W, H, st, bg_image=None):
+    """Kapak arkasi icin base gorsel uretir. Video karesi varsa uzerine %65 karartma filtresi uygular."""
+    if bg_image:
+        mask = Image.new("RGB", (W, H), (0, 0, 0))
+        img = Image.blend(bg_image, mask, 0.65)
+        return img
+    else:
+        return Image.new("RGB", (W, H), st["bg"])
 
 
 def _safe(text: str, max_len: int = 25) -> str:
@@ -250,18 +305,19 @@ def _corners(draw, a1, a2):
 
 
 # ── LAYOUT: split ─────────────────────────────────────────────────────────────
-def _layout_split(W, H, lines, st):
+def _layout_split(W, H, lines, st, bg_image=None):
     a1, a2 = st["accent1"], st["accent2"]
-    img = Image.new("RGB", (W, H), st["bg"])
+    img = _get_base_image(W, H, st, bg_image)
     draw = ImageDraw.Draw(img)
 
-    # Left / right gradient panels
-    for x in range(W // 2 + 80):
-        t = x / (W // 2 + 80)
-        draw.line([(x, 0), (x, H)], fill=_mix(st["left_bg"], st["bg"], t))
-    for x in range(W // 2 - 80, W):
-        t = (x - (W // 2 - 80)) / (W - (W // 2 - 80))
-        draw.line([(x, 0), (x, H)], fill=_mix(st["bg"], st["right_bg"], t))
+    if not bg_image:
+        # Left / right gradient panels
+        for x in range(W // 2 + 80):
+            t = x / (W // 2 + 80)
+            draw.line([(x, 0), (x, H)], fill=_mix(st["left_bg"], st["bg"], t))
+        for x in range(W // 2 - 80, W):
+            t = (x - (W // 2 - 80)) / (W - (W // 2 - 80))
+            draw.line([(x, 0), (x, H)], fill=_mix(st["bg"], st["right_bg"], t))
 
     img = _radial_glow(img, 200, H // 2, 500, a1, 0.35)
     img = _radial_glow(img, W - 200, H // 2, 450, a2, 0.28)
@@ -342,14 +398,15 @@ def _layout_split(W, H, lines, st):
 
 
 # ── LAYOUT: versus ────────────────────────────────────────────────────────────
-def _layout_versus(W, H, lines, st):
+def _layout_versus(W, H, lines, st, bg_image=None):
     a1, a2 = st["accent1"], st["accent2"]
-    img = Image.new("RGB", (W, H), (0, 5, 16))
+    img = _get_base_image(W, H, st, bg_image)
     draw = ImageDraw.Draw(img)
 
-    for y in range(H):
-        t = y / H
-        draw.line([(0, y), (W, y)], fill=_mix((0, 5, 16), (5, 0, 16), t))
+    if not bg_image:
+        for y in range(H):
+            t = y / H
+            draw.line([(0, y), (W, y)], fill=_mix((0, 5, 16), (5, 0, 16), t))
 
     img = _radial_glow(img, 300, H // 2, 500, a1, 0.35)
     img = _radial_glow(img, W - 200, H // 2, 400, a2, 0.28)
@@ -411,11 +468,12 @@ def _layout_versus(W, H, lines, st):
 
 
 # ── LAYOUT: shock ─────────────────────────────────────────────────────────────
-def _layout_shock(W, H, lines, st):
+def _layout_shock(W, H, lines, st, bg_image=None):
     a1, a2 = st["accent1"], st["accent2"]
-    img = Image.new("RGB", (W, H), (0, 0, 0))
+    img = _get_base_image(W, H, st, bg_image)
     draw = ImageDraw.Draw(img)
-    _gradient(draw, W, H, st["left_bg"], (0, 0, 0))
+    if not bg_image:
+        _gradient(draw, W, H, st["left_bg"], (0, 0, 0))
 
     img = _radial_glow(img, W // 2, int(H * 0.45), 550, a1, 0.4)
     img = _radial_glow(img, W // 2, int(H * 0.45), 400, a2, 0.25)
@@ -458,11 +516,12 @@ def _layout_shock(W, H, lines, st):
 
 
 # ── LAYOUT: data ──────────────────────────────────────────────────────────────
-def _layout_data(W, H, lines, st):
+def _layout_data(W, H, lines, st, bg_image=None):
     a1, a2 = st["accent1"], st["accent2"]
-    img = Image.new("RGB", (W, H), (0, 0, 0))
+    img = _get_base_image(W, H, st, bg_image)
     draw = ImageDraw.Draw(img)
-    _gradient(draw, W, H, st["left_bg"], st["right_bg"])
+    if not bg_image:
+        _gradient(draw, W, H, st["left_bg"], st["right_bg"])
 
     img = _radial_glow(img, 100, H // 2, 450, a1, 0.32)
     img = _radial_glow(img, W - 100, H // 2, 400, a2, 0.26)
@@ -521,13 +580,14 @@ def _layout_data(W, H, lines, st):
 
 
 # ── LAYOUT: neon ──────────────────────────────────────────────────────────────
-def _layout_neon(W, H, lines, st):
+def _layout_neon(W, H, lines, st, bg_image=None):
     a1, a2 = st["accent1"], st["accent2"]
-    img = Image.new("RGB", (W, H), (4, 0, 20))
+    img = _get_base_image(W, H, st, bg_image)
     draw = ImageDraw.Draw(img)
-    for i, y in enumerate(range(0, H, 36)):
-        intensity = 8 if i % 3 == 0 else 3
-        draw.line([(0, y), (W, y)], fill=(intensity, 0, intensity * 2))
+    if not bg_image:
+        for i, y in enumerate(range(0, H, 36)):
+            intensity = 8 if i % 3 == 0 else 3
+            draw.line([(0, y), (W, y)], fill=(intensity, 0, intensity * 2))
     img = _radial_glow(img, W // 2, H // 2, 600, a1, 0.5)
     img = _radial_glow(img, W // 2, H // 2, 350, a2, 0.3)
     draw = ImageDraw.Draw(img)
@@ -568,12 +628,13 @@ def _layout_neon(W, H, lines, st):
 
 
 # ── LAYOUT: minimal ───────────────────────────────────────────────────────────
-def _layout_minimal(W, H, lines, st):
+def _layout_minimal(W, H, lines, st, bg_image=None):
     a1, a2 = st["accent1"], st["accent2"]
-    img = Image.new("RGB", (W, H), (8, 8, 12))
+    img = _get_base_image(W, H, st, bg_image)
     draw = ImageDraw.Draw(img)
-    for x in range(W):
-        draw.line([(x, 0), (x, H)], fill=_mix((8, 8, 12), st["right_bg"], x / W * 0.15))
+    if not bg_image:
+        for x in range(W):
+            draw.line([(x, 0), (x, H)], fill=_mix((8, 8, 12), st["right_bg"], x / W * 0.15))
     draw.rectangle([0, 0, 16, H], fill=a1)
     draw.rectangle([0, 0, W, 6], fill=a1)
     draw.text((30, 20), f"EVTRIX  //  {st['label']}", font=_fnt(20, False), fill=(100, 110, 125))
@@ -615,12 +676,13 @@ def _layout_minimal(W, H, lines, st):
 
 
 # ── LAYOUT: alert ─────────────────────────────────────────────────────────────
-def _layout_alert(W, H, lines, st):
+def _layout_alert(W, H, lines, st, bg_image=None):
     a1, a2 = st["accent1"], st["accent2"]
     dark1 = tuple(min(20, c // 4) for c in a1)
-    img = Image.new("RGB", (W, H), (0, 0, 0))
+    img = _get_base_image(W, H, st, bg_image)
     draw = ImageDraw.Draw(img)
-    _gradient(draw, W, H, dark1, (0, 0, 0))
+    if not bg_image:
+        _gradient(draw, W, H, dark1, (0, 0, 0))
     img = _radial_glow(img, W // 4, H // 2, 600, a1, 0.45)
     draw = ImageDraw.Draw(img)
     draw.rectangle([0, 0, 22, H], fill=a1)
@@ -661,9 +723,9 @@ def _layout_alert(W, H, lines, st):
 
 
 # ── LAYOUT: cinematic ─────────────────────────────────────────────────────────
-def _layout_cinematic(W, H, lines, st):
+def _layout_cinematic(W, H, lines, st, bg_image=None):
     a1, a2 = st["accent1"], st["accent2"]
-    img = Image.new("RGB", (W, H), (2, 2, 6))
+    img = _get_base_image(W, H, st, bg_image)
     draw = ImageDraw.Draw(img)
     img = _radial_glow(img, W // 2, H // 2, 700, a1, 0.38)
     img = _radial_glow(img, W // 2, H // 2, 400, a2, 0.18)
@@ -710,15 +772,16 @@ def _layout_cinematic(W, H, lines, st):
 
 
 # ── LAYOUT: grid ──────────────────────────────────────────────────────────────
-def _layout_grid(W, H, lines, st):
+def _layout_grid(W, H, lines, st, bg_image=None):
     a1, a2 = st["accent1"], st["accent2"]
-    img = Image.new("RGB", (W, H), (0, 0, 0))
+    img = _get_base_image(W, H, st, bg_image)
     draw = ImageDraw.Draw(img)
-    for x in range(0, W, 60):
-        draw.line([(x, 0), (x, H)], fill=(12, 12, 18), width=1)
-    for y in range(0, H, 60):
-        draw.line([(0, y), (W, y)], fill=(12, 12, 18), width=1)
-    _gradient(draw, W, H, st["left_bg"], (0, 0, 0))
+    if not bg_image:
+        for x in range(0, W, 60):
+            draw.line([(x, 0), (x, H)], fill=(12, 12, 18), width=1)
+        for y in range(0, H, 60):
+            draw.line([(0, y), (W, y)], fill=(12, 12, 18), width=1)
+        _gradient(draw, W, H, st["left_bg"], (0, 0, 0))
     img = _radial_glow(img, 200, H // 2, 550, a1, 0.35)
     draw = ImageDraw.Draw(img)
     draw.rectangle([0, 0, 20, H], fill=a1)
@@ -765,15 +828,16 @@ def _layout_grid(W, H, lines, st):
 
 
 # ── LAYOUT: bold ──────────────────────────────────────────────────────────────
-def _layout_bold(W, H, lines, st):
+def _layout_bold(W, H, lines, st, bg_image=None):
     a1, a2 = st["accent1"], st["accent2"]
-    img = Image.new("RGB", (W, H), (0, 0, 0))
+    img = _get_base_image(W, H, st, bg_image)
     draw = ImageDraw.Draw(img)
-    tri_pts = [(W // 2, 0), (W, 0), (W, H), (W // 2 + 80, H)]
-    draw.polygon(tri_pts, fill=tuple(c // 5 for c in a1))
-    for i in range(12):
-        x_start = W // 2 - 40 + i * 30
-        draw.line([(x_start, 0), (x_start + 200, H)], fill=tuple(c // 3 for c in a1), width=2)
+    if not bg_image:
+        tri_pts = [(W // 2, 0), (W, 0), (W, H), (W // 2 + 80, H)]
+        draw.polygon(tri_pts, fill=tuple(c // 5 for c in a1))
+        for i in range(12):
+            x_start = W // 2 - 40 + i * 30
+            draw.line([(x_start, 0), (x_start + 200, H)], fill=tuple(c // 3 for c in a1), width=2)
     img = _radial_glow(img, W // 4, H // 2, 580, a1, 0.42)
     img = _radial_glow(img, W - 100, H // 4, 400, a2, 0.30)
     draw = ImageDraw.Draw(img)
@@ -840,11 +904,54 @@ class ThumbnailGenerator:
 
         W, H = 1280, 720
         topic_key = topic.lower().replace(" ", "_")
-        st = TOPIC_STYLES.get(topic_key, TOPIC_STYLES["default"])
+        
+        # Orijinal TOPIC_STYLES'i bozmamak için kopyalıyoruz
+        base_st = TOPIC_STYLES.get(topic_key, TOPIC_STYLES["default"])
+        st = {k: v for k, v in base_st.items()}
+        
+        # Stats listesinden rastgele 3 tanesini seçelim (sınırsız çeşitlilik için)
+        if "stats" in st and st["stats"]:
+            st["stats"] = random.sample(st["stats"], min(3, len(st["stats"])))
 
-        # Pick layout deterministically per title, cycle through all 4
-        h = int(hashlib.md5(title.encode()).hexdigest(), 16)
-        layout = LAYOUTS[h % len(LAYOUTS)]
+        # Sınırsız çeşitlilik için layout'u tamamen rastgele seçelim
+        layout = random.choice(LAYOUTS)
+
+        # Arka plan için assets/footage altındaki videolardan rastgele bir kare çıkarma
+        video_frame_img = None
+        temp_frame_path = f"assets/temp/temp_thumb_bg_{random.randint(1000, 9999)}.jpg"
+        
+        try:
+            footage_dirs = ["assets/footage", "assets/free_footage", "assets/videos", "assets/temp_videos", "assets"]
+            all_files = []
+            for d in footage_dirs:
+                if os.path.exists(d):
+                    for f in os.listdir(d):
+                        if f.lower().endswith(".mp4"):
+                            all_files.append(os.path.join(d, f))
+            
+            if all_files:
+                # Konuyla ilgili video aramayı deneyelim (basit filtreleme)
+                topic_words = set(topic_key.split("_"))
+                relevant_files = []
+                for f in all_files:
+                    f_lower = os.path.basename(f).lower()
+                    if any(w in f_lower for w in topic_words if len(w) > 2):
+                        relevant_files.append(f)
+                
+                # Eşleşen video varsa oradan, yoksa rastgele herhangi bir videodan kare al
+                chosen_video = None
+                if relevant_files:
+                    chosen_video = random.choice(relevant_files)
+                else:
+                    chosen_video = random.choice(all_files)
+                
+                if chosen_video:
+                    os.makedirs("assets/temp", exist_ok=True)
+                    if _extract_video_frame(chosen_video, temp_frame_path):
+                        video_frame_img = Image.open(temp_frame_path).resize((W, H))
+                        logger.info(f"[Thumbnail] Arka plan görseli videodan çıkarıldı: {chosen_video}")
+        except Exception as ve:
+            logger.error(f"[Thumbnail] Arka plan görseli çıkarma hatası: {ve}")
 
         lines = _split_title(title)
         try:
@@ -860,7 +967,9 @@ class ThumbnailGenerator:
                 "grid":      _layout_grid,
                 "bold":      _layout_bold,
             }
-            img = dispatch[layout](W, H, lines, st)
+            
+            # bg_image parametresini geçiyoruz
+            img = dispatch[layout](W, H, lines, st, bg_image=video_frame_img)
 
             if not output_path:
                 safe_t = re.sub(r"[^\w]", "_", title[:30])
@@ -878,6 +987,18 @@ class ThumbnailGenerator:
         except Exception as e:
             logger.error(f"[Thumbnail] ERROR create(): {e}")
             return output_path or ""
+        finally:
+            # Geçici dosyayı temizle
+            if video_frame_img:
+                try:
+                    video_frame_img.close()
+                except:
+                    pass
+            if os.path.exists(temp_frame_path):
+                try:
+                    os.remove(temp_frame_path)
+                except Exception as re_err:
+                    logger.warning(f"[Thumbnail] Geçici dosya silinemedi: {re_err}")
 
     def upload_thumbnail(self, video_id: str, thumbnail_path: str) -> bool:
         try:
