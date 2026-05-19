@@ -1,3 +1,12 @@
+"""
+src/compositor.py — Evcarix Auto-Studio
+=======================================
+v8.5 COMPOSITOR REFACTOR:
+  - Upgraded preset from ultrafast to faster to remove compression pixelation
+  - Fixed aspect ratio stretching bug on the bottom panel
+  - Retained strict modular structure for fail-safe rendering
+"""
+
 import os
 import subprocess
 import logging
@@ -28,11 +37,12 @@ class VideoCompositor:
             bot_h  = 480   # %25
             # toplam = 1920 ✅
 
+            # Alt panelin (bot) bükülüp esnememesi için en-boy oranını koruyarak kırpma (crop) mantığı eklendi
             filter_complex = (
                 f"[0:v]scale={W}:{top_h}:force_original_aspect_ratio=increase,"
                 f"crop={W}:{top_h},setsar=1[top];"
-                f"[1:v]scale={W}:{bot_h}:force_original_aspect_ratio=disable,"
-                f"setsar=1[bot];"
+                f"[1:v]scale={W}:{bot_h}:force_original_aspect_ratio=increase,"
+                f"crop={W}:{bot_h},setsar=1[bot];"
                 f"[top][bot]vstack=inputs=2[v]"
             )
             cmd = [
@@ -42,8 +52,8 @@ class VideoCompositor:
                 "-i", audio_path,
                 "-filter_complex", filter_complex,
                 "-map", "[v]", "-map", "2:a",
-                "-c:v", "libx264", "-crf", "22", "-preset", "ultrafast",
-                "-pix_fmt", "yuv420p",
+                "-c:v", "libx264", "-crf", "22", "-preset", "faster",  # Kalite artırıldı (ultrafast -> faster)
+                "[-pix_fmt]", "yuv420p",
                 "-c:a", "aac", "-b:a", "192k",
                 "-shortest", output_path
             ]
@@ -59,7 +69,7 @@ class VideoCompositor:
                 "-i", audio_path,
                 "-filter_complex", filter_complex,
                 "-map", "[v]", "-map", "1:a",
-                "-c:v", "libx264", "-crf", "22", "-preset", "ultrafast",
+                "-c:v", "libx264", "-crf", "22", "-preset", "faster",  # Kalite artırıldı (ultrafast -> faster)
                 "-pix_fmt", "yuv420p",
                 "-c:a", "aac", "-b:a", "192k",
                 "-shortest", output_path
