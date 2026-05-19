@@ -380,6 +380,17 @@ class EvcarixOrchestrator:
 
         print("\n[5/7] Thumbnail üretiliyor...", flush=True)
         thumbnail_path = None
+        try:
+            from src.thumbnail_generator import ThumbnailGenerator
+            thumb_gen = ThumbnailGenerator()
+            thumb_result = thumb_gen.create(title=title, topic=topic_key)
+            if thumb_result and os.path.exists(thumb_result):
+                thumbnail_path = thumb_result
+                print(f"      ✅ Thumbnail oluşturuldu: {thumbnail_path}", flush=True)
+            else:
+                print("      ⚠️ Thumbnail oluşturulamadı, yükleme thumbnail'siz devam edecek.", flush=True)
+        except Exception as te:
+            print(f"      ⚠️ Thumbnail hatası (yükleme devam edecek): {te}", flush=True)
 
         print("\n[6/7] SEO hazır.", flush=True)
 
@@ -393,26 +404,16 @@ class EvcarixOrchestrator:
                     description=description,
                     tags=tags,
                     playlist_name="EV Data Reports",
-                    thumbnail_path=None
+                    thumbnail_path=thumbnail_path
                 )
                 print(f"      ✅ Yüklendi! Video ID: {video_id}", flush=True)
                 print(f"      🔗 https://www.youtube.com/watch?v={video_id}", flush=True)
 
-                # ── OTOMATİK THUMBNAIL (Long Video) ───────────────
-                try:
-                    from src.thumbnail_generator import generate_and_upload
-                    print("      🎨 Thumbnail üretiliyor ve yükleniyor...", flush=True)
-                    success = generate_and_upload(
-                        video_id=video_id,
-                        title=title,
-                        topic=topic_key
-                    )
-                    if success:
-                        print("      ✅ Thumbnail YouTube'a yüklendi!", flush=True)
-                    else:
-                        print("      ⚠️ Thumbnail yüklenemedi.", flush=True)
-                except Exception as te:
-                    print(f"      ⚠️ Thumbnail hatası (video yüklendi): {te}", flush=True)
+                # ── THUMBNAIL DURUMU ───────────────────────────
+                if thumbnail_path:
+                    print("      🎨 Thumbnail video yükleme sırasında eklendi.", flush=True)
+                else:
+                    print("      ⚠️ Thumbnail üretilemediği için yüklenmedi.", flush=True)
                 # ───────────────────────────────────────────────────
 
             except Exception as e:
