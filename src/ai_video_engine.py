@@ -1,8 +1,8 @@
 """
-src/ai_video_engine.py — Evcarix Auto-Studio
+src/ai_video_engine.py — Evtrix Auto-Studio
 ===========================================
-v8.5 ENGINE REFACTOR:
-  - Dynamic prompt-to-query translation (No more repeating stock videos)
+v8.6 BRAND OPTIMIZED:
+  - Updated watermark to 'EVTRIX' for automated animation clips
   - Fixed Pixabay vertical/portrait orientation bug
   - Added micro-movements to FFmpeg fallback animation to maintain retention
 """
@@ -44,10 +44,8 @@ def _pick_theme(prompt: str) -> dict:
     return {**THEMES["electric"], "name": "electric"}
 
 def _pick_pexels_query(prompt: str) -> str:
-    """Prompt içindeki sanatsal kalıpları temizler ve doğrudan API'ye gönderir."""
     import re
     clean = prompt.lower()
-    # Gereksiz ve aramayı bozan kelimeleri ayıkla
     clean = re.sub(r'\b(cinematic|slow motion|shot of|abstract|4k|8k|visualization|close up|extreme)\b', '', clean)
     clean = " ".join(clean.split()).strip()
     return clean if clean else "electric vehicle"
@@ -70,19 +68,15 @@ class AIVideoGenerator:
             logger.info(f"[AIVideo] Sahne {i+1}/{len(prompts)} üretiliyor...")
             path = None
 
-            # Çift sahneler → Pexels
             if i % 2 == 0:
                 path = self._pexels(prompt, i)
 
-            # Tek sahneler → Pixabay
             if not path:
                 path = self._pixabay(prompt, i)
 
-            # Hâlâ yoksa → Pexels tekrar dene
             if not path:
                 path = self._pexels(prompt, i)
 
-            # Son çare → FFmpeg animasyon
             if not path:
                 logger.info(f"[AIVideo] Animasyon üretiliyor (Sahne {i+1})")
                 path = self._ffmpeg_anim(prompt, i)
@@ -146,7 +140,7 @@ class AIVideoGenerator:
                 "key": self.pixabay_key,
                 "q": query,
                 "video_type": "film",
-                "orientation": "vertical",  # Pixabay dikey (Shorts) filtresi eklendi!
+                "orientation": "vertical",
                 "per_page": 10,
                 "safesearch": "true"
             }
@@ -182,7 +176,6 @@ class AIVideoGenerator:
         return None
 
     def _ffmpeg_anim(self, prompt: str, idx: int):
-        """Garantili FFmpeg animasyonu — drawtext kayma efektiyle retention korur."""
         out   = os.path.join(OUTPUT_DIR, f"anim_{idx}.mp4")
         theme = _pick_theme(prompt)
         bg    = theme["bg"]
@@ -210,7 +203,6 @@ class AIVideoGenerator:
                 f"drawbox=x={x}:y={y_bar}:w=80:h={h_bar}:color={acc}@0.3:t=fill"
             )
 
-        # Yazıların ekranda donup kalmaması için saniyede hafifçe (t*15) yukarı kayma hareketi eklendi
         vf_parts = [
             f"drawbox=x=0:y=0:w=iw:h=ih:color={bg}@1:t=fill",
             *lines,
@@ -218,7 +210,7 @@ class AIVideoGenerator:
             f"drawtext=text='{t1}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=700-(t*15):shadowcolor=black@0.8:shadowx=4:shadowy=4",
             f"drawtext=text='{t2}':fontsize=110:fontcolor={acc}:x=(w-tw)/2:y=840-(t*15):shadowcolor=black@0.8:shadowx=4:shadowy=4",
             f"drawtext=text='{sub}':fontsize=46:fontcolor=white@0.75:x=(w-tw)/2:y=1010-(t*10)",
-            f"drawtext=text='EVCARIX':fontsize=36:fontcolor={acc}@0.5:x=(w-tw)/2:y=1750",
+            f"drawtext=text='EVTRIX':fontsize=36:fontcolor={acc}@0.5:x=(w-tw)/2:y=1750", # Marka adı EVTRIX olarak güncellendi! ✅
         ]
 
         vf = ",".join(vf_parts)
